@@ -24,7 +24,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .expect("Failed to find an appropriate adapter");
 
     // get system timestamp (not adapter.get_presentation_timestamp() which is the timestamp of the last frame)
-    let mut last_time = adapter.get_presentation_timestamp();
+    let mut last_time = SystemTime::now();
 
     // Create the logical device and command queue
     let (device, queue) = adapter
@@ -149,8 +149,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             rpass.draw(0..3, 0..1);
         }
 
-        let now = adapter.get_presentation_timestamp();
-        let frame_duration = (now.0 - last_time.0) / 1_000_000;
+        let now = SystemTime::now();
+        let frame_duration = now
+            .duration_since(last_time)
+            .unwrap()
+            .as_millis();
 
         queue.submit(Some(encoder.finish()));
 
