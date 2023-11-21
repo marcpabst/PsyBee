@@ -1,6 +1,7 @@
 use rand;
 use std::borrow::Cow;
 use std::time::{SystemTime, UNIX_EPOCH};
+use wgpu::util::DeviceExt;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -26,6 +27,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // get system timestamp (not adapter.get_presentation_timestamp() which is the timestamp of the last frame)
     let mut last_time = SystemTime::now();
 
+    let mut phase: f32 = 1.0;
+
     // Create the logical device and command queue
     let (device, queue) = adapter
         .request_device(
@@ -47,9 +50,40 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
     });
 
+    // add phase as a uniform for the fragment shader
+    let stimulus_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Stimulus Buffer"),
+        contents: bytemuck::cast_slice(&[phase]),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    });
+
+    let stimulus_bind_group_layout =
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: Some("stimulus_bind_group_layout"),
+        });
+
+    let stimulus_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &stimulus_bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: stimulus_buffer.as_entire_binding(),
+        }],
+        label: Some("stimulus_bind_group"),
+    });
+
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
-        bind_group_layouts: &[],
+        bind_group_layouts: &[&stimulus_bind_group_layout],
         push_constant_ranges: &[],
     });
 
@@ -145,15 +179,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
+            // update the stimulus buffer
+            rpass.set_bind_group(0, &stimulus_bind_group, &[]);
             rpass.set_pipeline(&render_pipeline);
-            rpass.draw(0..3, 0..1);
+            rpass.draw(0..6, 0..1);
         }
 
         let now = SystemTime::now();
-        let frame_duration = now
-            .duration_since(last_time)
-            .unwrap()
-            .as_millis();
+        let frame_duration = now.duration_since(last_time).unwrap().as_millis();
 
         queue.submit(Some(encoder.finish()));
 
@@ -162,6 +195,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             println!("Time since last frame: {:?} ms", frame_duration);
         }
         last_time = now;
+
+        phase = (phase + 1.0);
+
+        // update the stimulus buffer
+        queue.write_buffer(&stimulus_buffer, 0, bytemuck::cast_slice(&[phase]));
 
         frame.present();
     });
