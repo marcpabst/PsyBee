@@ -19,6 +19,9 @@ glyphon = { git = "https://github.com/grovesNL/glyphon", version = "0.3.0" }
 web-time = "0.2.3"
 tract = "0.20.21"
 tract-onnx = "0.20.21"
+ort = "2.0.0-alpha.1"
+ndarray = "0.15.6"
+wonnx = "0.5.1"
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
