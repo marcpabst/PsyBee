@@ -1,0 +1,27 @@
+[package]
+name = "gratings"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+env_logger = "0.10.1"
+pollster = "0.3"
+wgpu = "0.18"
+raw-window-handle = "0.6"
+winit = { version = "0.27"}
+rand = "0.8.5"
+bytemuck = { bersion="1.14.0", features=["derive"] }
+nalgebra = "0.32.3"
+glyphon = { git = "https://github.com/grovesNL/glyphon", version = "0.3.0" }
+web-time = "0.2.3"
+tract = "0.20.21"
+tract-onnx = "0.20.21"
+
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook.workspace = true
+console_log.workspace = true
+wasm-bindgen-futures.workspace = true
