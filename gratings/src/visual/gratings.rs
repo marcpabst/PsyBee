@@ -1,10 +1,10 @@
 use super::shape::{ShapeParams, ShapeShader, ShapeStimulus};
-
 use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
-
 use wgpu::{Adapter, Device, ShaderModule, Surface};
 
+// the parameters for the gratings stimulus, these will be used as uniforms
+// and made available to the shader
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub struct GratingsParams {
@@ -15,7 +15,7 @@ pub struct GratingsParams {
 impl ShapeParams for GratingsParams {}
 
 pub struct GratingsShader {
-    pub shader: ShaderModule,
+    shader: ShaderModule,
 }
 
 impl GratingsShader {
@@ -55,10 +55,7 @@ impl GratingsStimulus {
         phase: f32,
     ) -> Self {
         let shader = GratingsShader::new(device, phase, frequency);
-        let params = GratingsParams {
-            phase: phase,
-            frequency,
-        };
+        let params = GratingsParams { phase, frequency };
 
         let stim: ShapeStimulus<GratingsShader, GratingsParams> =
             ShapeStimulus::create(device, surface, adapter, shader, params);
