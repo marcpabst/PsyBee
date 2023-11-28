@@ -1,18 +1,9 @@
 use super::shape::{ShapeParams, ShapeShader, ShapeStimulus};
-use crate::visual::Renderable;
+
 use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
-use web_time::SystemTime;
-use wgpu::util::DeviceExt;
-use wgpu::{
-    Adapter, CommandEncoder, Device, MultisampleState, Queue, RenderPass, ShaderModule, Surface,
-    SurfaceConfiguration, TextureFormat, TextureView,
-};
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::Window,
-};
+
+use wgpu::{Adapter, Device, ShaderModule, Surface};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
@@ -28,7 +19,7 @@ pub struct GratingsShader {
 }
 
 impl GratingsShader {
-    pub fn new(device: &Device, phase: f32, frequency: f32) -> Self {
+    pub fn new(device: &Device, _phase: f32, _frequency: f32) -> Self {
         let shader: ShaderModule = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shaders/gratings.wgsl"))),
@@ -41,7 +32,7 @@ impl GratingsShader {
 impl ShapeShader<GratingsParams> for GratingsShader {
     fn update(&self, params: &mut GratingsParams) -> () {
         // update the stimulus buffer
-        let params = GratingsParams {
+        let _params = GratingsParams {
             phase: params.phase,
             frequency: params.frequency,
         };

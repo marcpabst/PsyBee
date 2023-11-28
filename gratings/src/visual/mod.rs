@@ -2,19 +2,15 @@ pub mod gratings;
 pub mod shape;
 pub mod text;
 
-use bytemuck::{Pod, Zeroable};
-use std::borrow::Cow;
-use web_time::SystemTime;
-use wgpu::util::DeviceExt;
+
+
+
+
 use wgpu::{
-    Adapter, CommandEncoder, Device, MultisampleState, Queue, RenderPass, ShaderModule, Surface,
-    SurfaceConfiguration, TextureFormat, TextureView,
+    CommandEncoder, Device, Queue, RenderPass,
+    SurfaceConfiguration,
 };
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::Window,
-};
+
 
 // Renderable trait should be implemented by all visual stimuli
 // the API is extremely simple: render() and update() and follows the

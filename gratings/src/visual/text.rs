@@ -4,8 +4,8 @@ use glyphon::{
     TextAtlas, TextBounds, TextRenderer,
 };
 use wgpu::{
-    Adapter, CommandEncoder, Device, MultisampleState, Queue, RenderPass, ShaderModule, Surface,
-    SurfaceConfiguration, TextureFormat, TextureView,
+    CommandEncoder, Device, MultisampleState, Queue, RenderPass,
+    SurfaceConfiguration, TextureFormat,
 };
 
 use crate::visual::Renderable;
@@ -76,9 +76,9 @@ impl TextStimulus {
         let scale_factor = 1.0;
         // Set up text renderer
         let mut font_system = FontSystem::new();
-        let mut cache = SwashCache::new();
+        let cache = SwashCache::new();
         let mut atlas = TextAtlas::new(&device, &queue, swapchain_format);
-        let mut text_renderer =
+        let text_renderer =
             TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
         let mut buffer = Buffer::new(&mut font_system, Metrics::new(30.0, 42.0));
 

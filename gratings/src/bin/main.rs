@@ -1,21 +1,18 @@
 extern crate gratings;
 
-use bytemuck::{Pod, Zeroable};
+
 use gratings::visual::Renderable;
-use std::borrow::Cow;
+
 use web_time::SystemTime;
-use wgpu::util::DeviceExt;
-use wgpu::{Adapter, Device, ShaderModule, Surface, TextureView};
+
+
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
 
-use glyphon::{
-    Attrs, Buffer, Color, Family, FontSystem, Metrics, Resolution, Shaping, SwashCache, TextArea,
-    TextAtlas, TextBounds, TextRenderer,
-};
+
 
 use gratings::visual::gratings::GratingsStimulus;
 use gratings::visual::text::TextStimulus;
@@ -100,9 +97,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             Event::WindowEvent {
                 event:
                     WindowEvent::KeyboardInput {
-                        device_id,
-                        input,
-                        is_synthetic,
+                        device_id: _,
+                        input: _,
+                        is_synthetic: _,
                     },
                 ..
             } => *control_flow = ControlFlow::Exit,

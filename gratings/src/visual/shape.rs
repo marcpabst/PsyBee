@@ -1,17 +1,13 @@
 use crate::visual::Renderable;
 use bytemuck::{Pod, Zeroable};
-use std::borrow::Cow;
-use web_time::SystemTime;
+
+
 use wgpu::util::DeviceExt;
 use wgpu::{
-    Adapter, CommandEncoder, Device, MultisampleState, Queue, RenderPass, ShaderModule, Surface,
-    SurfaceConfiguration, TextureFormat, TextureView,
+    Adapter, CommandEncoder, Device, Queue, RenderPass, ShaderModule, Surface,
+    SurfaceConfiguration,
 };
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::Window,
-};
+
 
 pub trait ShapeShader<P: ShapeParams> {
     fn update(&self, params: &mut P) -> ();
@@ -30,7 +26,7 @@ pub struct ShapeStimulus<S: ShapeShader<P>, P: ShapeParams> {
 }
 
 impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
-    fn render<'pass>(&'pass self, device: &mut Device, pass: &mut RenderPass<'pass>) -> () {
+    fn render<'pass>(&'pass self, _device: &mut Device, pass: &mut RenderPass<'pass>) -> () {
         {
             // update the stimulus buffer
             let bind_group = &self.bind_group;
@@ -44,9 +40,9 @@ impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
     fn update(
         &mut self,
         device: &mut Device,
-        queue: &Queue,
+        _queue: &Queue,
         encoder: &mut CommandEncoder,
-        config: &SurfaceConfiguration,
+        _config: &SurfaceConfiguration,
     ) -> () {
         {
             // call the shader update function
