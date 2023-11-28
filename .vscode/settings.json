@@ -1,6 +1,5 @@
 {
     "rust-analyzer.linkedProjects": [
-        "./Cargo.toml",
-        "./xtask/Cargo.toml"
+        "./Cargo.toml"
     ]
 }

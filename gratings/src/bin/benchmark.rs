@@ -1,12 +1,17 @@
+use image;
 use ndarray::{s, Array, Axis};
-use std::collections::HashMap;
 use ort::{CPUExecutionProvider, Session};
+use std::collections::HashMap;
 use tract_onnx::prelude::*;
 use web_time::SystemTime;
 use wonnx::{
     utils::{attribute, graph, initializer, model, node, tensor, OutputTensor},
     SessionError, WonnxError,
 };
+
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
 
 async fn run_wonnx(onnx_file: &[u8], n: usize) {
     let session = wonnx::Session::from_bytes(onnx_file).await.unwrap();
@@ -15,7 +20,7 @@ async fn run_wonnx(onnx_file: &[u8], n: usize) {
 
     for i in 0..n {
         // create input tensor (256x256x3, 1.0f32)
-        let input: Array::<f32, ndarray::Dim<[usize; 4]>> = Array::zeros((1, 256, 256, 3));
+        let input: Array<f32, ndarray::Dim<[usize; 4]>> = Array::zeros((1, 256, 256, 3));
 
         let mut input_data = HashMap::new();
         input_data.insert("input_12".to_string(), input.as_slice().unwrap().into());
@@ -36,6 +41,9 @@ async fn run_wonnx(onnx_file: &[u8], n: usize) {
 }
 
 fn main() {
+    // LOAD image
+    let img = image::open("face.png").unwrap().to_rgb8();
+
     // TRACT
     // load onnx model at compile time
     let onnx_file = include_bytes!("modified_face_landmarks_detector2-fixed.onnx");
@@ -62,11 +70,17 @@ fn main() {
     let mut times = vec![1.0f32; n];
 
     for i in 0..n {
-        // create input tensor (256x256x3, 1.0f32)
-        let dummy_input = Tensor::zero_dt(DatumType::F32, &[1, 256, 256, 3]).unwrap();
+        // create input tensor (256x256x3, 1.0f32) from pixels_vec
+        let input: Tensor =
+            tract_ndarray::Array4::from_shape_fn((1, 256, 256, 3), |(_, y, x, c)| {
+                let mean = [0.485, 0.456, 0.406][c];
+                let std = [0.229, 0.224, 0.225][c];
+                (img[(x as _, y as _)][c] as f32 / 255.0 - mean) / std
+            })
+            .into();
 
         let start = SystemTime::now();
-        let _outputs = model.run(tvec![dummy_input.into()]).unwrap();
+        let _outputs = model.run(tvec!(input.into())).unwrap();
         let end = SystemTime::now();
 
         // add duration to times
