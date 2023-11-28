@@ -25,12 +25,12 @@ impl GratingsShader {
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shaders/gratings.wgsl"))),
         });
 
-        Self { shader: shader }
+        Self { shader }
     }
 }
 
 impl ShapeShader<GratingsParams> for GratingsShader {
-    fn update(&self, params: &mut GratingsParams) -> () {
+    fn update(&self, params: &mut GratingsParams) {
         // update the stimulus buffer
         let _params = GratingsParams {
             phase: params.phase,
@@ -59,6 +59,6 @@ impl GratingsStimulus {
 
         let stim: ShapeStimulus<GratingsShader, GratingsParams> =
             ShapeStimulus::create(device, surface, adapter, shader, params);
-        return stim;
+        stim
     }
 }
