@@ -10,7 +10,7 @@ use wgpu::{
 
 
 pub trait ShapeShader<P: ShapeParams> {
-    fn update(&self, params: &mut P) -> ();
+    fn update(&self, params: &mut P);
     fn get_shader(&self) -> &ShaderModule;
 }
 
@@ -26,13 +26,13 @@ pub struct ShapeStimulus<S: ShapeShader<P>, P: ShapeParams> {
 }
 
 impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
-    fn render<'pass>(&'pass self, _device: &mut Device, pass: &mut RenderPass<'pass>) -> () {
+    fn render<'pass>(&'pass self, _device: &mut Device, pass: &mut RenderPass<'pass>) {
         {
             // update the stimulus buffer
             let bind_group = &self.bind_group;
             let render_pipeline = &self.pipeline;
-            pass.set_pipeline(&render_pipeline);
-            pass.set_bind_group(0, &bind_group, &[]);
+            pass.set_pipeline(render_pipeline);
+            pass.set_bind_group(0, bind_group, &[]);
 
             pass.draw(0..6, 0..1);
         }
@@ -43,7 +43,7 @@ impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
         _queue: &Queue,
         encoder: &mut CommandEncoder,
         _config: &SurfaceConfiguration,
-    ) -> () {
+    ) {
         {
             // call the shader update function
             self.shader.update(&mut self.params);
@@ -110,19 +110,19 @@ impl<S: ShapeShader<P>, P: ShapeParams> ShapeStimulus<S, P> {
             push_constant_ranges: &[],
         });
 
-        let swapchain_capabilities = surface.get_capabilities(&adapter);
+        let swapchain_capabilities = surface.get_capabilities(adapter);
         let swapchain_format = swapchain_capabilities.formats[0];
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader.get_shader(),
+                module: shader.get_shader(),
                 entry_point: "vs_main",
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader.get_shader(),
+                module: shader.get_shader(),
                 entry_point: "fs_main",
                 targets: &[Some(swapchain_format.into())],
             }),
@@ -136,7 +136,7 @@ impl<S: ShapeShader<P>, P: ShapeParams> ShapeStimulus<S, P> {
             buffer: stimulus_buffer,
             bind_group: stimulus_bind_group,
             pipeline: render_pipeline,
-            shader: shader,
+            shader,
             params: stim_params,
         }
     }

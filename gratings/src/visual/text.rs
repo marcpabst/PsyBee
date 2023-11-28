@@ -24,9 +24,9 @@ pub struct TextStimulus {
 }
 
 impl Renderable for TextStimulus {
-    fn render<'pass>(&'pass self, _device: &mut Device, mut pass: &mut RenderPass<'pass>) -> () {
+    fn render<'pass>(&'pass self, _device: &mut Device, pass: &mut RenderPass<'pass>) {
         self.text_renderer
-            .render(&self.text_atlas, &mut pass)
+            .render(&self.text_atlas, pass)
             .unwrap();
     }
     fn update(
@@ -35,11 +35,11 @@ impl Renderable for TextStimulus {
         queue: &Queue,
         _encoder: &mut CommandEncoder,
         config: &SurfaceConfiguration,
-    ) -> () {
+    ) {
         self.text_renderer
             .prepare(
-                &device,
-                &queue,
+                device,
+                queue,
                 &mut self.font_system,
                 &mut self.text_atlas,
                 Resolution {
@@ -77,9 +77,9 @@ impl TextStimulus {
         // Set up text renderer
         let mut font_system = FontSystem::new();
         let cache = SwashCache::new();
-        let mut atlas = TextAtlas::new(&device, &queue, swapchain_format);
+        let mut atlas = TextAtlas::new(device, queue, swapchain_format);
         let text_renderer =
-            TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
+            TextRenderer::new(&mut atlas, device, MultisampleState::default(), None);
         let mut buffer = Buffer::new(&mut font_system, Metrics::new(30.0, 42.0));
 
         let physical_width = (width as f64 * scale_factor) as f32;
@@ -95,10 +95,10 @@ impl TextStimulus {
         buffer.shape_until_scroll(&mut font_system);
 
         Self {
-            text: text,
+            text,
             text_atlas: atlas,
-            text_renderer: text_renderer,
-            font_system: font_system,
+            text_renderer,
+            font_system,
             text_buffer: buffer,
             text_cache: cache,
         }

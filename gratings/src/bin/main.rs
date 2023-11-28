@@ -153,11 +153,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         }
 
         if n_frame % 8 == 0 {
-            gratings.params.phase = gratings.params.phase + PI;
+            gratings.params.phase += PI;
         }
 
         // update frame count
-        n_frame = n_frame + 1;
+        n_frame += 1;
 
         last_time = now;
     });
