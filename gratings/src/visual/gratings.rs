@@ -1,6 +1,6 @@
 use super::shape::{ShapeParams, ShapeShader, ShapeStimulus};
 use bytemuck::{Pod, Zeroable};
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Deref};
 use wgpu::{Adapter, Device, ShaderModule, Surface};
 
 // the parameters for the gratings stimulus, these will be used as uniforms
@@ -16,6 +16,24 @@ impl ShapeParams for GratingsParams {}
 
 pub struct GratingsShader {
     shader: ShaderModule,
+}
+
+pub type GratingsStimulus = ShapeStimulus<GratingsShader, GratingsParams>;
+
+impl GratingsStimulus {
+    pub fn new(window: &super::Window, frequency: f32, phase: f32) -> Self {
+        let binding = window.device.clone();
+        let device = binding.lock().unwrap();
+        let binding = window.surface.clone();
+        let surface = binding.lock().unwrap();
+        let binding = window.adapter.clone();
+        let adapter = binding.lock().unwrap();
+
+        let shader = GratingsShader::new(&device, phase, frequency);
+        let params = GratingsParams { phase, frequency };
+
+        ShapeStimulus::create(&device, &surface, &adapter, shader, params)
+    }
 }
 
 impl GratingsShader {
@@ -39,26 +57,5 @@ impl ShapeShader<GratingsParams> for GratingsShader {
     }
     fn get_shader(&self) -> &ShaderModule {
         &self.shader
-    }
-}
-
-// make GratingsStimulus a alias for ShapeStimulus with GratingsShader and GratingsParams
-pub type GratingsStimulus = ShapeStimulus<GratingsShader, GratingsParams>;
-
-// implement new() for GratingsStimulus
-impl GratingsStimulus {
-    pub fn new(
-        device: &Device,
-        surface: &Surface,
-        adapter: &Adapter,
-        frequency: f32,
-        phase: f32,
-    ) -> Self {
-        let shader = GratingsShader::new(device, phase, frequency);
-        let params = GratingsParams { phase, frequency };
-
-        let stim: ShapeStimulus<GratingsShader, GratingsParams> =
-            ShapeStimulus::create(device, surface, adapter, shader, params);
-        stim
     }
 }

@@ -24,6 +24,7 @@ cpal = "0.15.2"
 clap = "4.4.8"
 anyhow = "1.0.75"
 rodio = "0.17.3"
+futures = "0.3.29"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 

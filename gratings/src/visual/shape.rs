@@ -1,70 +1,90 @@
+use std::ops::Deref;
+use std::sync::{Arc, Mutex, MutexGuard};
+
 use crate::visual::Renderable;
 use bytemuck::{Pod, Zeroable};
 
-
 use wgpu::util::DeviceExt;
 use wgpu::{
-    Adapter, CommandEncoder, Device, Queue, RenderPass, ShaderModule, Surface,
-    SurfaceConfiguration,
+    Adapter, CommandBuffer, CommandEncoder, Device, Queue, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModule, Surface, SurfaceConfiguration,
 };
-
-
 pub trait ShapeShader<P: ShapeParams> {
     fn update(&self, params: &mut P);
     fn get_shader(&self) -> &ShaderModule;
 }
-
 pub trait ShapeParams: Pod + Zeroable + Copy {}
 
+#[derive(Debug)]
 // define gratings stimulus
 pub struct ShapeStimulus<S: ShapeShader<P>, P: ShapeParams> {
-    buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
-    pipeline: wgpu::RenderPipeline,
-    pub params: P,
-    pub shader: S,
+    buffer: Arc<Mutex<wgpu::Buffer>>,
+    bind_group: Arc<Mutex<wgpu::BindGroup>>,
+    pipeline: Arc<Mutex<wgpu::RenderPipeline>>,
+    pub params: Arc<Mutex<P>>,
+    pub shader: Arc<Mutex<S>>,
+}
+
+impl<S: ShapeShader<P>, P: ShapeParams> Clone for ShapeStimulus<S, P> {
+    fn clone(&self) -> Self {
+        Self {
+            buffer: self.buffer.clone(),
+            bind_group: self.bind_group.clone(),
+            pipeline: self.pipeline.clone(),
+            params: self.params.clone(),
+            shader: self.shader.clone(),
+        }
+    }
 }
 
 impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
-    fn render<'pass>(&'pass self, _device: &mut Device, pass: &mut RenderPass<'pass>) {
-        {
-            // update the stimulus buffer
-            let bind_group = &self.bind_group;
-            let render_pipeline = &self.pipeline;
-            pass.set_pipeline(render_pipeline);
-            pass.set_bind_group(0, bind_group, &[]);
-
-            pass.draw(0..6, 0..1);
-        }
-    }
-    fn update(
+    fn prepare(
         &mut self,
-        device: &mut Device,
-        _queue: &Queue,
-        encoder: &mut CommandEncoder,
-        _config: &SurfaceConfiguration,
-    ) {
-        {
-            // call the shader update function
-            self.shader.update(&mut self.params);
+        device: &Device,
+        queue: &Queue,
+        view: &wgpu::TextureView,
+        config: &SurfaceConfiguration,
+    ) -> () {
+        // call the shader update function
+        self.shader
+            .lock()
+            .unwrap()
+            .update(&mut self.params.lock().unwrap());
 
-            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Stimulus Buffer"),
-                contents: bytemuck::cast_slice(&[self.params]),
-                usage: wgpu::BufferUsages::COPY_SRC,
+        // update the stimulus buffer
+        queue.write_buffer(
+            self.buffer.lock().unwrap().deref(),
+            0,
+            bytemuck::cast_slice(&[*self.params.lock().unwrap()]),
+        );
+    }
+
+    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
+        let pipeline = self.pipeline.lock().unwrap();
+        let bind_group = self.bind_group.lock().unwrap();
+        {
+            let mut rpass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
             });
 
-            encoder.copy_buffer_to_buffer(&buffer, 0, &self.buffer, 0, 8);
+            rpass.set_pipeline(&pipeline.deref());
+            rpass.set_bind_group(0, &bind_group.deref(), &[]);
+            rpass.draw(0..6, 0..1);
         }
     }
 }
 
-// constructor for GratingStimulus
-// impl GratingStimulus {
-//     fn get_state(&self) -> &StimulusState {
-//         &self.state
-//     }
-// }
 impl<S: ShapeShader<P>, P: ShapeParams> ShapeStimulus<S, P> {
     pub fn create(
         device: &Device,
@@ -133,11 +153,11 @@ impl<S: ShapeShader<P>, P: ShapeParams> ShapeStimulus<S, P> {
         });
 
         Self {
-            buffer: stimulus_buffer,
-            bind_group: stimulus_bind_group,
-            pipeline: render_pipeline,
-            shader,
-            params: stim_params,
+            buffer: Arc::new(Mutex::new(stimulus_buffer)),
+            bind_group: Arc::new(Mutex::new(stimulus_bind_group)),
+            pipeline: Arc::new(Mutex::new(render_pipeline)),
+            shader: Arc::new(Mutex::new(shader)),
+            params: Arc::new(Mutex::new(stim_params)),
         }
     }
 }
