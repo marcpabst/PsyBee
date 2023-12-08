@@ -1,14 +1,12 @@
-use std::ops::Deref;
-use std::sync::{Arc, Mutex, MutexGuard};
+use async_std::sync::Mutex;
+use futures_lite::future::block_on;
+use std::sync::Arc;
 
 use crate::visual::Renderable;
 use bytemuck::{Pod, Zeroable};
 
 use wgpu::util::DeviceExt;
-use wgpu::{
-    Adapter, CommandBuffer, CommandEncoder, Device, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, Surface, SurfaceConfiguration,
-};
+use wgpu::{Adapter, Device, Queue, ShaderModule, Surface, SurfaceConfiguration};
 pub trait ShapeShader<P: ShapeParams> {
     fn update(&self, params: &mut P);
     fn get_shader(&self) -> &ShaderModule;
@@ -40,28 +38,25 @@ impl<S: ShapeShader<P>, P: ShapeParams> Clone for ShapeStimulus<S, P> {
 impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
     fn prepare(
         &mut self,
-        device: &Device,
+        _device: &Device,
         queue: &Queue,
-        view: &wgpu::TextureView,
-        config: &SurfaceConfiguration,
+        _view: &wgpu::TextureView,
+        _config: &SurfaceConfiguration,
     ) -> () {
         // call the shader update function
-        self.shader
-            .lock()
-            .unwrap()
-            .update(&mut self.params.lock().unwrap());
+        block_on(self.shader.lock()).update(&mut (block_on(self.params.lock())));
 
         // update the stimulus buffer
         queue.write_buffer(
-            self.buffer.lock().unwrap().deref(),
+            &block_on(self.buffer.lock()),
             0,
-            bytemuck::cast_slice(&[*self.params.lock().unwrap()]),
+            bytemuck::cast_slice(&[*block_on(self.params.lock())]),
         );
     }
 
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
-        let pipeline = self.pipeline.lock().unwrap();
-        let bind_group = self.bind_group.lock().unwrap();
+        let pipeline = block_on(self.pipeline.lock());
+        let bind_group = block_on(self.bind_group.lock());
         {
             let mut rpass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
@@ -78,8 +73,8 @@ impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
                 occlusion_query_set: None,
             });
 
-            rpass.set_pipeline(&pipeline.deref());
-            rpass.set_bind_group(0, &bind_group.deref(), &[]);
+            rpass.set_pipeline(&pipeline);
+            rpass.set_bind_group(0, &bind_group, &[]);
             rpass.draw(0..6, 0..1);
         }
     }

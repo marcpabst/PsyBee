@@ -1,23 +1,20 @@
-use std::ops::Deref;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use bytemuck::{Pod, Zeroable};
+use glyphon::cosmic_text::Align;
 use glyphon::{
     Attrs, Buffer, Color, Family, FontSystem, Metrics, Resolution, Shaping, SwashCache, TextArea,
     TextAtlas, TextBounds, TextRenderer,
 };
-use wgpu::{
-    CommandEncoder, Device, MultisampleState, Queue, RenderPass, SurfaceConfiguration,
-    TextureFormat,
-};
 
+use web_sys::console;
+use wgpu::{Device, MultisampleState, Queue, SurfaceConfiguration};
+
+use crate::visual::pwindow::PWindow;
 use crate::visual::Renderable;
-use crate::visual::Window;
 
 pub struct TextStimulus {
-    pub text: Arc<Mutex<String>>,
+    config: Arc<Mutex<TextStimulusConfig>>,
     text_atlas: Arc<Mutex<TextAtlas>>,
     text_renderer: Arc<Mutex<TextRenderer>>,
     font_system: Arc<Mutex<FontSystem>>,
@@ -25,10 +22,41 @@ pub struct TextStimulus {
     text_cache: Arc<Mutex<SwashCache>>,
 }
 
+pub struct TextStimulusConfig {
+    // the text to display
+    pub text: String,
+    // the font size
+    pub font_size: f32,
+    // the line height
+    pub line_height: f32,
+    // the bounds of the text
+    pub bounds: TextBounds,
+    // the color of the text
+    pub color: Color,
+}
+
+// default values for the text stimulus
+impl Default for TextStimulusConfig {
+    fn default() -> Self {
+        Self {
+            text: String::from("Hello World!"),
+            font_size: 30.0,
+            line_height: 42.0,
+            bounds: TextBounds {
+                left: 0,
+                top: 0,
+                right: 800,
+                bottom: 600,
+            },
+            color: Color::rgb(255, 255, 255),
+        }
+    }
+}
+
 impl Clone for TextStimulus {
     fn clone(&self) -> Self {
         Self {
-            text: self.text.clone(),
+            config: self.config.clone(),
             text_atlas: self.text_atlas.clone(),
             text_renderer: self.text_renderer.clone(),
             font_system: self.font_system.clone(),
@@ -43,9 +71,11 @@ impl Renderable for TextStimulus {
         &mut self,
         device: &Device,
         queue: &Queue,
-        view: &wgpu::TextureView,
+        _view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
     ) -> () {
+        let conf = self.config.lock().unwrap();
+
         self.text_renderer
             .lock()
             .unwrap()
@@ -60,16 +90,11 @@ impl Renderable for TextStimulus {
                 },
                 [TextArea {
                     buffer: &self.text_buffer.lock().unwrap(),
-                    left: 10.0,
-                    top: 10.0,
+                    left: conf.bounds.left as f32,
+                    top: conf.bounds.top as f32,
                     scale: 1.0,
-                    bounds: TextBounds {
-                        left: 0,
-                        top: 0,
-                        right: 600,
-                        bottom: 160,
-                    },
-                    default_color: Color::rgb(255, 255, 255),
+                    bounds: conf.bounds,
+                    default_color: conf.color,
                 }],
                 &mut self.text_cache.lock().unwrap(),
             )
@@ -101,51 +126,60 @@ impl Renderable for TextStimulus {
 }
 
 impl TextStimulus {
-    pub fn new(window: &Window, text: String) -> Self {
-        let binding = window.device.clone();
-        let device = &binding.lock().unwrap();
-        let binding = window.queue.clone();
-        let queue = &binding.lock().unwrap();
-        let binding = window.adapter.clone();
-        let adapter = &binding.lock().unwrap();
+    pub fn new(window: &PWindow, config: TextStimulusConfig) -> Self {
+        let device = &window.device;
+        let queue = &window.queue;
+        let adapter = &window.adapter;
 
-        let swapchain_capabilities = window
-            .surface
-            .clone()
-            .lock()
-            .unwrap()
-            .get_capabilities(&adapter);
+        let swapchain_capabilities = window.surface.get_capabilities(&adapter);
         let swapchain_format = swapchain_capabilities.formats[0];
 
-        let (width, height) = (800, 600);
+        let width: f64;
+        let height: f64;
+        (width, height) = (800.0, 600.0);
+        //console::log_1(&format!("width: {}", width).into());
         let scale_factor = 1.0;
         // Set up text renderer
+        // load fonts
+        let plex_font = include_bytes!("./assets/IBMPlexSans-Regular.ttf").to_vec();
         let mut font_system = FontSystem::new();
+        font_system.db_mut().load_font_data(plex_font);
+
         let cache = SwashCache::new();
-        let mut atlas = TextAtlas::new(device, queue, swapchain_format);
+        let mut atlas = TextAtlas::new(&device, &queue, swapchain_format);
         let text_renderer =
-            TextRenderer::new(&mut atlas, device, MultisampleState::default(), None);
-        let mut buffer = Buffer::new(&mut font_system, Metrics::new(30.0, 42.0));
+            TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
+        let mut buffer = Buffer::new(
+            &mut font_system,
+            Metrics::new(config.font_size, config.line_height),
+        );
 
         let physical_width = (width as f64 * scale_factor) as f32;
         let physical_height = (height as f64 * scale_factor) as f32;
 
         buffer.set_size(&mut font_system, physical_width, physical_height);
+
         buffer.set_text(
             &mut font_system,
-            text.as_str(),
+            &config.text,
             Attrs::new().family(Family::SansSerif),
             Shaping::Advanced,
         );
+        buffer.lines[0].set_align(Some(Align::Center));
         buffer.shape_until_scroll(&mut font_system);
 
         Self {
-            text: Arc::new(Mutex::new(text)),
+            config: Arc::new(Mutex::new(config)),
             text_atlas: Arc::new(Mutex::new(atlas)),
             text_renderer: Arc::new(Mutex::new(text_renderer)),
             font_system: Arc::new(Mutex::new(font_system)),
             text_buffer: Arc::new(Mutex::new(buffer)),
             text_cache: Arc::new(Mutex::new(cache)),
         }
+    }
+
+    pub fn set_color(&mut self, color: Color) {
+        let mut conf = self.config.lock().unwrap();
+        conf.color = color;
     }
 }

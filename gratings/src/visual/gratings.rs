@@ -1,7 +1,10 @@
-use super::shape::{ShapeParams, ShapeShader, ShapeStimulus};
+use super::{
+    pwindow::PWindow,
+    shape::{ShapeParams, ShapeShader, ShapeStimulus},
+};
 use bytemuck::{Pod, Zeroable};
-use std::{borrow::Cow, ops::Deref};
-use wgpu::{Adapter, Device, ShaderModule, Surface};
+use std::borrow::Cow;
+use wgpu::{Device, ShaderModule};
 
 // the parameters for the gratings stimulus, these will be used as uniforms
 // and made available to the shader
@@ -21,13 +24,10 @@ pub struct GratingsShader {
 pub type GratingsStimulus = ShapeStimulus<GratingsShader, GratingsParams>;
 
 impl GratingsStimulus {
-    pub fn new(window: &super::Window, frequency: f32, phase: f32) -> Self {
-        let binding = window.device.clone();
-        let device = binding.lock().unwrap();
-        let binding = window.surface.clone();
-        let surface = binding.lock().unwrap();
-        let binding = window.adapter.clone();
-        let adapter = binding.lock().unwrap();
+    pub fn new(window: &PWindow, frequency: f32, phase: f32) -> Self {
+        let device = &window.device;
+        let surface = &window.surface;
+        let adapter = &window.adapter;
 
         let shader = GratingsShader::new(&device, phase, frequency);
         let params = GratingsParams { phase, frequency };
