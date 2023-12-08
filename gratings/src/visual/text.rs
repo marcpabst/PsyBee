@@ -1,12 +1,13 @@
-use std::sync::Arc;
-use std::sync::Mutex;
-
+use futures_lite::future::block_on;
 use glyphon::cosmic_text::Align;
 use glyphon::{
     Attrs, Buffer, Color, Family, FontSystem, Metrics, Resolution, Shaping, SwashCache, TextArea,
     TextAtlas, TextBounds, TextRenderer,
 };
+use std::sync::Arc;
+use std::sync::Mutex;
 
+use crate::visual::pwindow::WindowHandle;
 use web_sys::console;
 use wgpu::{Device, MultisampleState, Queue, SurfaceConfiguration};
 
@@ -126,7 +127,8 @@ impl Renderable for TextStimulus {
 }
 
 impl TextStimulus {
-    pub fn new(window: &PWindow, config: TextStimulusConfig) -> Self {
+    pub fn new(window_handle: &WindowHandle, config: TextStimulusConfig) -> Self {
+        let window = block_on(window_handle.get_window());
         let device = &window.device;
         let queue = &window.queue;
         let adapter = &window.adapter;

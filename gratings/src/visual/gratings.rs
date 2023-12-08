@@ -1,8 +1,9 @@
 use super::{
-    pwindow::PWindow,
+    pwindow::{PWindow, WindowHandle},
     shape::{ShapeParams, ShapeShader, ShapeStimulus},
 };
 use bytemuck::{Pod, Zeroable};
+use futures_lite::future::block_on;
 use std::borrow::Cow;
 use wgpu::{Device, ShaderModule};
 
@@ -24,7 +25,8 @@ pub struct GratingsShader {
 pub type GratingsStimulus = ShapeStimulus<GratingsShader, GratingsParams>;
 
 impl GratingsStimulus {
-    pub fn new(window: &PWindow, frequency: f32, phase: f32) -> Self {
+    pub fn new(window_handle: &WindowHandle, frequency: f32, phase: f32) -> Self {
+        let window = block_on(window_handle.get_window());
         let device = &window.device;
         let surface = &window.surface;
         let adapter = &window.adapter;
