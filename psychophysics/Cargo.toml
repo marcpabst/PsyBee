@@ -1,0 +1,41 @@
+[package]
+name = "psychophysics"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+env_logger = "0.10.1"
+wgpu = "0.18"
+raw-window-handle = "0.6"
+winit = { version = "0.27"}
+rand = "0.8.5"
+bytemuck = { version="1.14.0", features=["derive"] }
+nalgebra = "0.32.3"
+glyphon = { git = "https://github.com/grovesNL/glyphon", version = "0.3.0" }
+web-time = "0.2.3"
+ndarray = "0.15.6"
+image = "0.24.7"
+cpal = "0.15.2"
+anyhow = "1.0.75"
+rodio = "0.17.3"
+wasm-bindgen = "0.2.89"
+fontdb = "0.16.0"
+fastrand = "2.0.1"
+async-broadcast = { git = "https://github.com/kuviman/async-broadcast", rev = "6767b8a76cd2a1b57da0dd435488df112514afe8" }
+futures-lite = "2.1.0"
+async-lock = "3.2.0"
+async-executor = "1.8.0"
+async-channel = "2.1.1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+smol = "1.3.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version="0.3.64", features=["Window"] }
+js-sys = "0.3.66"
+console_error_panic_hook.workspace = true
+console_log.workspace = true
+wasm-bindgen-futures.workspace = true
