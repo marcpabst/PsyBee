@@ -2,6 +2,7 @@ use async_broadcast::broadcast;
 use async_channel::{bounded, Receiver, Sender};
 use async_lock::Mutex;
 
+use atomic_float::AtomicF64;
 use futures_lite::{future::block_on, Future};
 
 use async_executor::Executor;
@@ -19,7 +20,7 @@ pub mod input;
 pub mod visual;
 use winit::{event_loop::EventLoop, window::Window};
 
-use crate::visual::pwindow::{Frame, PWindow, WindowHandle};
+use crate::visual::pwindow::{render_task, Frame, PWindow, WindowHandle};
 pub enum PFutureReturns {
     Duration(Duration),
     Timeout(Duration),
@@ -101,10 +102,7 @@ pub async fn sleep(secs: f64) -> Result<PFutureReturns, anyhow::Error> {
     {
         let window = web_window();
         let promise = js_sys::Promise::new(&mut |resolve, _reject| {
-            window.set_timeout_with_callback_and_timeout_and_arguments_0(
-                &resolve,
-                (secs * 1000.0) as i32,
-            );
+            window.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, (secs * 1000.0) as i32);
         });
         wasm_bindgen_futures::JsFuture::from(promise).await.unwrap();
     }
@@ -146,10 +144,6 @@ pub fn spawn_task<F>(future: F)
 where
     F: Future<Output = ()> + 'static + Send,
 {
-    log_extra!(
-        "Task SPAWN running on thread {:?}",
-        std::thread::current().id()
-    );
     smol::spawn(future).detach();
 }
 
@@ -185,29 +179,34 @@ where
 
     #[cfg(not(target_arch = "wasm32"))]
     {
+        simple_logger::SimpleLogger::new().env().init().unwrap();
+        log::set_max_level(log::LevelFilter::Info);
         // get monitor
-        let monitor = winit_window.available_monitors().nth(1).unwrap_or_else(|| {
-            println!("No second monitor found, using current monitor");
+        let mon_index = 1;
+        let monitor = winit_window.available_monitors().nth(mon_index).unwrap_or_else(|| {
+            log::warn!(
+                "The specified monitor with index {} does not exist. Using the current monitor instead.",
+                mon_index
+            );
             winit_window.current_monitor().unwrap()
         });
 
+        log::info!("Monitor informaton: {:?}", monitor);
+
         // get video mode with biggest width
-        let target_size = monitor
-            .video_modes()
-            .max_by_key(|m| m.size().width)
-            .unwrap()
-            .size();
+        let target_size = monitor.video_modes().max_by_key(|m| m.size().width).unwrap().size();
 
         // get video mode with biggest width and highest refresh rate
-        let _video_mode = monitor
+        let video_mode = monitor
             .video_modes()
             .filter(|m| m.size() == target_size)
             .max_by_key(|m| m.refresh_rate_millihertz())
             .unwrap();
 
+        log::info!("Selected video mode: {:?}", video_mode);
+
         // make fullscreen
-        //window.set_fullscreen(Some(winit::window::Fullscreen::Exclusive(video_mode)));
-        env_logger::init(); // Enable logging
+        //winit_window.set_fullscreen(Some(winit::window::Fullscreen::Exclusive(video_mode)));
 
         // run
         block_on(run(event_loop, winit_window, experiment_fn));
@@ -221,26 +220,17 @@ where
         web_sys::window()
             .and_then(|win| win.document())
             .and_then(|doc| doc.body())
-            .and_then(|body| {
-                body.append_child(&web_sys::Element::from(winit_window.canvas()))
-                    .ok()
-            })
+            .and_then(|body| body.append_child(&web_sys::Element::from(winit_window.canvas())).ok())
             .expect("couldn't append canvas to document body");
         wasm_bindgen_futures::spawn_local(run(event_loop, winit_window, experiment_fn));
     }
 }
 
-async fn run<F>(
-    event_loop: EventLoop<()>,
-    winit_window: Window,
-    experiment_fn: impl FnOnce(WindowHandle) -> F,
-) where
+async fn run<F>(event_loop: EventLoop<()>, winit_window: Window, experiment_fn: impl FnOnce(WindowHandle) -> F)
+where
     F: FutureReturnTrait,
 {
-    log_extra!(
-        "Task RUN running on thread {:?}",
-        std::thread::current().id()
-    );
+    log::debug!("Main task is running on thread {:?}", std::thread::current().id());
 
     let size = winit_window.inner_size();
 
@@ -255,7 +245,7 @@ async fn run<F>(
             compatible_surface: Some(&surface),
         })
         .await
-        .expect("Failed to find an appropriate adapter");
+        .expect("Failed to find an appropiate graphics adapter. This is likely a bug, please report it.");
 
     // Create the logical device and command queue
     let (device, queue) = adapter
@@ -264,13 +254,12 @@ async fn run<F>(
                 label: None,
                 features: wgpu::Features::empty(),
                 // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                limits: wgpu::Limits::downlevel_webgl2_defaults()
-                    .using_resolution(adapter.limits()),
+                limits: wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()),
             },
             None,
         )
         .await
-        .expect("Failed to create device");
+        .expect("Failed to create device. This is likely a bug, please report it.");
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[0];
@@ -288,8 +277,7 @@ async fn run<F>(
     surface.configure(&device, &config);
 
     // create channel for frame submission
-    let (frame_sender, frame_receiver): (Sender<Arc<Mutex<Frame>>>, Receiver<Arc<Mutex<Frame>>>) =
-        bounded(1);
+    let (frame_sender, frame_receiver): (Sender<Arc<Mutex<Frame>>>, Receiver<Arc<Mutex<Frame>>>) = bounded(1);
 
     let (frame_ok_sender, frame_ok_receiver): (Sender<bool>, Receiver<bool>) = bounded(1);
 
@@ -306,6 +294,7 @@ async fn run<F>(
     // create a pwindow
     let pwindow = PWindow {
         window: winit_window,
+        event_loop_proxy: event_loop.create_proxy(),
         device,
         instance,
         surface,
@@ -322,10 +311,15 @@ async fn run<F>(
         frame_receiver,
         frame_ok_sender,
         frame_ok_receiver,
+        physical_width: Arc::new(AtomicF64::new(300.0)),
+        viewing_distance: Arc::new(AtomicF64::new(57.0)),
     };
 
     // start renderer
-    spawn_task(win_handle.clone().render_task());
+    {
+        let win_handle = win_handle.clone();
+        spawn_task(render_task(win_handle));
+    }
 
     // start experiment
     spawn_task(experiment_fn(win_handle.clone()));
@@ -334,15 +328,19 @@ async fn run<F>(
         *control_flow = ControlFlow::Poll;
         match event {
             Event::WindowEvent {
-                event: WindowEvent::Resized(_size),
+                event: WindowEvent::Resized(new_size),
                 ..
             } => {
-                // Reconfigure the surface with the new size
-                // config.width = size.width;
-                // config.height = size.height;
-                // surface.configure(&device, &config);
-                // // On macos the window needs to be redrawn manually after resizing
-                // window.request_redraw();
+                log::info!("Window resized");
+                // Reconfigure the surface with the new size (this should likely be done on the renderer thread instead)
+                let mut pwindow = block_on(win_handle.pw.lock());
+                pwindow.config.width = new_size.width.max(1);
+                pwindow.config.height = new_size.height.max(1);
+                pwindow.surface.configure(&pwindow.device, &pwindow.config);
+            }
+            Event::UserEvent(()) => {
+                // close window
+                *control_flow = ControlFlow::Exit;
             }
             Event::RedrawRequested(_) => {
                 // nothing to do here
@@ -374,4 +372,44 @@ async fn run<F>(
             _ => {}
         }
     });
+}
+
+#[macro_export]
+macro_rules! loop_frames {
+    ($win:expr $(, keys = $keys:expr)? $(, keystate = $keystate:expr)? $(, timeout = $timeout:expr)?, $body:block) => {
+        {
+            let timeout_duration = $(Some(web_time::Duration::from_secs_f64($timeout));)? None as Option<web_time::Duration>;
+            let keys_vec: Vec<Key> = $($keys.into_iter().map(|k| k.into()).collect();)? vec![] as Vec<Key>;
+            let keystate: KeyState = $($keystate;)? KeyState::Any;
+
+            let mut keyboard_receiver = $win.keyboard_receiver.activate_cloned();
+
+            let mut kc: Option<Key> = None;
+
+            {
+                $body
+            }
+
+            let start = web_time::Instant::now();
+
+            'outer: loop {
+
+                // check if timeout has been reached
+                if timeout_duration.is_some() && start.elapsed() > timeout_duration.unwrap() {
+                    break 'outer;
+                }
+                // check if a key has been pressed
+                while let Ok(e) = keyboard_receiver.try_recv() {
+                    // check if the key is one of the keys we are looking for
+                    if keys_vec.contains(&e.virtual_keycode.unwrap().into()) && keystate == e.state.into() {
+                        kc = Some(e.virtual_keycode.unwrap().clone().into());
+                        break 'outer;
+                    }
+                }
+                // if not, run another iteration of the loop
+                $body
+            }
+        (kc, start.elapsed())
+        }
+    };
 }

@@ -29,6 +29,10 @@ futures-lite = "2.1.0"
 async-lock = "3.2.0"
 async-executor = "1.8.0"
 async-channel = "2.1.1"
+log = "0.4.20"
+simple_logger = "4.3.0"
+backtrace-on-stack-overflow = "0.3.0"
+atomic_float = "0.1.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 smol = "1.3.0"

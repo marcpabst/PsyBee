@@ -5,8 +5,14 @@ use std::sync::Arc;
 use crate::visual::Renderable;
 use bytemuck::{Pod, Zeroable};
 
+use super::geometry::ToVertices;
+use super::geometry::Vertex;
+use super::pwindow::WindowHandle;
 use wgpu::util::DeviceExt;
 use wgpu::{Adapter, Device, Queue, ShaderModule, Surface, SurfaceConfiguration};
+
+
+
 pub trait ShapeShader<P: ShapeParams> {
     fn update(&self, params: &mut P);
     fn get_shader(&self) -> &ShaderModule;
@@ -15,15 +21,17 @@ pub trait ShapeParams: Pod + Zeroable + Copy {}
 
 #[derive(Debug)]
 // define gratings stimulus
-pub struct ShapeStimulus<S: ShapeShader<P>, P: ShapeParams> {
+pub struct ShapeStimulus<G: ToVertices, S: ShapeShader<P>, P: ShapeParams> {
     buffer: Arc<Mutex<wgpu::Buffer>>,
     bind_group: Arc<Mutex<wgpu::BindGroup>>,
     pipeline: Arc<Mutex<wgpu::RenderPipeline>>,
     pub params: Arc<Mutex<P>>,
     pub shader: Arc<Mutex<S>>,
+    pub geometry: Arc<Mutex<G>>,
+    vertex_buffer: Arc<Mutex<wgpu::Buffer>>,
 }
 
-impl<S: ShapeShader<P>, P: ShapeParams> Clone for ShapeStimulus<S, P> {
+impl<G: ToVertices, S: ShapeShader<P>, P: ShapeParams> Clone for ShapeStimulus<G, S, P> {
     fn clone(&self) -> Self {
         Self {
             buffer: self.buffer.clone(),
@@ -31,20 +39,26 @@ impl<S: ShapeShader<P>, P: ShapeParams> Clone for ShapeStimulus<S, P> {
             pipeline: self.pipeline.clone(),
             params: self.params.clone(),
             shader: self.shader.clone(),
+            geometry: self.geometry.clone(),
+            vertex_buffer: self.vertex_buffer.clone(),
         }
     }
 }
 
-impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
+impl<G: ToVertices, S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<G, S, P> {
     fn prepare(
         &mut self,
         _device: &Device,
         queue: &Queue,
         _view: &wgpu::TextureView,
         _config: &SurfaceConfiguration,
+        _window_handle: &super::pwindow::WindowHandle,
     ) -> () {
         // call the shader update function
+        // TODO: does this need to be a blocking call?
         block_on(self.shader.lock()).update(&mut (block_on(self.params.lock())));
+
+        // update the geometry buffer
 
         // update the stimulus buffer
         queue.write_buffer(
@@ -56,6 +70,7 @@ impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
 
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
         let pipeline = block_on(self.pipeline.lock());
+
         let bind_group = block_on(self.bind_group.lock());
         {
             let mut rpass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -80,35 +95,44 @@ impl<S: ShapeShader<P>, P: ShapeParams> Renderable for ShapeStimulus<S, P> {
     }
 }
 
-impl<S: ShapeShader<P>, P: ShapeParams> ShapeStimulus<S, P> {
-    pub fn create(
-        device: &Device,
-        surface: &Surface,
-        adapter: &Adapter,
-        shader: S,
-        stim_params: P,
-    ) -> Self {
-        // add phase as a uniform for the fragment shader
+impl<G: ToVertices, S: ShapeShader<P>, P: ShapeParams> ShapeStimulus<G, S, P> {
+    pub fn create(window_handle: WindowHandle, shader: S, shape: G, stim_params: P) -> Self {
+
+        let window = block_on(window_handle.get_window());
+        let device = &window.device;
+        let surface = &window.surface;
+        let adapter = &window.adapter;
+
+        let width_mm = window_handle.physical_width.get();
+        let width_px = window_handle.physical_width.get();
+
+        // create the vertex buffer
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(shape.to_vertices_ndc(width_mm, width_px, height_px)
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        // create the uniform buffer
         let stimulus_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Stimulus Buffer"),
             contents: bytemuck::cast_slice(&[stim_params]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let stimulus_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("stimulus_bind_group_layout"),
-            });
+        let stimulus_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: Some("stimulus_bind_group_layout"),
+        });
 
         let stimulus_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &stimulus_bind_group_layout,
@@ -134,7 +158,9 @@ impl<S: ShapeShader<P>, P: ShapeParams> ShapeStimulus<S, P> {
             vertex: wgpu::VertexState {
                 module: shader.get_shader(),
                 entry_point: "vs_main",
-                buffers: &[],
+                buffers: &[
+            Vertex::desc(),
+        ],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader.get_shader(),
@@ -153,6 +179,7 @@ impl<S: ShapeShader<P>, P: ShapeParams> ShapeStimulus<S, P> {
             pipeline: Arc::new(Mutex::new(render_pipeline)),
             shader: Arc::new(Mutex::new(shader)),
             params: Arc::new(Mutex::new(stim_params)),
+            geometry: Arc::new(Mutex::new(shape)),
         }
     }
 }

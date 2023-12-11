@@ -1,5 +1,5 @@
 use super::{
-    geometry::ToVertices,
+    geometry::Triangulatable,
     pwindow::WindowHandle,
     shape::{ShapeParams, ShapeShader, ShapeStimulus},
 };
@@ -8,32 +8,29 @@ use futures_lite::future::block_on;
 use std::borrow::Cow;
 use wgpu::{Device, ShaderModule};
 
-// the parameters for the gratings stimulus, these will be used as uniforms
-// and made available to the shader
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
-pub struct GratingsParams {
-    pub phase: f32,
-    pub frequency: f32,
+pub struct PlainParams {
+    pub color: [f32; 4],
 }
 
-impl ShapeParams for GratingsParams {}
+impl ShapeParams for PlainParams {}
 
-pub struct GratingsShader {
+pub struct PlainShader {
     shader: ShaderModule,
 }
 
-pub type GratingsStimulus<G> = ShapeStimulus<G, GratingsShader, GratingsParams>;
+pub type PlainStimulus<G> = ShapeStimulus<G, PlainShader, PlainParams>;
 
-impl<G: ToVertices> GratingsStimulus<G> {
+impl<G: Triangulatable> GratingsStimulus<G> {
     pub fn new(window_handle: &WindowHandle, shape: G, frequency: f32, phase: f32) -> Self {
         let window = block_on(window_handle.get_window());
         let device = &window.device;
         let surface = &window.surface;
         let adapter = &window.adapter;
 
-        let shader = GratingsShader::new(&device, phase, frequency);
-        let params = GratingsParams { phase, frequency };
+        let shader = PlainShader::new(&device, phase, frequency);
+        let params = PlainParams { phase, frequency };
 
         ShapeStimulus::create(&device, &surface, &adapter, shader, shape, params)
     }
@@ -53,7 +50,6 @@ impl GratingsShader {
 impl ShapeShader<GratingsParams> for GratingsShader {
     fn update(&self, params: &mut GratingsParams) {
         // update the stimulus buffer
-        // TODO: is this needed?
         let _params = GratingsParams {
             phase: params.phase,
             frequency: params.frequency,

@@ -1,4 +1,5 @@
 pub mod color;
+pub mod geometry;
 pub mod gratings;
 pub mod pwindow;
 pub mod shape;
@@ -18,18 +19,11 @@ pub trait Renderable {
         queue: &Queue,
         view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
+        window_handle: &pwindow::WindowHandle,
     ) -> ();
     /// Render the object to the screen.
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();
     fn is_finnished(&self) -> bool {
         false
     }
-}
-
-pub enum Scaling {
-    Pixel,                             // all units are in pixels
-    Normalized,                        // units are scaled to the window size
-    ScaleFactor { scale_factor: f32 }, // units are scaled by a factor
-    Degree,                            // units are in degrees of visual angle
-    Default,                           // use the window's default scaling
 }

@@ -1,8 +1,8 @@
 use futures_lite::future::block_on;
 use glyphon::cosmic_text::Align;
 use glyphon::{
-    Attrs, Buffer, Family, FontSystem, Metrics, Resolution, Shaping, Stretch, Style, SwashCache,
-    TextArea, TextAtlas, TextBounds, TextRenderer, Weight,
+    Attrs, Buffer, Family, FontSystem, Metrics, Resolution, Shaping, Stretch, Style, SwashCache, TextArea, TextAtlas,
+    TextBounds, TextRenderer, Weight,
 };
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -11,6 +11,7 @@ use crate::visual::pwindow::WindowHandle;
 
 use wgpu::{Device, MultisampleState, Queue, SurfaceConfiguration};
 
+use crate::visual::geometry::{Rectangle, Unit};
 use crate::visual::Renderable;
 
 use super::Color;
@@ -28,9 +29,9 @@ pub struct TextStimulusConfig {
     // the text to display
     pub text: String,
     // the font size
-    pub font_size: f32,
+    pub font_size: Unit,
     // the line height
-    pub line_height: f32,
+    pub line_height: Unit,
     // the weight of the font
     pub font_weight: Weight,
     // the style of the font
@@ -38,16 +39,9 @@ pub struct TextStimulusConfig {
     // the stretch of the font
     pub font_width: Stretch,
     // the bounds of the text
-    pub bounds: TextRect,
+    pub bounds: Rectangle,
     // the color of the text
     pub color: Color,
-}
-
-pub struct TextRect {
-    pub left: f32,
-    pub top: f32,
-    pub width: f32,
-    pub height: f32,
 }
 
 // default values for the text stimulus
@@ -55,14 +49,9 @@ impl Default for TextStimulusConfig {
     fn default() -> Self {
         Self {
             text: String::from(""),
-            font_size: 42.0,
-            line_height: 42.0,
-            bounds: TextRect {
-                left: -250.0,
-                top: -42.0,
-                width: 500.0,
-                height: 42.0,
-            },
+            font_size: Unit::Points(62.0),
+            line_height: Unit::Points(62.0),
+            bounds: Rectangle::new(-250.0, -42.0, 500.0, 42.0),
             font_weight: Weight::NORMAL,
             font_style: Style::Normal,
             font_width: Stretch::Normal,
@@ -91,6 +80,7 @@ impl Renderable for TextStimulus {
         queue: &Queue,
         _view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
+        _window_handle: &WindowHandle,
     ) -> () {
         let conf = self.config.lock().unwrap();
 
@@ -112,6 +102,14 @@ impl Renderable for TextStimulus {
             buffer.shape_until_scroll(&mut font_system);
         }
 
+        // convert bounds to pixels
+        let screen_width_mm = 300.0;
+        let screen_width_px = config.width as i32;
+        let screen_height_px = config.height as i32;
+        let bounds_px = conf
+            .bounds
+            .to_pixels(screen_width_mm, screen_width_px, screen_height_px);
+
         self.text_renderer
             .lock()
             .unwrap()
@@ -126,8 +124,8 @@ impl Renderable for TextStimulus {
                 },
                 [TextArea {
                     buffer: &self.text_buffer.lock().unwrap(),
-                    left: conf.bounds.left + config.width as f32 / 2.0,
-                    top: conf.bounds.top + config.height as f32 / 2.0,
+                    left: bounds_px.0 + config.width as f32 / 2.0,
+                    top: bounds_px.1 + config.height as f32 / 2.0,
                     scale: 1.0,
                     bounds: TextBounds {
                         left: 0,
@@ -172,19 +170,34 @@ impl TextStimulus {
         let device = &window.device;
         let queue = &window.queue;
         let adapter = &window.adapter;
+        let sconfig = window.config.clone();
 
         let swapchain_capabilities = window.surface.get_capabilities(&adapter);
         let swapchain_format = swapchain_capabilities.formats[0];
 
-        let width: f64 = config.bounds.width as f64;
-        let height: f64 = config.bounds.height as f64;
+        // convert bounds to pixels
+        let screen_width_mm = 300.0;
+        let screen_width_px = sconfig.width as i32;
+        let screen_height_px = sconfig.height as i32;
+        let bounds_px = config
+            .bounds
+            .to_pixels(screen_width_mm, screen_width_px, screen_height_px);
 
-        println!("width: {}, height: {}", width, height);
+        let font_size_px = config
+            .font_size
+            .to_pixels(screen_width_mm, screen_width_px, screen_height_px);
+
+        let line_height_px = config
+            .line_height
+            .to_pixels(screen_width_mm, screen_width_px, screen_height_px);
+
+        let width: f64 = bounds_px.2 as f64;
+        let height: f64 = bounds_px.3 as f64;
 
         let scale_factor = 1.0;
+
         // Set up text renderer
         // load fonts
-
         let plex_fonts = vec![
             include_bytes!("./assets/IBMPlexSans-Regular.ttf").to_vec(),
             include_bytes!("./assets/IBMPlexSans-Bold.ttf").to_vec(),
@@ -200,12 +213,8 @@ impl TextStimulus {
 
         let cache = SwashCache::new();
         let mut atlas = TextAtlas::new(&device, &queue, swapchain_format);
-        let text_renderer =
-            TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
-        let mut buffer = Buffer::new(
-            &mut font_system,
-            Metrics::new(config.font_size, config.line_height),
-        );
+        let text_renderer = TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
+        let mut buffer = Buffer::new(&mut font_system, Metrics::new(font_size_px, line_height_px));
 
         let physical_width = (width as f64 * scale_factor) as f32;
         let physical_height = (height as f64 * scale_factor) as f32;
