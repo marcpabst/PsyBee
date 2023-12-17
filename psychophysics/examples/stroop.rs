@@ -45,7 +45,7 @@ async fn stroop_experiment(window: WindowHandle) {
         &window,
         TextStimulusConfig {
             text: "".into(),
-            font_size: Unit::Points(100.0),
+            font_size: Size::Points(100.0),
             font_weight: glyphon::Weight::BOLD,
             ..Default::default()
         },
@@ -103,21 +103,30 @@ async fn stroop_experiment(window: WindowHandle) {
         word_text.set_text(name.to_string());
 
         // show word screen and wait for keypress or timeout after 2s
-        let (key, duration) = loop_frames!(window, keys = keys.clone(), timeout = 2.0, {
-            let mut frame = Frame::new();
-            // add word text to frame
-            frame.add(&word_text);
-            // submit frame
-            window.submit_frame(frame).await;
-        });
+        let (key, duration) =
+            loop_frames!(window, keys = keys.clone(), timeout = 2.0, {
+                let mut frame = Frame::new();
+                // add word text to frame
+                frame.add(&word_text);
+                // submit frame
+                window.submit_frame(frame).await;
+            });
 
         // check if key was pressed
         if let Some(key) = key {
             // check if key was correct
             if key == correct_key {
-                log::info!("Trial {} - Correct keypress after {:?}", i + 1, duration);
+                log::info!(
+                    "Trial {} - Correct keypress after {:?}",
+                    i + 1,
+                    duration
+                );
             } else {
-                log::info!("Trial {} - Wrong keypress after {:?}", i + 1, duration);
+                log::info!(
+                    "Trial {} - Wrong keypress after {:?}",
+                    i + 1,
+                    duration
+                );
             }
         } else {
             log::info!("Trial {} - No keypress after {:?}", i + 1, duration);

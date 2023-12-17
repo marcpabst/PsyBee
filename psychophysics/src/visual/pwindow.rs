@@ -1,9 +1,11 @@
 #[cfg(target_arch = "wasm32")]
 use crate::request_animation_frame;
-use crate::{input::Key, PFutureReturns};
+use crate::{input::Key, sleep, PFutureReturns};
 use async_lock::{Mutex, MutexGuard};
 
 use atomic_float::AtomicF64;
+
+use nalgebra;
 
 use async_channel::{bounded, Receiver, Sender};
 use futures_lite::future::block_on;
@@ -123,6 +125,21 @@ impl WindowHandle {
     pub async fn close(&self) {
         self.pw.lock().await.event_loop_proxy.send_event(());
     }
+
+    /// Returns the 4x4 matrix than when applied to pixel coordinates will transform them to normalized device coordinates.
+    /// Pixel coordinates are in a coordinate system with (0.0,0.0) in the center of the screen and
+    /// (half of screen width in px, half of screen height in px) in the top right corner of the screen.
+    #[rustfmt::skip]
+    pub fn transformation_matrix_to_ndc(width_px: i32, height_px: i32) -> nalgebra::Matrix4<f64> {
+        // TODO: this could be cached to avoid locking the mutex
+
+        nalgebra::Matrix4::new(
+            2.0 / width_px as f64,0.0, 0.0, 0.0,
+            0.0, 2.0 / height_px as f64, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0,0.0, 0.0, 1.0,
+        )
+    }
 }
 
 /// This is the window's main render task. On native, it will submit frames when they are ready (and block when an approriate presentation mode is used).
@@ -190,7 +207,13 @@ pub async fn render_task(window_handle: WindowHandle) {
                     });
                 }
 
-                frame.prepare(&window_lock.device, &window_lock.queue, &view, &window_lock.config);
+                frame.prepare(
+                    &window_lock.device,
+                    &window_lock.queue,
+                    &view,
+                    &window_lock.config,
+                    &window_handle,
+                );
 
                 frame.render(&mut encoder, &view);
 

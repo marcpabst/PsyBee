@@ -1,9 +1,13 @@
-use gratings::{
+use psychophysics::{
     input::Key,
     log_extra, sleep, start_experiment,
     visual::{
-        psychophysics::GratingsStimulus,
+        geometry::Circle,
+        geometry::Rectangle,
+        geometry::{Size, Transformation2D},
         pwindow::{Frame, WindowHandle},
+        stimuli::gratings::GratingsStimulus,
+        stimuli::image::ImageStimulus,
         text::{TextStimulus, TextStimulusConfig},
         Color,
     },
@@ -31,7 +35,20 @@ async fn gratings_experiment(window: WindowHandle) {
         },
     );
 
-    let gratings = GratingsStimulus::new(&window, 100., 0.0);
+    let shape = Rectangle::new(
+        Size::ScreenWidth(-0.5) + Size::Pixels(50.0),
+        Size::Pixels(-50.0),
+        Size::ScreenWidth(1.0) - Size::Pixels(100.0),
+        Size::Pixels(100.0),
+    );
+
+    let image_jpg =
+        image::load_from_memory(include_bytes!("wundt.jpg")).unwrap();
+
+    let gratings = ImageStimulus::new(&window, shape, image_jpg);
+
+    // let gratings =
+    //     GratingsStimulus::new(&window, shape, Size::Pixels(1.0 / 5.0), 0.0);
 
     // This is were the experiment starts. We first create a start screen that will be shown
     let start_screen = async {
@@ -50,7 +67,7 @@ async fn gratings_experiment(window: WindowHandle) {
     loop {
         let fixiation_screen = async {
             loop {
-                let mut frame = Frame::new();
+                let mut frame = Frame::new_with_bg_color(Color::BLUE);
                 // add fixation cross to frame
                 frame.add(&fixation_cross);
                 // submit frame
@@ -62,10 +79,17 @@ async fn gratings_experiment(window: WindowHandle) {
         fixiation_screen.or(sleep(0.5)).await;
 
         let grating_screen = async {
+            let mut rot = 0.0;
+            let mut phase = 0.0;
             loop {
+                rot += 0.5;
+                phase += 0.1;
                 let mut frame = Frame::new();
                 // set phase
-                gratings.params.lock().await.phase += 0.01;
+                //gratings.set_phase(phase);
+                // set rotation
+                gratings
+                    .set_transformation(Transformation2D::RotationCenter(rot));
                 // add word text to frame
                 frame.add(&gratings);
                 // submit frame
@@ -80,4 +104,6 @@ async fn gratings_experiment(window: WindowHandle) {
 fn main() {
     // run experiment
     start_experiment(gratings_experiment);
+    // set log level to debug
+    log::set_max_level(log::LevelFilter::Debug);
 }

@@ -1,9 +1,10 @@
 use futures_lite::future::block_on;
 use glyphon::cosmic_text::Align;
 use glyphon::{
-    Attrs, Buffer, Family, FontSystem, Metrics, Resolution, Shaping, Stretch, Style, SwashCache, TextArea, TextAtlas,
-    TextBounds, TextRenderer, Weight,
+    Attrs, Buffer, Family, FontSystem, Metrics, Resolution, Shaping, Stretch,
+    Style, SwashCache, TextArea, TextAtlas, TextBounds, TextRenderer, Weight,
 };
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -11,7 +12,7 @@ use crate::visual::pwindow::WindowHandle;
 
 use wgpu::{Device, MultisampleState, Queue, SurfaceConfiguration};
 
-use crate::visual::geometry::{Rectangle, Unit};
+use crate::visual::geometry::{Rectangle, Size};
 use crate::visual::Renderable;
 
 use super::Color;
@@ -29,9 +30,9 @@ pub struct TextStimulusConfig {
     // the text to display
     pub text: String,
     // the font size
-    pub font_size: Unit,
+    pub font_size: Size,
     // the line height
-    pub line_height: Unit,
+    pub line_height: Size,
     // the weight of the font
     pub font_weight: Weight,
     // the style of the font
@@ -49,8 +50,8 @@ impl Default for TextStimulusConfig {
     fn default() -> Self {
         Self {
             text: String::from(""),
-            font_size: Unit::Points(62.0),
-            line_height: Unit::Points(62.0),
+            font_size: Size::Points(62.0),
+            line_height: Size::Points(62.0),
             bounds: Rectangle::new(-250.0, -42.0, 500.0, 42.0),
             font_weight: Weight::NORMAL,
             font_style: Style::Normal,
@@ -80,7 +81,7 @@ impl Renderable for TextStimulus {
         queue: &Queue,
         _view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
-        _window_handle: &WindowHandle,
+        window_handle: &WindowHandle,
     ) -> () {
         let conf = self.config.lock().unwrap();
 
@@ -103,12 +104,18 @@ impl Renderable for TextStimulus {
         }
 
         // convert bounds to pixels
-        let screen_width_mm = 300.0;
+        let screen_width_mm =
+            window_handle.physical_width.load(Ordering::Relaxed);
+        let viewing_distance_mm =
+            window_handle.viewing_distance.load(Ordering::Relaxed);
         let screen_width_px = config.width as i32;
         let screen_height_px = config.height as i32;
-        let bounds_px = conf
-            .bounds
-            .to_pixels(screen_width_mm, screen_width_px, screen_height_px);
+        let bounds_px = conf.bounds.to_pixels(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
 
         self.text_renderer
             .lock()
@@ -124,8 +131,8 @@ impl Renderable for TextStimulus {
                 },
                 [TextArea {
                     buffer: &self.text_buffer.lock().unwrap(),
-                    left: bounds_px.0 + config.width as f32 / 2.0,
-                    top: bounds_px.1 + config.height as f32 / 2.0,
+                    left: (bounds_px[0] + config.width as f64 / 2.0) as f32,
+                    top: (bounds_px[1] + config.height as f64 / 2.0) as f32,
                     scale: 1.0,
                     bounds: TextBounds {
                         left: 0,
@@ -139,25 +146,32 @@ impl Renderable for TextStimulus {
             )
             .unwrap();
     }
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
+    fn render(
+        &mut self,
+        enc: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+    ) -> () {
         // Lock and dereference to get to the inner data
         let text_renderer = self.text_renderer.lock().unwrap();
         let atlas = self.text_atlas.lock().unwrap();
         {
-            let mut rpass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
+            let mut rpass =
+                enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: None,
+                    color_attachments: &[Some(
+                        wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                        },
+                    )],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
 
             text_renderer.render(&atlas, &mut rpass).unwrap();
         }
@@ -165,7 +179,10 @@ impl Renderable for TextStimulus {
 }
 
 impl TextStimulus {
-    pub fn new(window_handle: &WindowHandle, config: TextStimulusConfig) -> Self {
+    pub fn new(
+        window_handle: &WindowHandle,
+        config: TextStimulusConfig,
+    ) -> Self {
         let window = block_on(window_handle.get_window());
         let device = &window.device;
         let queue = &window.queue;
@@ -175,24 +192,35 @@ impl TextStimulus {
         let swapchain_capabilities = window.surface.get_capabilities(&adapter);
         let swapchain_format = swapchain_capabilities.formats[0];
 
-        // convert bounds to pixels
-        let screen_width_mm = 300.0;
+        let screen_width_mm =
+            window_handle.physical_width.load(Ordering::Relaxed);
+        let viewing_distance_mm =
+            window_handle.viewing_distance.load(Ordering::Relaxed);
         let screen_width_px = sconfig.width as i32;
         let screen_height_px = sconfig.height as i32;
-        let bounds_px = config
-            .bounds
-            .to_pixels(screen_width_mm, screen_width_px, screen_height_px);
+        let bounds_px = config.bounds.to_pixels(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
 
-        let font_size_px = config
-            .font_size
-            .to_pixels(screen_width_mm, screen_width_px, screen_height_px);
+        let font_size_px = config.font_size.to_pixels(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
 
-        let line_height_px = config
-            .line_height
-            .to_pixels(screen_width_mm, screen_width_px, screen_height_px);
+        let line_height_px = config.line_height.to_pixels(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
 
-        let width: f64 = bounds_px.2 as f64;
-        let height: f64 = bounds_px.3 as f64;
+        let width: f64 = bounds_px[2] as f64;
+        let height: f64 = bounds_px[3] as f64;
 
         let scale_factor = 1.0;
 
@@ -213,8 +241,16 @@ impl TextStimulus {
 
         let cache = SwashCache::new();
         let mut atlas = TextAtlas::new(&device, &queue, swapchain_format);
-        let text_renderer = TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
-        let mut buffer = Buffer::new(&mut font_system, Metrics::new(font_size_px, line_height_px));
+        let text_renderer = TextRenderer::new(
+            &mut atlas,
+            &device,
+            MultisampleState::default(),
+            None,
+        );
+        let mut buffer = Buffer::new(
+            &mut font_system,
+            Metrics::new(font_size_px as f32, line_height_px as f32),
+        );
 
         let physical_width = (width as f64 * scale_factor) as f32;
         let physical_height = (height as f64 * scale_factor) as f32;
