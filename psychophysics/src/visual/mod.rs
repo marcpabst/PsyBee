@@ -1,4 +1,3 @@
-pub mod color;
 pub mod geometry;
 pub mod pwindow;
 pub mod stimuli;

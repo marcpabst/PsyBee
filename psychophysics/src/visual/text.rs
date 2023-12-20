@@ -15,8 +15,6 @@ use wgpu::{Device, MultisampleState, Queue, SurfaceConfiguration};
 use crate::visual::geometry::{Rectangle, Size};
 use crate::visual::Renderable;
 
-use super::Color;
-
 pub struct TextStimulus {
     config: Arc<Mutex<TextStimulusConfig>>,
     text_atlas: Arc<Mutex<TextAtlas>>,

@@ -48,7 +48,8 @@ pub struct PWindow {
 pub struct WindowHandle {
     pub pw: Arc<Mutex<PWindow>>,
     /// Broadcast receiver for keyboard events. Used by the main window task to send keyboard events to the experiment task.
-    pub keyboard_receiver: async_broadcast::InactiveReceiver<winit::event::KeyboardInput>,
+    pub keyboard_receiver:
+        async_broadcast::InactiveReceiver<winit::event::KeyboardInput>,
     /// Channel for frame submission. Used by the experiment task to submit frames to the render task.
     pub frame_sender: Sender<Arc<Mutex<Frame>>>,
     /// Channel for frame submission. Used by the experiment task to submit frames to the render task.
@@ -71,7 +72,10 @@ impl WindowHandle {
 
     /// Listens for the specified keypresses and returns the key that was pressed and the time it took to press it.
     /// When a keypress is detected, the Future returns a PFutureReturns::KeyPress.
-    pub async fn wait_for_keypress<T, I>(&self, keys: T) -> Result<PFutureReturns, anyhow::Error>
+    pub async fn wait_for_keypress<T, I>(
+        &self,
+        keys: T,
+    ) -> Result<PFutureReturns, anyhow::Error>
     where
         T: IntoIterator<Item = I>,
         I: Into<Key>,
@@ -85,13 +89,14 @@ impl WindowHandle {
         let kc: winit::event::VirtualKeyCode;
         loop {
             // wait for buttons pres
-            let e = keyboard_receiver
-                .recv()
-                .await
-                .map_err(|_| anyhow::anyhow!("Failed to receive keypress from channel"))?;
+            let e = keyboard_receiver.recv().await.map_err(|_| {
+                anyhow::anyhow!("Failed to receive keypress from channel")
+            })?;
 
             // check if keypress matches any of the keys
-            if key_vec.contains(&e.virtual_keycode.unwrap().into()) || key_vec.is_empty() {
+            if key_vec.contains(&e.virtual_keycode.unwrap().into())
+                || key_vec.is_empty()
+            {
                 kc = e.virtual_keycode.unwrap();
                 break;
             }
@@ -104,7 +109,9 @@ impl WindowHandle {
     }
 
     /// Same as wait_for_keypress, but waits for any keypress.
-    pub async fn wait_for_any_keypress(&self) -> Result<PFutureReturns, anyhow::Error> {
+    pub async fn wait_for_any_keypress(
+        &self,
+    ) -> Result<PFutureReturns, anyhow::Error> {
         let empty_vec: Vec<Key> = Vec::new();
         return self.wait_for_keypress(empty_vec).await;
     }
@@ -152,7 +159,10 @@ pub async fn render_task(window_handle: WindowHandle) {
     // on wasm, we register our own requestAnimationFrame callback in a separate task
     #[cfg(target_arch = "wasm32")]
     {
-        log::debug!("Render task running on thread {:?}", std::thread::current().id());
+        log::debug!(
+            "Render task running on thread {:?}",
+            std::thread::current().id()
+        );
 
         // here, we create a closure that will be called by requestAnimationFrame
         let f = Rc::new(RefCell::new(None));
@@ -180,31 +190,40 @@ pub async fn render_task(window_handle: WindowHandle) {
                     .surface
                     .get_current_texture()
                     .expect("Failed to acquire next swap chain texture");
-                let view = suface_texture
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
-                let mut encoder = window_lock
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                let view = suface_texture.texture.create_view(
+                    &wgpu::TextureViewDescriptor {
+                        format: Some(wgpu::TextureFormat::Rgba16Float),
+                        ..wgpu::TextureViewDescriptor::default()
+                    },
+                );
+                let mut encoder = window_lock.device.create_command_encoder(
+                    &wgpu::CommandEncoderDescriptor { label: None },
+                );
 
                 // clear the frame
                 {
                     // clear the frame (once the lifetime annoyance is fixed, this can be removed only a single render pass is needed
                     // using the LoadOp::Clear option)
-                    let rpass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: None,
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(frame.bg_color.into()),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                    });
+                    let rpass = &mut encoder.begin_render_pass(
+                        &wgpu::RenderPassDescriptor {
+                            label: None,
+                            color_attachments: &[Some(
+                                wgpu::RenderPassColorAttachment {
+                                    view: &view,
+                                    resolve_target: None,
+                                    ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Clear(
+                                            frame.bg_color.into(),
+                                        ),
+                                        store: wgpu::StoreOp::Store,
+                                    },
+                                },
+                            )],
+                            depth_stencil_attachment: None,
+                            timestamp_writes: None,
+                            occlusion_query_set: None,
+                        },
+                    );
                 }
 
                 frame.prepare(
@@ -230,7 +249,10 @@ pub async fn render_task(window_handle: WindowHandle) {
     // on native, we submit frames when they are ready
     #[cfg(not(target_arch = "wasm32"))]
     {
-        log::debug!("Render task running on thread {:?}", std::thread::current().id());
+        log::debug!(
+            "Render task running on thread {:?}",
+            std::thread::current().id()
+        );
 
         loop {
             // wait for frame to be submitted
@@ -246,30 +268,39 @@ pub async fn render_task(window_handle: WindowHandle) {
                 .surface
                 .get_current_texture()
                 .expect("Failed to acquire next swap chain texture");
-            let view = suface_texture
-                .texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-            let mut encoder = window_lock
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            let view = suface_texture.texture.create_view(
+                &wgpu::TextureViewDescriptor {
+                    format: Some(wgpu::TextureFormat::Rgba16Float),
+                    ..wgpu::TextureViewDescriptor::default()
+                },
+            );
+            let mut encoder = window_lock.device.create_command_encoder(
+                &wgpu::CommandEncoderDescriptor { label: None },
+            );
             // clear the frame
             {
                 // clear the frame (once the lifetime annoyance is fixed, this can be removed only a single render pass is needed
                 // using the LoadOp::Clear option)
-                let _rpass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(frame.bg_color.into()),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                });
+                let _rpass = &mut encoder.begin_render_pass(
+                    &wgpu::RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(
+                            wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(
+                                        frame.bg_color.into(),
+                                    ),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            },
+                        )],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    },
+                );
             }
             frame.prepare(
                 &window_lock.device,
@@ -311,7 +342,11 @@ impl Renderable for Frame {
         }
     }
 
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
+    fn render(
+        &mut self,
+        enc: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+    ) -> () {
         // call render() on all renderables
         for renderable in &mut (block_on(self.renderables.lock())).iter_mut() {
             renderable.render(enc, view);
@@ -337,7 +372,10 @@ impl Frame {
     }
 
     /// Add a renderable to the frame.
-    pub fn add(&mut self, renderable: &(impl Renderable + Clone + 'static)) -> () {
+    pub fn add(
+        &mut self,
+        renderable: &(impl Renderable + Clone + 'static),
+    ) -> () {
         let renderable = Box::new(renderable.clone());
         block_on(self.renderables.lock()).push(renderable);
     }

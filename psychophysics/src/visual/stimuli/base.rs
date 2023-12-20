@@ -1,11 +1,13 @@
 use async_lock::Mutex;
 use futures_lite::future::block_on;
+use half::f16;
 use ndarray::ArrayView;
 use rodio::queue;
 use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use wgpu::TextureFormat;
 
 use crate::visual::Renderable;
 use bytemuck::{Pod, Zeroable};
@@ -329,11 +331,11 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 // TODO: this should be configurable
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                format: wgpu::TextureFormat::Rgba16Float,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING
                     | wgpu::TextureUsages::COPY_DST,
                 label: Some("diffuse_texture"),
-                view_formats: &[],
+                view_formats: &[wgpu::TextureFormat::Rgba16Float], // allow reading texture in linear space
             });
             Some(texture)
         } else {
@@ -343,14 +345,17 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
         // if a texture is specified, create a sampler and bind group
         let (texture_bind_group_layout, texture_bind_group) =
             if let Some(texture) = &texture {
-                let texture_view = texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
+                let texture_view =
+                    texture.create_view(&wgpu::TextureViewDescriptor {
+                        format: Some(wgpu::TextureFormat::Rgba16Float),
+                        ..Default::default()
+                    });
                 let texture_sampler =
                     device.create_sampler(&wgpu::SamplerDescriptor {
                         address_mode_u: wgpu::AddressMode::ClampToEdge,
                         address_mode_v: wgpu::AddressMode::ClampToEdge,
                         address_mode_w: wgpu::AddressMode::ClampToEdge,
-                        mag_filter: wgpu::FilterMode::Linear,
+                        mag_filter: wgpu::FilterMode::Nearest,
                         min_filter: wgpu::FilterMode::Nearest,
                         mipmap_filter: wgpu::FilterMode::Nearest,
                         ..Default::default()
@@ -431,7 +436,9 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
             });
 
         let swapchain_capabilities = surface.get_capabilities(adapter);
-        let swapchain_format = swapchain_capabilities.formats[0];
+        let swapchain_format = TextureFormat::Rgba16Float;
+
+        log::warn!("swapchain format: {:?}", swapchain_capabilities.formats);
 
         let render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -497,20 +504,23 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
     ///
     /// # Arguments
     ///
-    /// * `data` - The data for the texture. Must be a 2D array of RGBA values matching the size of the texture. The data is expected to be in row-major order.
+    /// * `data` - The data for the texture. The data must be a slice of `f16` values. The length of the slice must match the size of the texture.
     ///
     /// # Panics
     ///
     /// This method will panic if the data size does not match the texture size or if no texture is specified for this stimulus.
-    pub fn set_texture(&self, data: &[u8]) {
+    pub fn set_texture(&self, data: &[f16]) {
+        // get a view of u8 from the f16 data using bytemuck
+        let data: &[u8] = bytemuck::cast_slice(data);
+
         if let Some(texture) = &self.texture {
             let texture = block_on(texture.lock());
             let width = texture.size().width;
             let height = texture.size().height;
-            // check if the data has the correct size
-            if data.len() != (4 * width * height) as usize {
-                panic!("Data size does not match texture size. Expected {} bytes (texture size) but got {} bytes (data size).", (4 * width * height) as usize, data.len());
-            }
+
+            // convert data to array of bytes
+            let byte_slice: &[u8] = bytemuck::cast_slice(&data);
+
             let queue = &block_on(self.window.get_window()).queue;
 
             queue.write_texture(
@@ -520,10 +530,10 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
-                data,
+                byte_slice,
                 wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(4 * width),
+                    bytes_per_row: Some(2 * 4 * width),
                     rows_per_image: Some(height),
                 },
                 wgpu::Extent3d {
@@ -534,6 +544,6 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
             );
         } else {
             panic!("No texture specified for this stimulus.");
-        }
+        };
     }
 }

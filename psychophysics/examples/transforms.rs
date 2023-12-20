@@ -1,6 +1,7 @@
+use palette::{convert::FromColorUnclamped, white_point::D65, FromColor};
 use psychophysics::{
     input::Key,
-    log_extra, sleep, start_experiment,
+    log_extra, loop_frames, sleep, start_experiment,
     visual::{
         geometry::Circle,
         geometry::Rectangle,
@@ -36,69 +37,66 @@ async fn gratings_experiment(window: WindowHandle) {
     );
 
     let shape = Rectangle::new(
-        Size::ScreenWidth(-0.5) + Size::Pixels(50.0),
-        Size::Pixels(-50.0),
-        Size::ScreenWidth(1.0) - Size::Pixels(100.0),
-        Size::Pixels(100.0),
+        Size::Pixels(-250.0),
+        Size::Pixels(-250.0),
+        Size::Pixels(500.0),
+        Size::Pixels(500.0),
     );
 
     let image_jpg =
-        image::load_from_memory(include_bytes!("wundt.jpg")).unwrap();
+        image::load_from_memory(include_bytes!("wicked_witch.png")).unwrap();
 
     let gratings = ImageStimulus::new(&window, shape, image_jpg);
+
+    // create an array of RGBA values in f16 format
+    use half::f16;
+    use palette::{Lab, LinSrgb, Srgb};
+
+    let red_1 = LinSrgb::new(1.0, 0.0, 0.0);
+    let red_2 = LinSrgb::new(1.5, 0.0, 0.0);
+
+    // convert both colors to extended linear sRGB
+    let red_1 = LinSrgb::from_color_unclamped(red_1);
+    let red_2 = LinSrgb::from_color_unclamped(red_2);
+
+    // create a vector of 500 x 500 rgba values, with the first half being red_1
+    // and the second half being red_2
+    let mut rgba: Vec<f16> = Vec::new();
+    for i in 0..500 {
+        for j in 0..500 {
+            if i < 250 {
+                rgba.push(f16::from_f32(red_1.red));
+                rgba.push(f16::from_f32(red_1.green));
+                rgba.push(f16::from_f32(red_1.blue));
+                rgba.push(f16::from_f32(1.0));
+            } else {
+                rgba.push(f16::from_f32(red_2.red));
+                rgba.push(f16::from_f32(red_2.green));
+                rgba.push(f16::from_f32(red_2.blue));
+                rgba.push(f16::from_f32(1.0));
+            }
+        }
+    }
+    // create a slice from the vector
+    let rgba = rgba.as_slice();
+
+    gratings.set_texture(rgba);
 
     // let gratings =
     //     GratingsStimulus::new(&window, shape, Size::Pixels(1.0 / 5.0), 0.0);
 
-    // This is were the experiment starts. We first create a start screen that will be shown
-    let start_screen = async {
-        loop {
-            let mut frame = Frame::new_with_bg_color(Color::BLACK);
-            // add text stimulus to frame
-            frame.add(&start_text);
-            // submit frame
-            window.submit_frame(frame).await;
-        }
-    };
-
-    start_screen.or(window.wait_for_keypress(Key::Space)).await;
-
-    // This is the trial loop that will be executed n_trials times
-    loop {
-        let fixiation_screen = async {
-            loop {
-                let mut frame = Frame::new_with_bg_color(Color::BLUE);
-                // add fixation cross to frame
-                frame.add(&fixation_cross);
-                // submit frame
-                window.submit_frame(frame).await;
-            }
-        };
-
-        // first, show fixation cross for 500ms
-        fixiation_screen.or(sleep(0.5)).await;
-
-        let grating_screen = async {
-            let mut rot = 0.0;
-            let mut phase = 0.0;
-            loop {
-                rot += 0.5;
-                phase += 0.1;
-                let mut frame = Frame::new();
-                // set phase
-                //gratings.set_phase(phase);
-                // set rotation
-                gratings
-                    .set_transformation(Transformation2D::RotationCenter(rot));
-                // add word text to frame
-                frame.add(&gratings);
-                // submit frame
-                window.submit_frame(frame).await;
-            }
-        };
-
-        grating_screen.or(sleep(2.0)).await;
-    }
+    let mut rotation = 0.0;
+    loop_frames!(window, keys = Key::Space, {
+        // create frame with black background
+        let mut frame = Frame::new_with_bg_color(Color::BLACK);
+        // add the image stimulus to the frame
+        frame.add(&gratings);
+        // rotate the image
+        //rotation += 0.1;
+        gratings.set_transformation(Transformation2D::RotationCenter(rotation));
+        // submit frame
+        window.submit_frame(frame).await;
+    });
 }
 
 fn main() {

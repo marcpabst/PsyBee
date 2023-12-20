@@ -5,6 +5,7 @@ use super::{
 };
 use bytemuck::{Pod, Zeroable};
 use futures_lite::future::block_on;
+use half::f16;
 use image;
 use std::borrow::Cow;
 use wgpu::{Device, ShaderModule};
@@ -48,7 +49,12 @@ impl<G: ToVertices> ImageStimulus<'_, G> {
             depth_or_array_layers: 1,
         };
 
-        let texture_data = shader.image.to_rgba8().into_raw();
+        let texture_data = shader.image.to_rgba8();
+        // convert to Rgba16Float
+        let texture_data: Vec<f16> = texture_data
+            .iter()
+            .map(|x| f16::from_f32(*x as f32 / 255.0))
+            .collect();
 
         let out = BaseStimulus::create(
             window_handle,

@@ -352,32 +352,32 @@ impl ToVertices for Rectangle {
             Vertex {
                 position: [left, top, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [0.0, 0.0],
+                tex_coords: [0.0, 1.0],
             },
             Vertex {
                 position: [left + width, top, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [1.0, 0.0],
+                tex_coords: [1.0, 1.0],
             },
             Vertex {
                 position: [left + width, top + height, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [1.0, 1.0],
+                tex_coords: [1.0, 0.0],
             },
             Vertex {
                 position: [left, top, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [0.0, 0.0],
+                tex_coords: [0.0, 1.0],
             },
             Vertex {
                 position: [left + width, top + height, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [1.0, 1.0],
+                tex_coords: [1.0, 0.0],
             },
             Vertex {
                 position: [left, top + height, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [0.0, 1.0],
+                tex_coords: [0.0, 0.0],
             },
         ];
 

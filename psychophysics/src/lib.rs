@@ -8,6 +8,7 @@ use futures_lite::{future::block_on, Future};
 use async_executor::Executor;
 
 use input::Key;
+use wgpu::TextureFormat;
 
 use std::sync::Arc;
 
@@ -26,6 +27,36 @@ pub enum PFutureReturns {
     Timeout(Duration),
     KeyPress((Key, Duration)),
     NeverReturn,
+}
+
+///
+pub enum ColorFormat {
+    /// Standard 8 bit per channel (24 bit total) color depth. Color values are
+    /// between 0 and 255.
+    Rgba8u,
+    /// 16 bit per channel (64 bit total) color depth. Color values are between
+    /// 0 and 65535.
+    Rgba16u,
+    /// 16 bit per channel (64 bit total) floating point color depth. This format
+    /// can be used to represent out-of-gamut colors. However, because the normal
+    /// range of values is 0.0 to 1.0, the effective precision is only about 11
+    /// bits per channel inside the respective gamut.
+    Rgba16f,
+}
+
+/// The color space used in the rendering pipeline.
+/// All color spaces are linear to ensure correct blending.
+pub enum ColorSpace<B>
+where
+    B: ColorFormat,
+{
+    /// Standard RGB color space using the same primaries as sRGB but with a
+    /// linear transfer function. The white point is D65. Supports out-of-gamut
+    /// colors with a 16 bit floating point color depth.
+    LinearSrgb,
+    /// DCI-P3 color space using a linear transfer function. Supports
+    /// out-of-gamut colors with a 16 bit floating point color depth.
+    LinearP3,
 }
 
 // implement unwrap_duration for Result<PFutureReturns, anyhow::Error>
@@ -102,7 +133,10 @@ pub async fn sleep(secs: f64) -> Result<PFutureReturns, anyhow::Error> {
     {
         let window = web_window();
         let promise = js_sys::Promise::new(&mut |resolve, _reject| {
-            window.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, (secs * 1000.0) as i32);
+            window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                &resolve,
+                (secs * 1000.0) as i32,
+            );
         });
         wasm_bindgen_futures::JsFuture::from(promise).await.unwrap();
     }
@@ -170,8 +204,9 @@ pub trait FutureReturnTrait: Future<Output = ()> + 'static {}
 #[cfg(target_arch = "wasm32")]
 impl<F> FutureReturnTrait for F where F: Future<Output = ()> + 'static {}
 
-pub fn start_experiment<F>(experiment_fn: impl FnOnce(WindowHandle) -> F + 'static)
-where
+pub fn start_experiment<F>(
+    experiment_fn: impl FnOnce(WindowHandle) -> F + 'static,
+) where
     F: FutureReturnTrait,
 {
     let event_loop = EventLoop::new();
@@ -194,7 +229,11 @@ where
         log::info!("Monitor informaton: {:?}", monitor);
 
         // get video mode with biggest width
-        let target_size = monitor.video_modes().max_by_key(|m| m.size().width).unwrap().size();
+        let target_size = monitor
+            .video_modes()
+            .max_by_key(|m| m.size().width)
+            .unwrap()
+            .size();
 
         // get video mode with biggest width and highest refresh rate
         let video_mode = monitor
@@ -220,17 +259,32 @@ where
         web_sys::window()
             .and_then(|win| win.document())
             .and_then(|doc| doc.body())
-            .and_then(|body| body.append_child(&web_sys::Element::from(winit_window.canvas())).ok())
+            .and_then(|body| {
+                body.append_child(&web_sys::Element::from(
+                    winit_window.canvas(),
+                ))
+                .ok()
+            })
             .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(run(event_loop, winit_window, experiment_fn));
+        wasm_bindgen_futures::spawn_local(run(
+            event_loop,
+            winit_window,
+            experiment_fn,
+        ));
     }
 }
 
-async fn run<F>(event_loop: EventLoop<()>, winit_window: Window, experiment_fn: impl FnOnce(WindowHandle) -> F)
-where
+async fn run<F>(
+    event_loop: EventLoop<()>,
+    winit_window: Window,
+    experiment_fn: impl FnOnce(WindowHandle) -> F,
+) where
     F: FutureReturnTrait,
 {
-    log::debug!("Main task is running on thread {:?}", std::thread::current().id());
+    log::debug!(
+        "Main task is running on thread {:?}",
+        std::thread::current().id()
+    );
 
     let size = winit_window.inner_size();
 
@@ -254,15 +308,25 @@ where
                 label: None,
                 features: wgpu::Features::empty(),
                 // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                limits: wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()),
+                limits: wgpu::Limits::downlevel_webgl2_defaults()
+                    .using_resolution(adapter.limits()),
             },
             None,
         )
         .await
-        .expect("Failed to create device. This is likely a bug, please report it.");
+        .expect(
+            "Failed to create device. This is likely a bug, please report it.",
+        );
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[0];
+    let swapchain_format = TextureFormat::Rgba16Float;
+    let swapchain_view_format = vec![TextureFormat::Rgba16Float];
+
+    // log supported texture formats
+    log::info!("Supported texture formats:");
+    for format in swapchain_capabilities.formats {
+        log::info!("{:?}", format);
+    }
 
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -271,19 +335,27 @@ where
         height: size.height,
         present_mode: wgpu::PresentMode::Fifo,
         alpha_mode: swapchain_capabilities.alpha_modes[0],
-        view_formats: vec![],
+        view_formats: swapchain_view_format,
     };
 
     surface.configure(&device, &config);
 
     // create channel for frame submission
-    let (frame_sender, frame_receiver): (Sender<Arc<Mutex<Frame>>>, Receiver<Arc<Mutex<Frame>>>) = bounded(1);
+    let (frame_sender, frame_receiver): (
+        Sender<Arc<Mutex<Frame>>>,
+        Receiver<Arc<Mutex<Frame>>>,
+    ) = bounded(1);
 
-    let (frame_ok_sender, frame_ok_receiver): (Sender<bool>, Receiver<bool>) = bounded(1);
+    let (frame_ok_sender, frame_ok_receiver): (Sender<bool>, Receiver<bool>) =
+        bounded(1);
 
     // create broadcast channel
-    let mut keyboard_sender: async_broadcast::Sender<winit::event::KeyboardInput>;
-    let keyboard_receiver: async_broadcast::Receiver<winit::event::KeyboardInput>;
+    let mut keyboard_sender: async_broadcast::Sender<
+        winit::event::KeyboardInput,
+    >;
+    let keyboard_receiver: async_broadcast::Receiver<
+        winit::event::KeyboardInput,
+    >;
     (keyboard_sender, keyboard_receiver) = broadcast(100);
 
     // set overflow strategy
@@ -354,7 +426,9 @@ where
             } => {
                 if let Some(keycode) = input.virtual_keycode {
                     match keycode {
-                        winit::event::VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
+                        winit::event::VirtualKeyCode::Escape => {
+                            *control_flow = ControlFlow::Exit
+                        }
                         // send keypresses to channel
 
                         // log any other keypresses
@@ -378,6 +452,8 @@ where
 macro_rules! loop_frames {
     ($win:expr $(, keys = $keys:expr)? $(, keystate = $keystate:expr)? $(, timeout = $timeout:expr)?, $body:block) => {
         {
+            use psychophysics::input::Key;
+            use psychophysics::input::KeyState;
             let timeout_duration = $(Some(web_time::Duration::from_secs_f64($timeout));)? None as Option<web_time::Duration>;
             let keys_vec: Vec<Key> = $($keys.into_iter().map(|k| k.into()).collect();)? vec![] as Vec<Key>;
             let keystate: KeyState = $($keystate;)? KeyState::Any;
