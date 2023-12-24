@@ -5,6 +5,8 @@ use async_lock::Mutex;
 use atomic_float::AtomicF64;
 use futures_lite::{future::block_on, Future};
 
+use crate::visual::color::ColorFormat;
+
 use async_executor::Executor;
 
 use input::Key;
@@ -19,44 +21,14 @@ use winit::event_loop::ControlFlow;
 
 pub mod input;
 pub mod visual;
-use winit::{event_loop::EventLoop, window::Window};
+use winit::event_loop::EventLoop;
 
-use crate::visual::pwindow::{render_task, Frame, PWindow, WindowHandle};
+use crate::visual::pwindow::{render_task, Frame, Window, WindowState};
 pub enum PFutureReturns {
     Duration(Duration),
     Timeout(Duration),
     KeyPress((Key, Duration)),
     NeverReturn,
-}
-
-///
-pub enum ColorFormat {
-    /// Standard 8 bit per channel (24 bit total) color depth. Color values are
-    /// between 0 and 255.
-    Rgba8u,
-    /// 16 bit per channel (64 bit total) color depth. Color values are between
-    /// 0 and 65535.
-    Rgba16u,
-    /// 16 bit per channel (64 bit total) floating point color depth. This format
-    /// can be used to represent out-of-gamut colors. However, because the normal
-    /// range of values is 0.0 to 1.0, the effective precision is only about 11
-    /// bits per channel inside the respective gamut.
-    Rgba16f,
-}
-
-/// The color space used in the rendering pipeline.
-/// All color spaces are linear to ensure correct blending.
-pub enum ColorSpace<B>
-where
-    B: ColorFormat,
-{
-    /// Standard RGB color space using the same primaries as sRGB but with a
-    /// linear transfer function. The white point is D65. Supports out-of-gamut
-    /// colors with a 16 bit floating point color depth.
-    LinearSrgb,
-    /// DCI-P3 color space using a linear transfer function. Supports
-    /// out-of-gamut colors with a 16 bit floating point color depth.
-    LinearP3,
 }
 
 // implement unwrap_duration for Result<PFutureReturns, anyhow::Error>
@@ -204,9 +176,8 @@ pub trait FutureReturnTrait: Future<Output = ()> + 'static {}
 #[cfg(target_arch = "wasm32")]
 impl<F> FutureReturnTrait for F where F: Future<Output = ()> + 'static {}
 
-pub fn start_experiment<F>(
-    experiment_fn: impl FnOnce(WindowHandle) -> F + 'static,
-) where
+pub fn start_experiment<F>(experiment_fn: impl FnOnce(Window) -> F + 'static)
+where
     F: FutureReturnTrait,
 {
     let event_loop = EventLoop::new();
@@ -276,8 +247,8 @@ pub fn start_experiment<F>(
 
 async fn run<F>(
     event_loop: EventLoop<()>,
-    winit_window: Window,
-    experiment_fn: impl FnOnce(WindowHandle) -> F,
+    winit_window: winit::window::Window,
+    experiment_fn: impl FnOnce(Window) -> F,
 ) where
     F: FutureReturnTrait,
 {
@@ -319,8 +290,8 @@ async fn run<F>(
         );
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = TextureFormat::Rgba16Float;
-    let swapchain_view_format = vec![TextureFormat::Rgba16Float];
+    let swapchain_format = TextureFormat::Bgra8Unorm;
+    let swapchain_view_format = vec![TextureFormat::Bgra8UnormSrgb];
 
     // log supported texture formats
     log::info!("Supported texture formats:");
@@ -364,7 +335,7 @@ async fn run<F>(
     let keyboard_receiver = keyboard_receiver.deactivate();
 
     // create a pwindow
-    let pwindow = PWindow {
+    let pwindow = WindowState {
         window: winit_window,
         event_loop_proxy: event_loop.create_proxy(),
         device,
@@ -376,8 +347,8 @@ async fn run<F>(
     };
 
     // create handle
-    let win_handle = WindowHandle {
-        pw: Arc::new(Mutex::new(pwindow)),
+    let win_handle = Window {
+        state: Arc::new(Mutex::new(pwindow)),
         keyboard_receiver,
         frame_sender,
         frame_receiver,
@@ -385,6 +356,7 @@ async fn run<F>(
         frame_ok_receiver,
         physical_width: Arc::new(AtomicF64::new(300.0)),
         viewing_distance: Arc::new(AtomicF64::new(57.0)),
+        color_format: ColorFormat::SRGBA8,
     };
 
     // start renderer
@@ -405,7 +377,7 @@ async fn run<F>(
             } => {
                 log::info!("Window resized");
                 // Reconfigure the surface with the new size (this should likely be done on the renderer thread instead)
-                let mut pwindow = block_on(win_handle.pw.lock());
+                let mut pwindow = block_on(win_handle.state.lock());
                 pwindow.config.width = new_size.width.max(1);
                 pwindow.config.height = new_size.height.max(1);
                 pwindow.surface.configure(&pwindow.device, &pwindow.config);

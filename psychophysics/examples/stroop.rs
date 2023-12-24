@@ -1,24 +1,35 @@
 use psychophysics::{
     input::Key,
-    input::KeyState,
     loop_frames, start_experiment,
     visual::{
+        color,
         geometry::*,
-        pwindow::{Frame, WindowHandle},
+        pwindow::Window,
+        stimuli::image::ImageStimulus,
         text::{TextStimulus, TextStimulusConfig},
-        Color,
     },
 };
 
-async fn stroop_experiment(window: WindowHandle) {
+async fn stroop_experiment(window: Window) {
     // define colors for stroop task
-    let colors = vec![Color::RED, Color::GREEN, Color::BLUE, Color::YELLOW];
+    let colors = vec![color::RED, color::GREEN, color::BLUE, color::YELLOW];
     let names = vec!["RED", "GREEN", "BLUE", "YELLOW"];
     let keys = vec![Key::R, Key::G, Key::B, Key::Y];
 
     let n_trials = 5;
 
     log::info!("Starting Stroop experiment");
+
+    let image_stim = ImageStimulus::new(
+        &window,
+        Rectangle::new(
+            Size::Pixels(-250.0),
+            Size::Pixels(-250.0),
+            Size::Pixels(500.0),
+            Size::Pixels(500.0),
+        ),
+        image::load_from_memory(include_bytes!("wicked_witch.png")).unwrap(),
+    );
 
     // First, create a vector of trials. Each trial is a tuple of (trial number, name, color, key)
     let mut trials = Vec::with_capacity(n_trials);
@@ -34,7 +45,6 @@ async fn stroop_experiment(window: WindowHandle) {
         &window,
         TextStimulusConfig {
             text: "Press space to start".into(),
-            color: Color::WHITE,
             ..Default::default()
         },
     );
@@ -55,7 +65,6 @@ async fn stroop_experiment(window: WindowHandle) {
         &window,
         TextStimulusConfig {
             text: "Too slow!".into(),
-            color: Color::WHITE,
             ..Default::default()
         },
     );
@@ -64,7 +73,6 @@ async fn stroop_experiment(window: WindowHandle) {
         &window,
         TextStimulusConfig {
             text: "End of experiment!".into(),
-            color: Color::BLACK,
             ..Default::default()
         },
     );
@@ -80,9 +88,12 @@ async fn stroop_experiment(window: WindowHandle) {
     // This is were the experiment starts. We first create a start screen that will be shown
     loop_frames!(window, keys = Key::Space, {
         // create frame with black background
-        let mut frame = Frame::new_with_bg_color(Color::BLACK);
+        let mut frame = window.get_frame_with_bg_color(color::MAROON);
         // add text stimulus to frame
         frame.add(&start_text);
+
+        // add image stimulus to frame
+        frame.add(&image_stim);
         // submit frame
         window.submit_frame(frame).await;
     });
@@ -91,7 +102,7 @@ async fn stroop_experiment(window: WindowHandle) {
     for (i, name, color, correct_key) in trials {
         // this is the fixation screen that will be shown for 750ms
         loop_frames!(window, timeout = 0.75, {
-            let mut frame = Frame::new();
+            let mut frame = window.get_frame_with_bg_color(color::RED);
             // add fixation cross to frame
             frame.add(&fixation_cross);
             // submit frame
@@ -105,7 +116,7 @@ async fn stroop_experiment(window: WindowHandle) {
         // show word screen and wait for keypress or timeout after 2s
         let (key, duration) =
             loop_frames!(window, keys = keys.clone(), timeout = 2.0, {
-                let mut frame = Frame::new();
+                let mut frame = window.get_frame_with_bg_color(color::WHITE);
                 // add word text to frame
                 frame.add(&word_text);
                 // submit frame
@@ -133,7 +144,7 @@ async fn stroop_experiment(window: WindowHandle) {
 
             // show too slow screen for 500ms
             loop_frames!(window, timeout = 0.5, {
-                let mut frame = Frame::new_with_bg_color(Color::BLACK);
+                let mut frame = window.get_frame_with_bg_color(color::WHITE);
                 // add text stimulus to frame
                 frame.add(&too_slow_text);
                 // submit frame
@@ -143,7 +154,7 @@ async fn stroop_experiment(window: WindowHandle) {
     }
     // show end screen
     loop_frames!(window, keys = Key::Space, {
-        let mut frame = Frame::new_with_bg_color(Color::WHITE);
+        let mut frame = window.get_frame_with_bg_color(color::BLACK);
         // add text stimulus to frame
         frame.add(&end_text);
         // submit frame

@@ -1391,7 +1391,7 @@ dependencies = [
  "cosmic-text",
  "etagere",
  "lru",
- "wgpu 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wgpu",
 ]
 
 [[package]]
@@ -1945,25 +1945,6 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "naga"
-version = "0.14.0"
-source = "git+https://github.com/gfx-rs/naga?rev=92e41b43e437146b5d946eb238de963be1168016#92e41b43e437146b5d946eb238de963be1168016"
-dependencies = [
- "bit-set",
- "bitflags 2.4.1",
- "codespan-reporting",
- "hexf-parse",
- "indexmap 2.1.0",
- "log",
- "num-traits",
- "rustc-hash",
- "spirv",
- "termcolor",
- "thiserror",
- "unicode-xid",
 ]
 
 [[package]]
@@ -2570,7 +2551,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
- "wgpu 0.18.0",
+ "wgpu",
  "winit",
 ]
 
@@ -3780,29 +3761,6 @@ checksum = "9193164d4de03a926d909d3bc7c30543cecb35400c02114792c2cae20d5e2dbb"
 [[package]]
 name = "wgpu"
 version = "0.18.0"
-dependencies = [
- "arrayvec 0.7.4",
- "cfg-if",
- "flume 0.11.0",
- "js-sys",
- "log",
- "naga 0.14.0",
- "parking_lot",
- "profiling",
- "raw-window-handle 0.5.2",
- "smallvec",
- "static_assertions",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "wgpu-core 0.18.0",
- "wgpu-hal 0.18.0",
- "wgpu-types 0.18.0",
-]
-
-[[package]]
-name = "wgpu"
-version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30e7d227c9f961f2061c26f4cb0fbd4df0ef37e056edd0931783599d6c94ef24"
 dependencies = [
@@ -3811,7 +3769,7 @@ dependencies = [
  "flume 0.11.0",
  "js-sys",
  "log",
- "naga 0.14.2",
+ "naga",
  "parking_lot",
  "profiling",
  "raw-window-handle 0.5.2",
@@ -3820,30 +3778,9 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "wgpu-core 0.18.1",
- "wgpu-hal 0.18.1",
- "wgpu-types 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "wgpu-core"
-version = "0.18.0"
-dependencies = [
- "arrayvec 0.7.4",
- "bit-vec",
- "bitflags 2.4.1",
- "codespan-reporting",
- "log",
- "naga 0.14.0",
- "parking_lot",
- "profiling",
- "raw-window-handle 0.5.2",
- "rustc-hash",
- "smallvec",
- "thiserror",
- "web-sys",
- "wgpu-hal 0.18.0",
- "wgpu-types 0.18.0",
+ "wgpu-core",
+ "wgpu-hal",
+ "wgpu-types",
 ]
 
 [[package]]
@@ -3857,7 +3794,7 @@ dependencies = [
  "bitflags 2.4.1",
  "codespan-reporting",
  "log",
- "naga 0.14.2",
+ "naga",
  "parking_lot",
  "profiling",
  "raw-window-handle 0.5.2",
@@ -3865,49 +3802,8 @@ dependencies = [
  "smallvec",
  "thiserror",
  "web-sys",
- "wgpu-hal 0.18.1",
- "wgpu-types 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "wgpu-hal"
-version = "0.18.0"
-dependencies = [
- "android_system_properties",
- "arrayvec 0.7.4",
- "ash",
- "bit-set",
- "bitflags 2.4.1",
- "block",
- "core-graphics-types",
- "d3d12",
- "glow",
- "glutin_wgl_sys",
- "gpu-alloc",
- "gpu-allocator",
- "gpu-descriptor",
- "hassle-rs",
- "js-sys",
- "khronos-egl",
- "libc",
- "libloading 0.8.1",
- "log",
- "metal",
- "naga 0.14.0",
- "objc",
- "once_cell",
- "parking_lot",
- "profiling",
- "range-alloc",
- "raw-window-handle 0.5.2",
- "renderdoc-sys",
- "rustc-hash",
- "smallvec",
- "thiserror",
- "wasm-bindgen",
- "web-sys",
- "wgpu-types 0.18.0",
- "winapi",
+ "wgpu-hal",
+ "wgpu-types",
 ]
 
 [[package]]
@@ -3936,7 +3832,7 @@ dependencies = [
  "libloading 0.8.1",
  "log",
  "metal",
- "naga 0.14.2",
+ "naga",
  "objc",
  "once_cell",
  "parking_lot",
@@ -3949,17 +3845,8 @@ dependencies = [
  "thiserror",
  "wasm-bindgen",
  "web-sys",
- "wgpu-types 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wgpu-types",
  "winapi",
-]
-
-[[package]]
-name = "wgpu-types"
-version = "0.18.0"
-dependencies = [
- "bitflags 2.4.1",
- "js-sys",
- "web-sys",
 ]
 
 [[package]]

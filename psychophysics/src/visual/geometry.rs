@@ -1,9 +1,32 @@
-use nalgebra::{Matrix3, Matrix4};
-use num_traits::Num;
+//! This module contains structs and traits that are used to specify the geometry of a stimulus.
+//! This includes rectangles, circles, and transformations.
 
-/// The Unit enum is used to specify the size of a stimulus. The unit can be specified in different ways,
+use nalgebra::{Matrix3, Matrix4};
+
+/// This enum is used to specify the size and position of a stimulus. The unit can be specified in different ways,
 /// which will be evaluated just before the stimulus is rendered. This allows for the size of the stimulus to
 /// be specified in a flexible way, e.g. as a fraction of the screen size or in degrees of visual angle.
+///
+/// Important: The unit is specified in the constructor of the stimulus, but its actual size in pixels
+/// is only calculated when the stimulus is rendered. This is because the size of the stimulus depends on the
+/// size of the window, the distance of the observer to the screen, and the physical size of the screen. As
+/// some of these parameters may change during the experiment, the size and position of the stimulus in pixels
+/// can only be known at the time of rendering.
+///
+/// # Examples
+///
+/// ```
+/// use psychophysics::visual::geometry::Size;
+///
+/// // create a unit that is 100 pixels wide
+/// let unit = Size::Pixels(100.0);
+///
+/// // create a unit that is 10% of the screen width
+/// let unit = Size::ScreenWidth(0.1);
+///
+/// // create a unit that is 10% of the screen height
+/// let unit = Size::ScreenHeight(0.1);
+/// ```
 pub enum Size {
     // Physical pixels
     Pixels(f64),
@@ -80,7 +103,16 @@ impl std::ops::Div<f64> for Size {
 }
 
 impl Size {
-    /// Convert the given angle in degrees to a distance in millimeters.
+    /// Convert the given angle of visual angle to millimeters, taking the viewing distance into account.
+    ///
+    /// # Arguments
+    ///
+    /// * `angle` - The angle in degrees.
+    /// * `viewing_distance_mm` - The viewing distance in millimeters.
+    ///
+    /// # Returns
+    ///
+    /// The distance in millimeters.
     fn angle_to_milimeter(angle: f64, viewing_distance_mm: f64) -> Size {
         Size::Millimeters(
             2.0 * viewing_distance_mm * (angle.to_radians() / 2.0).tan(),
@@ -98,7 +130,7 @@ impl Size {
     ///
     /// # Returns
     ///
-    /// The unit converted to pixels.
+    /// The unit converted to pixels (as a float).
     pub fn to_pixels(
         &self,
         width_mm: f64,
@@ -201,7 +233,6 @@ impl Size {
     }
 }
 
-// implement pretty printing for units
 impl std::fmt::Debug for Size {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -237,6 +268,7 @@ pub trait ToVertices {
     ) -> Vec<Vertex>;
 }
 
+/// A rectangle with a given position and size.
 pub struct Rectangle {
     pub left: Size,
     pub top: Size,
@@ -244,6 +276,7 @@ pub struct Rectangle {
     pub height: Size,
 }
 
+/// A circle with a given center and radius.
 pub struct Circle {
     pub center_x: Size,
     pub center_y: Size,
@@ -251,6 +284,27 @@ pub struct Circle {
 }
 
 impl Rectangle {
+    /// Create a new rectangle.
+    ///
+    /// # Arguments
+    ///
+    /// * `left` - The left position of the rectangle.
+    /// * `top` - The top position of the rectangle.
+    /// * `width` - The width of the rectangle.
+    /// * `height` - The height of the rectangle.
+    ///
+    /// # Returns
+    ///
+    /// A new rectangle.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use psychophysics::visual::geometry::Rectangle;
+    /// use psychophysics::visual::geometry::Size;
+    ///
+    /// let rect = Rectangle::new(Size::Pixels(0.0), Size::Pixels(0.0), Size::Pixels(100.0), Size::Pixels(100.0));
+    /// ```
     pub fn new(
         left: impl Into<Size>,
         top: impl Into<Size>,
@@ -265,6 +319,9 @@ impl Rectangle {
         }
     }
 
+    /// Convert the rectangle to a list of vertices in pixels. The vertices are given as a list of floats,
+    /// where each three floats represent the x, y, and z coordinate of a vertex. The z coordinate is
+    /// always 0.0. X and y coordinates are given in pixels.
     pub fn to_pixels(
         &self,
         width_mm: f64,
@@ -302,6 +359,17 @@ impl Rectangle {
 }
 
 impl Circle {
+    /// Create a new circle.
+    ///
+    /// # Arguments
+    ///
+    /// * `center_x` - The x coordinate of the center of the circle.
+    /// * `center_y` - The y coordinate of the center of the circle.
+    /// * `radius` - The radius of the circle.
+    ///
+    /// # Returns
+    ///
+    /// A new circle.
     pub fn new(
         center_x: impl Into<Size>,
         center_y: impl Into<Size>,
@@ -450,6 +518,14 @@ impl ToVertices for Circle {
     }
 }
 
+/// 2D transformations that can be applied to a stimulus.
+/// This enum is used to specify the transformation of a stimulus. The transformation is applied to the stimulus
+/// just before it is rendered.
+///
+/// Important: The transformation is specified in the constructor of the stimulus, but its actual transformation
+/// matrix is only calculated when the stimulus is rendered. This is because the transformation of the stimulus depends on the
+/// size of the window, the distance of the observer to the screen, and the physical size of the screen. As
+/// some of these parameters may change during the experiment, the transformation matrix of the stimulus can only be known at the time of rendering.
 #[derive(Debug)]
 pub enum Transformation2D {
     /// Identity transformation (no transformation).

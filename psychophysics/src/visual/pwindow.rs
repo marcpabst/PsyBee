@@ -2,6 +2,9 @@
 use crate::request_animation_frame;
 use crate::{input::Key, sleep, PFutureReturns};
 use async_lock::{Mutex, MutexGuard};
+use palette::IntoColor;
+
+use crate::visual::color::ColorFormat;
 
 use atomic_float::AtomicF64;
 
@@ -19,11 +22,11 @@ use wasm_bindgen::{closure::Closure, JsCast};
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
 
-use super::{Color, Renderable};
+use super::Renderable;
 
 /// This is the main window struct. It contains all the information needed to render stimuli and control the graphics pipeline.
 /// Since the window might be shared across threads, you will usually have access to it through a WindowHandle.
-pub struct PWindow {
+pub struct WindowState {
     // the winit window
     pub window: winit::window::Window,
     // the event loop proxy
@@ -42,11 +45,12 @@ pub struct PWindow {
     pub config: wgpu::SurfaceConfiguration,
 }
 
-/// A WindowHandle is a shared reference to a PWindow. It is the main way to interact with the window.
+/// A Winod is a shared reference to a PWindow. It is the main way to interact with the window.
 /// It also stores the channels used for communication between the main task, the render task and the experiment task.
 #[derive(Clone)]
-pub struct WindowHandle {
-    pub pw: Arc<Mutex<PWindow>>,
+pub struct Window {
+    /// The window state.
+    pub state: Arc<Mutex<WindowState>>,
     /// Broadcast receiver for keyboard events. Used by the main window task to send keyboard events to the experiment task.
     pub keyboard_receiver:
         async_broadcast::InactiveReceiver<winit::event::KeyboardInput>,
@@ -62,12 +66,14 @@ pub struct WindowHandle {
     pub physical_width: Arc<AtomicF64>,
     /// Viewing distance in millimeters.
     pub viewing_distance: Arc<AtomicF64>,
+    /// The color format used for rendering.
+    pub color_format: ColorFormat,
 }
 
-impl WindowHandle {
+impl Window {
     /// Returns a MutexGuard to the PWindow behind the mutex.
-    pub async fn get_window(&self) -> MutexGuard<PWindow> {
-        return self.pw.lock().await;
+    pub async fn get_window(&self) -> MutexGuard<WindowState> {
+        return self.state.lock().await;
     }
 
     /// Listens for the specified keypresses and returns the key that was pressed and the time it took to press it.
@@ -130,7 +136,12 @@ impl WindowHandle {
     }
 
     pub async fn close(&self) {
-        self.pw.lock().await.event_loop_proxy.send_event(());
+        self.state.lock().await.event_loop_proxy.send_event(());
+    }
+
+    /// Returns the color format.
+    pub fn get_color_format(&self) -> ColorFormat {
+        self.color_format
     }
 
     /// Returns the 4x4 matrix than when applied to pixel coordinates will transform them to normalized device coordinates.
@@ -147,11 +158,32 @@ impl WindowHandle {
             0.0,0.0, 0.0, 1.0,
         )
     }
+
+    // Create a new frame with a black background.
+    pub fn get_frame(&self) -> Frame {
+        Frame {
+            renderables: Arc::new(Mutex::new(Vec::new())),
+            bg_color: wgpu::Color::BLACK,
+        }
+    }
+
+    // Create a new frame with a custom background color.
+    pub fn get_frame_with_bg_color(
+        &self,
+        bg_color: impl IntoColor<palette::Xyza<palette::white_point::D65, f32>>,
+    ) -> Frame {
+        let bg_color = self.color_format.convert_to_raw_rgba(bg_color);
+
+        Frame {
+            renderables: Arc::new(Mutex::new(Vec::new())),
+            bg_color: (bg_color).into(),
+        }
+    }
 }
 
 /// This is the window's main render task. On native, it will submit frames when they are ready (and block when an approriate presentation mode is used).
 /// On wasm, it will submit frames when the browser requests a new frame.
-pub async fn render_task(window_handle: WindowHandle) {
+pub async fn render_task(window_handle: Window) {
     // get rx and tx from handle
     let tx = window_handle.frame_ok_sender.clone();
     let rx = window_handle.frame_receiver.clone();
@@ -192,7 +224,7 @@ pub async fn render_task(window_handle: WindowHandle) {
                     .expect("Failed to acquire next swap chain texture");
                 let view = suface_texture.texture.create_view(
                     &wgpu::TextureViewDescriptor {
-                        format: Some(wgpu::TextureFormat::Rgba16Float),
+                        format: Some(wgpu::TextureFormat::Bgra8Unorm),
                         ..wgpu::TextureViewDescriptor::default()
                     },
                 );
@@ -262,7 +294,7 @@ pub async fn render_task(window_handle: WindowHandle) {
             let mut frame = block_on(frame.lock());
 
             // acquire lock on window
-            let window_lock = window_handle.pw.lock().await;
+            let window_lock = window_handle.state.lock().await;
 
             let suface_texture = window_lock
                 .surface
@@ -270,7 +302,7 @@ pub async fn render_task(window_handle: WindowHandle) {
                 .expect("Failed to acquire next swap chain texture");
             let view = suface_texture.texture.create_view(
                 &wgpu::TextureViewDescriptor {
-                    format: Some(wgpu::TextureFormat::Rgba16Float),
+                    format: Some(wgpu::TextureFormat::Bgra8Unorm),
                     ..wgpu::TextureViewDescriptor::default()
                 },
             );
@@ -334,7 +366,7 @@ impl Renderable for Frame {
         queue: &wgpu::Queue,
         view: &wgpu::TextureView,
         config: &wgpu::SurfaceConfiguration,
-        window_handle: &WindowHandle,
+        window_handle: &Window,
     ) -> () {
         // call prepare() on all renderables
         for renderable in &mut (block_on(self.renderables.lock())).iter_mut() {
@@ -355,22 +387,6 @@ impl Renderable for Frame {
 }
 
 impl Frame {
-    // Create a new frame with a black background.
-    pub fn new() -> Self {
-        Self {
-            renderables: Arc::new(Mutex::new(Vec::new())),
-            bg_color: Color::rgb(0.0, 0.0, 0.0).into(),
-        }
-    }
-
-    // Create a new frame with a custom background color.
-    pub fn new_with_bg_color(bg_color: Color) -> Self {
-        Self {
-            renderables: Arc::new(Mutex::new(Vec::new())),
-            bg_color: bg_color.into(),
-        }
-    }
-
     /// Add a renderable to the frame.
     pub fn add(
         &mut self,

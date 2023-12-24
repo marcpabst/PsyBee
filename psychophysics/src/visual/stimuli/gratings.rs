@@ -1,6 +1,6 @@
 use super::{
     super::geometry::{Size, ToVertices, Transformation2D},
-    super::pwindow::WindowHandle,
+    super::pwindow::Window,
     base::{BaseStimulus, BaseStimulusPixelShader, ShapeStimulusParams},
 };
 use bytemuck::{Pod, Zeroable};
@@ -32,7 +32,7 @@ pub type GratingsStimulus<'a, G> =
 impl<G: ToVertices> GratingsStimulus<'_, G> {
     /// Create a new gratings stimulus.
     pub fn new(
-        window_handle: &WindowHandle,
+        window_handle: &Window,
         shape: G,
         cycle_length: impl Into<Size>,
         phase: f32,

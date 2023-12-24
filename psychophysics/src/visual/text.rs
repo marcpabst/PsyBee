@@ -4,16 +4,21 @@ use glyphon::{
     Attrs, Buffer, Family, FontSystem, Metrics, Resolution, Shaping, Stretch,
     Style, SwashCache, TextArea, TextAtlas, TextBounds, TextRenderer, Weight,
 };
+use palette::white_point::D65;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::visual::pwindow::WindowHandle;
+use crate::visual::color::RawRgba;
+
+use crate::visual::pwindow::Window;
 
 use wgpu::{Device, MultisampleState, Queue, SurfaceConfiguration};
 
 use crate::visual::geometry::{Rectangle, Size};
 use crate::visual::Renderable;
+
+use super::color;
 
 pub struct TextStimulus {
     config: Arc<Mutex<TextStimulusConfig>>,
@@ -22,6 +27,7 @@ pub struct TextStimulus {
     font_system: Arc<Mutex<FontSystem>>,
     text_buffer: Arc<Mutex<Buffer>>,
     text_cache: Arc<Mutex<SwashCache>>,
+    color_format: color::ColorFormat,
 }
 
 pub struct TextStimulusConfig {
@@ -40,7 +46,7 @@ pub struct TextStimulusConfig {
     // the bounds of the text
     pub bounds: Rectangle,
     // the color of the text
-    pub color: Color,
+    pub color: RawRgba,
 }
 
 // default values for the text stimulus
@@ -54,7 +60,13 @@ impl Default for TextStimulusConfig {
             font_weight: Weight::NORMAL,
             font_style: Style::Normal,
             font_width: Stretch::Normal,
-            color: Color::rgb(1.0, 1.0, 1.0).into(),
+            color: RawRgba {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            }
+            .into(),
         }
     }
 }
@@ -68,6 +80,7 @@ impl Clone for TextStimulus {
             font_system: self.font_system.clone(),
             text_buffer: self.text_buffer.clone(),
             text_cache: self.text_cache.clone(),
+            color_format: self.color_format.clone(),
         }
     }
 }
@@ -79,7 +92,7 @@ impl Renderable for TextStimulus {
         queue: &Queue,
         _view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
-        window_handle: &WindowHandle,
+        window_handle: &Window,
     ) -> () {
         let conf = self.config.lock().unwrap();
 
@@ -177,10 +190,7 @@ impl Renderable for TextStimulus {
 }
 
 impl TextStimulus {
-    pub fn new(
-        window_handle: &WindowHandle,
-        config: TextStimulusConfig,
-    ) -> Self {
+    pub fn new(window_handle: &Window, config: TextStimulusConfig) -> Self {
         let window = block_on(window_handle.get_window());
         let device = &window.device;
         let queue = &window.queue;
@@ -238,7 +248,7 @@ impl TextStimulus {
         }
 
         let cache = SwashCache::new();
-        let mut atlas = TextAtlas::new(&device, &queue, swapchain_format);
+        let mut atlas = TextAtlas::new(device, queue, swapchain_format);
         let text_renderer = TextRenderer::new(
             &mut atlas,
             &device,
@@ -271,13 +281,22 @@ impl TextStimulus {
             font_system: Arc::new(Mutex::new(font_system)),
             text_buffer: Arc::new(Mutex::new(buffer)),
             text_cache: Arc::new(Mutex::new(cache)),
+            color_format: window_handle.color_format,
         }
     }
 
-    pub fn set_color(&mut self, color: Color) {
+    pub fn set_color(
+        &mut self,
+        color: impl palette::IntoColor<palette::Xyza<D65, f32>>,
+    ) {
+        let color: palette::Xyza<D65, f32> = color.into_color();
+        log::info!("Setting color to {:?}", color);
+        let color = self.color_format.convert_to_raw_rgba(color);
+        log::info!("Setting color to {:?}", color);
         let mut conf = self.config.lock().unwrap();
         conf.color = color;
     }
+
     pub fn set_text(&mut self, text: String) {
         let mut conf = self.config.lock().unwrap();
         conf.text = text;

@@ -1,6 +1,6 @@
 use super::{
     super::geometry::{Size, ToVertices},
-    super::pwindow::WindowHandle,
+    super::pwindow::Window,
     base::{BaseStimulus, BaseStimulusPixelShader, ShapeStimulusParams},
 };
 use bytemuck::{Pod, Zeroable};
@@ -30,7 +30,7 @@ pub type ImageStimulus<'a, G> =
 impl<G: ToVertices> ImageStimulus<'_, G> {
     /// Create a new image stimulus.
     pub fn new(
-        window_handle: &WindowHandle,
+        window_handle: &Window,
         shape: G,
         image: image::DynamicImage,
     ) -> Self {

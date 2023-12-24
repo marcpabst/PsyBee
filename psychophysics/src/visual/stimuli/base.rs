@@ -15,7 +15,7 @@ use bytemuck::{Pod, Zeroable};
 use super::super::geometry::ToVertices;
 use super::super::geometry::Transformation2D;
 use super::super::geometry::Vertex;
-use super::super::pwindow::WindowHandle;
+use super::super::pwindow::Window;
 use wgpu::util::DeviceExt;
 use wgpu::{Device, Queue, ShaderModule, SurfaceConfiguration};
 
@@ -50,7 +50,7 @@ pub struct BaseStimulus<
     /// The rendering pipeline for the stimulus.
     pipeline: Arc<Mutex<wgpu::RenderPipeline>>,
     /// The window used to create the stimulus.
-    window: WindowHandle,
+    window: Window,
     /// A `Transformation2D` that will be applied in the vertex shader.
     transforms: Arc<Mutex<Transformation2D>>,
     /// Vertex buffer that will be uploaded to the shader.
@@ -105,7 +105,7 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
         queue: &Queue,
         _view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
-        window_handle: &super::super::pwindow::WindowHandle,
+        window_handle: &super::super::pwindow::Window,
     ) -> () {
         let screen_width_mm =
             window_handle.physical_width.load(Ordering::Relaxed);
@@ -149,7 +149,7 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
 
         // update the transform buffer
         // first get the transformation matrix from the window handle
-        let win_transform = WindowHandle::transformation_matrix_to_ndc(
+        let win_transform = Window::transformation_matrix_to_ndc(
             screen_width_px,
             screen_height_px,
         )
@@ -222,7 +222,7 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
 {
     /// Create a new stimulus.
     pub fn create(
-        window_handle: &WindowHandle,
+        window_handle: &Window,
         shader: S,
         shape: G,
         stim_params: P,
@@ -331,11 +331,11 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 // TODO: this should be configurable
-                format: wgpu::TextureFormat::Rgba16Float,
+                format: wgpu::TextureFormat::Bgra8UnormSrgb,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING
                     | wgpu::TextureUsages::COPY_DST,
                 label: Some("diffuse_texture"),
-                view_formats: &[wgpu::TextureFormat::Rgba16Float], // allow reading texture in linear space
+                view_formats: &[wgpu::TextureFormat::Bgra8Unorm], // allow reading texture in linear space
             });
             Some(texture)
         } else {
@@ -347,7 +347,7 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
             if let Some(texture) = &texture {
                 let texture_view =
                     texture.create_view(&wgpu::TextureViewDescriptor {
-                        format: Some(wgpu::TextureFormat::Rgba16Float),
+                        format: Some(wgpu::TextureFormat::Bgra8Unorm),
                         ..Default::default()
                     });
                 let texture_sampler =
@@ -436,7 +436,7 @@ impl<G: ToVertices, S: BaseStimulusPixelShader<P>, P: ShapeStimulusParams>
             });
 
         let swapchain_capabilities = surface.get_capabilities(adapter);
-        let swapchain_format = TextureFormat::Rgba16Float;
+        let swapchain_format = TextureFormat::Bgra8Unorm;
 
         log::warn!("swapchain format: {:?}", swapchain_capabilities.formats);
 
