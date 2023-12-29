@@ -33,10 +33,9 @@ pub mod pwindow;
 pub mod stimuli;
 pub mod text;
 
-use wgpu::{Device, Queue, SurfaceConfiguration};
+pub use pwindow::Window;
 
-// re-export the color module
-pub use color::RawRgba;
+use wgpu::{Device, Queue, SurfaceConfiguration};
 
 /// Trait for all renderable objects. This mostly follows the `wgpu`
 /// recommendations for rendering middleware. This is trait is mostly

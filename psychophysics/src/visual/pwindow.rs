@@ -1,7 +1,9 @@
 #[cfg(target_arch = "wasm32")]
 use crate::request_animation_frame;
-use crate::{input::Key, sleep, PFutureReturns};
+use crate::utils::BlockingLock;
+use crate::{async_sleep, input::Key, PFutureReturns};
 use async_lock::{Mutex, MutexGuard};
+use futures_lite::Future;
 use palette::IntoColor;
 
 use crate::visual::color::ColorFormat;
@@ -14,6 +16,7 @@ use async_channel::{bounded, Receiver, Sender};
 use futures_lite::future::block_on;
 #[cfg(target_arch = "wasm32")]
 use std::cell::RefCell;
+use std::pin::Pin;
 #[cfg(target_arch = "wasm32")]
 use std::rc::Rc;
 use std::sync::Arc;
@@ -62,6 +65,12 @@ pub struct Window {
     pub frame_ok_sender: Sender<bool>,
     /// Channel for frame consumption. Used by the render task to notify the experiment task that a frame has been consumed.
     pub frame_ok_receiver: Receiver<bool>,
+    /// Channel for sending a future to the render task. The future will be executed on the render thread.
+    pub render_task_sender:
+        Sender<Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()>>>>>,
+    /// Channel for receiving functions that should be executed on the render thread.
+    pub render_task_receiver:
+        Receiver<Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()>>>>>,
     /// Physical width of the window in millimeters.
     pub physical_width: Arc<AtomicF64>,
     /// Viewing distance in millimeters.
@@ -70,9 +79,17 @@ pub struct Window {
     pub color_format: ColorFormat,
 }
 
+// mark Window as Send and Sync
+unsafe impl Send for Window {}
+unsafe impl Sync for Window {}
+
 impl Window {
     /// Returns a MutexGuard to the PWindow behind the mutex.
-    pub async fn get_window(&self) -> MutexGuard<WindowState> {
+    pub fn get_window_state_blocking(&self) -> MutexGuard<WindowState> {
+        return self.state.lock_blocking();
+    }
+
+    pub async fn get_window_state(&self) -> MutexGuard<WindowState> {
         return self.state.lock().await;
     }
 
@@ -114,6 +131,37 @@ impl Window {
         )));
     }
 
+    /// Send a task to the render thread. The task will be executed on the render thread and will block the current thread until it is finished.
+    pub fn run_on_render_thread<R, Fut>(
+        &self,
+        task: impl FnOnce() -> Fut + 'static,
+    ) -> R
+    where
+        Fut: Future<Output = R> + 'static,
+        R: std::marker::Send + 'static,
+    {
+        // create channel to receive result
+        let (tx, rx) = bounded(1);
+
+        // create task
+        let rtask = move || {
+            let task = async move {
+                let result = task().await;
+                block_on(tx.send(result));
+            };
+            Box::pin(task) as Pin<Box<dyn Future<Output = ()>>>
+        };
+
+        let rtask_boxed = Box::new(rtask)
+            as Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()>>>>;
+
+        // send task
+        block_on(self.render_task_sender.send(rtask_boxed));
+
+        // wait for result
+        return block_on(rx.recv()).unwrap();
+    }
+
     /// Same as wait_for_keypress, but waits for any keypress.
     pub async fn wait_for_any_keypress(
         &self,
@@ -124,19 +172,19 @@ impl Window {
 
     /// Submits a frame to the render task. This will in turn call the prepare() and render() functions of all renderables in the frame.
     /// The future will return when the frame has been commited to the global render queue.
-    pub async fn submit_frame(&self, frame: Frame) {
+    pub fn submit_frame(&self, frame: Frame) {
         let frame_sender = self.frame_sender.clone();
         let frame_ok_receiver = self.frame_ok_receiver.clone();
 
         // submit frame to channel
-        frame_sender.send(Arc::new(Mutex::new(frame))).await;
+        block_on(frame_sender.send(Arc::new(Mutex::new(frame))));
 
         // wait for frame to be consumed
-        frame_ok_receiver.recv().await;
+        block_on(frame_ok_receiver.recv());
     }
 
-    pub async fn close(&self) {
-        self.state.lock().await.event_loop_proxy.send_event(());
+    pub fn close(&self) {
+        self.state.lock_blocking().event_loop_proxy.send_event(());
     }
 
     /// Returns the color format.
@@ -181,6 +229,17 @@ impl Window {
     }
 }
 
+/// This is the second render task. It is used to execute tasks on the render thread when running on WASM.
+pub async fn render_task2(window_handle: Window) {
+    // loop
+    loop {
+        // wait until task is available
+        let task = window_handle.render_task_receiver.recv().await.unwrap();
+        // await the task
+        task().await;
+    }
+}
+
 /// This is the window's main render task. On native, it will submit frames when they are ready (and block when an approriate presentation mode is used).
 /// On wasm, it will submit frames when the browser requests a new frame.
 pub async fn render_task(window_handle: Window) {
@@ -213,10 +272,10 @@ pub async fn render_task(window_handle: Window) {
             if try_frame.is_ok() {
                 let frame = try_frame.unwrap();
                 // acquire lock on frame
-                let mut frame = block_on(frame.lock());
+                let mut frame = frame.lock_blocking();
 
                 // acquire lock on window
-                let window_lock = block_on(window_handle.get_window());
+                let window_lock = window_handle.get_window_state_blocking();
 
                 let suface_texture: wgpu::SurfaceTexture = window_lock
                     .surface
@@ -291,10 +350,10 @@ pub async fn render_task(window_handle: Window) {
             let frame = rx.recv().await.unwrap();
 
             // acquire lock on frame
-            let mut frame = block_on(frame.lock());
+            let mut frame = (frame.lock_blocking());
 
             // acquire lock on window
-            let window_lock = window_handle.state.lock().await;
+            let window_lock = window_handle.state.lock_blocking();
 
             let suface_texture = window_lock
                 .surface
@@ -311,6 +370,7 @@ pub async fn render_task(window_handle: Window) {
             );
             // clear the frame
             {
+                log::info!("Clearing frame with color {:?}", frame.bg_color);
                 // clear the frame (once the lifetime annoyance is fixed, this can be removed only a single render pass is needed
                 // using the LoadOp::Clear option)
                 let _rpass = &mut encoder.begin_render_pass(
@@ -347,7 +407,7 @@ pub async fn render_task(window_handle: Window) {
             suface_texture.present();
 
             // notify sender that frame has been consumed
-            let _ = tx.send(true).await;
+            let _ = block_on(tx.send(true));
         }
     }
 }
@@ -369,7 +429,7 @@ impl Renderable for Frame {
         window_handle: &Window,
     ) -> () {
         // call prepare() on all renderables
-        for renderable in &mut (block_on(self.renderables.lock())).iter_mut() {
+        for renderable in &mut (self.renderables.lock_blocking()).iter_mut() {
             renderable.prepare(device, queue, view, config, window_handle);
         }
     }
@@ -380,7 +440,7 @@ impl Renderable for Frame {
         view: &wgpu::TextureView,
     ) -> () {
         // call render() on all renderables
-        for renderable in &mut (block_on(self.renderables.lock())).iter_mut() {
+        for renderable in &mut (self.renderables.lock_blocking()).iter_mut() {
             renderable.render(enc, view);
         }
     }
@@ -393,7 +453,7 @@ impl Frame {
         renderable: &(impl Renderable + Clone + 'static),
     ) -> () {
         let renderable = Box::new(renderable.clone());
-        block_on(self.renderables.lock()).push(renderable);
+        (self.renderables.lock_blocking()).push(renderable);
     }
 }
 

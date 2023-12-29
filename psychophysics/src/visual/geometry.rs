@@ -102,6 +102,15 @@ impl std::ops::Div<f64> for Size {
     }
 }
 
+// implements the minus operator for a single size
+impl std::ops::Neg for Size {
+    type Output = Size;
+    /// Negate a unit. The results is a `Unit::Product` with a factor of -1.0.
+    fn neg(self) -> Self::Output {
+        Size::Product(Box::new(self), -1.0)
+    }
+}
+
 impl Size {
     /// Convert the given angle of visual angle to millimeters, taking the viewing distance into account.
     ///
@@ -254,7 +263,7 @@ impl std::fmt::Debug for Size {
 }
 
 /// Types that can be triangulated, i.e. converted to a list of vertices.
-pub trait ToVertices {
+pub trait ToVertices: Send + Sync {
     /// Convert the shape to a list of vertices in pixels. The vertices are given as a list of floats,
     /// where each three floats represent the x, y, and z coordinate of a vertex. The z coordinate is
     /// always 0.0. X and y coordinates are given in NDC (Normalized Device Coordinates) space, i.e. between -1

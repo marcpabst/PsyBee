@@ -3,8 +3,9 @@ use palette::{
     IntoColor,
 };
 use psychophysics::{
+    async_sleep,
     input::Key,
-    log_extra, loop_frames, sleep, start_experiment,
+    log_extra, loop_frames, start_experiment,
     visual::{
         color::{self, LinearSRGBA, YxyA, SRGBA, XYZA},
         geometry::Circle,

@@ -7,6 +7,7 @@ use futures_lite::{future::block_on, Future};
 
 use crate::visual::color::ColorFormat;
 
+use crate::utils::BlockingLock;
 use async_executor::Executor;
 
 use input::Key;
@@ -20,10 +21,18 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::ControlFlow;
 
 pub mod input;
+pub mod utils;
 pub mod visual;
 use winit::event_loop::EventLoop;
 
-use crate::visual::pwindow::{render_task, Frame, Window, WindowState};
+#[cfg(not(target_arch = "wasm32"))]
+use std::thread;
+#[cfg(target_arch = "wasm32")]
+use wasm_thread as thread;
+
+use crate::visual::pwindow::{
+    render_task, render_task2, Frame, Window, WindowState,
+};
 pub enum PFutureReturns {
     Duration(Duration),
     Timeout(Duration),
@@ -97,7 +106,7 @@ impl UnwrapKeyPressAndDuration for Result<PFutureReturns, anyhow::Error> {
     }
 }
 
-pub async fn sleep(secs: f64) -> Result<PFutureReturns, anyhow::Error> {
+pub async fn async_sleep(secs: f64) -> Result<PFutureReturns, anyhow::Error> {
     let start = web_time::Instant::now();
     #[cfg(not(target_arch = "wasm32"))]
     smol::Timer::after(Duration::from_micros((secs * 1000000.0) as u64)).await;
@@ -146,7 +155,7 @@ pub fn request_animation_frame(f: &Closure<dyn FnMut()>) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn spawn_task<F>(future: F)
+pub fn spawn_async_task<F>(future: F)
 where
     F: Future<Output = ()> + 'static + Send,
 {
@@ -154,7 +163,7 @@ where
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn spawn_task<F>(future: F)
+pub fn spawn_async_task<F>(future: F)
 where
     F: Future<Output = ()> + 'static,
 {
@@ -176,9 +185,9 @@ pub trait FutureReturnTrait: Future<Output = ()> + 'static {}
 #[cfg(target_arch = "wasm32")]
 impl<F> FutureReturnTrait for F where F: Future<Output = ()> + 'static {}
 
-pub fn start_experiment<F>(experiment_fn: impl FnOnce(Window) -> F + 'static)
+pub fn start_experiment<F>(experiment_fn: F) -> ()
 where
-    F: FutureReturnTrait,
+    F: FnOnce(Window) -> () + 'static + Send,
 {
     let event_loop = EventLoop::new();
     let winit_window = winit::window::Window::new(&event_loop).unwrap();
@@ -237,6 +246,16 @@ where
                 .ok()
             })
             .expect("couldn't append canvas to document body");
+
+        // set canvas size
+        let canvas = winit_window.canvas();
+        let document = web_sys::window().unwrap().document().unwrap();
+        let width = document.body().unwrap().client_width();
+        let height = document.body().unwrap().client_height();
+        winit_window.set_inner_size(winit::dpi::LogicalSize::new(
+            width as f64,
+            height as f64,
+        ));
         wasm_bindgen_futures::spawn_local(run(
             event_loop,
             winit_window,
@@ -248,9 +267,9 @@ where
 async fn run<F>(
     event_loop: EventLoop<()>,
     winit_window: winit::window::Window,
-    experiment_fn: impl FnOnce(Window) -> F,
+    experiment_fn: F,
 ) where
-    F: FutureReturnTrait,
+    F: FnOnce(Window) -> () + 'static + Send,
 {
     log::debug!(
         "Main task is running on thread {:?}",
@@ -291,13 +310,16 @@ async fn run<F>(
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = TextureFormat::Bgra8Unorm;
-    let swapchain_view_format = vec![TextureFormat::Bgra8UnormSrgb];
+    let swapchain_view_format =
+        vec![TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb];
 
     // log supported texture formats
     log::info!("Supported texture formats:");
     for format in swapchain_capabilities.formats {
         log::info!("{:?}", format);
     }
+
+    log::info!("Selected swapchain format: {:?}", swapchain_format);
 
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -329,6 +351,9 @@ async fn run<F>(
     >;
     (keyboard_sender, keyboard_receiver) = broadcast(100);
 
+    // create channel for sending tasks to the render thread
+    let (render_task_sender, render_task_receiver) = bounded(100);
+
     // set overflow strategy
     keyboard_sender.set_overflow(true);
 
@@ -357,16 +382,27 @@ async fn run<F>(
         physical_width: Arc::new(AtomicF64::new(300.0)),
         viewing_distance: Arc::new(AtomicF64::new(57.0)),
         color_format: ColorFormat::SRGBA8,
+        render_task_sender: render_task_sender,
+        render_task_receiver: render_task_receiver,
     };
 
     // start renderer
     {
         let win_handle = win_handle.clone();
-        spawn_task(render_task(win_handle));
+        spawn_async_task(render_task(win_handle));
+    }
+    // start renderer2
+    {
+        let win_handle = win_handle.clone();
+        spawn_async_task(render_task2(win_handle));
     }
 
+    let cwh = win_handle.clone();
+
     // start experiment
-    spawn_task(experiment_fn(win_handle.clone()));
+    thread::spawn(move || {
+        experiment_fn(cwh);
+    });
 
     event_loop.run(move |event: Event<'_, ()>, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -377,7 +413,7 @@ async fn run<F>(
             } => {
                 log::info!("Window resized");
                 // Reconfigure the surface with the new size (this should likely be done on the renderer thread instead)
-                let mut pwindow = block_on(win_handle.state.lock());
+                let mut pwindow = win_handle.state.lock_blocking();
                 pwindow.config.width = new_size.width.max(1);
                 pwindow.config.height = new_size.height.max(1);
                 pwindow.surface.configure(&pwindow.device, &pwindow.config);
@@ -422,7 +458,7 @@ async fn run<F>(
 
 #[macro_export]
 macro_rules! loop_frames {
-    ($win:expr $(, keys = $keys:expr)? $(, keystate = $keystate:expr)? $(, timeout = $timeout:expr)?, $body:block) => {
+    ($frame:ident from $win:expr $(, keys = $keys:expr)? $(, keystate = $keystate:expr)? $(, timeout = $timeout:expr)?, $body:block) => {
         {
             use psychophysics::input::Key;
             use psychophysics::input::KeyState;
@@ -433,9 +469,10 @@ macro_rules! loop_frames {
             let mut keyboard_receiver = $win.keyboard_receiver.activate_cloned();
 
             let mut kc: Option<Key> = None;
-
             {
+                let mut $frame = $win.get_frame();
                 $body
+                $win.submit_frame($frame);
             }
 
             let start = web_time::Instant::now();
@@ -455,7 +492,9 @@ macro_rules! loop_frames {
                     }
                 }
                 // if not, run another iteration of the loop
+                let mut $frame = $win.get_frame();
                 $body
+                $win.submit_frame($frame);
             }
         (kc, start.elapsed())
         }

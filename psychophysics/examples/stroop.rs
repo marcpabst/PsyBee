@@ -10,7 +10,29 @@ use psychophysics::{
     },
 };
 
-async fn stroop_experiment(window: Window) {
+#[cfg(target_arch = "wasm32")]
+mod wasm {
+    use super::main;
+    use wasm_bindgen::prelude::*;
+
+    // Prevent `wasm_bindgen` from autostarting main on all spawned threads
+    #[wasm_bindgen(start)]
+    pub fn dummy_main() {
+        // log message to console
+        use web_sys::console;
+        console::log_1(&"Dummy main".into());
+    }
+
+    // Export explicit run function to start main
+    #[wasm_bindgen]
+    pub fn run() {
+        use web_sys::console;
+        console::log_1(&"Real main".into());
+        main();
+    }
+}
+
+fn stroop_experiment(window: Window) {
     // define colors for stroop task
     let colors = vec![color::RED, color::GREEN, color::BLUE, color::YELLOW];
     let names = vec!["RED", "GREEN", "BLUE", "YELLOW"];
@@ -20,8 +42,9 @@ async fn stroop_experiment(window: Window) {
 
     log::info!("Starting Stroop experiment");
 
-    let image_stim = ImageStimulus::new(
-        &window,
+    let ww = window.clone();
+    let mut image_stim = ImageStimulus::new(
+        &ww,
         Rectangle::new(
             Size::Pixels(-250.0),
             Size::Pixels(-250.0),
@@ -31,7 +54,10 @@ async fn stroop_experiment(window: Window) {
         image::load_from_memory(include_bytes!("wicked_witch.png")).unwrap(),
     );
 
-    // First, create a vector of trials. Each trial is a tuple of (trial number, name, color, key)
+    // rotate image stimulus by 45 degrees
+    image_stim.set_transformation(Transformation2D::RotationCenter(45.0));
+
+    // first, we create a vector of trials. Each trial is a tuple of (trial number, name, color, key)
     let mut trials = Vec::with_capacity(n_trials);
     for i in 0..n_trials {
         // draw a random color and name
@@ -95,7 +121,7 @@ async fn stroop_experiment(window: Window) {
         // add image stimulus to frame
         frame.add(&image_stim);
         // submit frame
-        window.submit_frame(frame).await;
+        window.submit_frame(frame);
     });
 
     // This is the trial loop that will be executed n_trials times
@@ -106,7 +132,7 @@ async fn stroop_experiment(window: Window) {
             // add fixation cross to frame
             frame.add(&fixation_cross);
             // submit frame
-            window.submit_frame(frame).await;
+            window.submit_frame(frame);
         });
 
         // set color and text
@@ -120,7 +146,7 @@ async fn stroop_experiment(window: Window) {
                 // add word text to frame
                 frame.add(&word_text);
                 // submit frame
-                window.submit_frame(frame).await;
+                window.submit_frame(frame);
             });
 
         // check if key was pressed
@@ -148,7 +174,7 @@ async fn stroop_experiment(window: Window) {
                 // add text stimulus to frame
                 frame.add(&too_slow_text);
                 // submit frame
-                window.submit_frame(frame).await;
+                window.submit_frame(frame);
             });
         }
     }
@@ -158,13 +184,13 @@ async fn stroop_experiment(window: Window) {
         // add text stimulus to frame
         frame.add(&end_text);
         // submit frame
-        window.submit_frame(frame).await;
+        window.submit_frame(frame);
     });
 
     log::info!("End of Stroop experiment");
 
     // close window
-    window.close().await;
+    window.close();
 }
 
 fn main() {

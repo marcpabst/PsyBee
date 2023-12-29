@@ -343,7 +343,7 @@ impl ColorFormat {
     /// Returns the wgpu::TextureFormat that corresponds to this color format.
     pub fn to_wgpu_texture_format(&self) -> TextureFormat {
         match self {
-            ColorFormat::SRGBA8 => TextureFormat::Rgba8UnormSrgb,
+            ColorFormat::SRGBA8 => TextureFormat::Bgra8UnormSrgb,
             ColorFormat::DisplayP3U8 => TextureFormat::Bgra8UnormSrgb,
         }
     }

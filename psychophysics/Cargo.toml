@@ -26,7 +26,6 @@ fontdb = "0.16.0"
 fastrand = "2.0.1"
 async-broadcast = { git = "https://github.com/kuviman/async-broadcast", rev = "6767b8a76cd2a1b57da0dd435488df112514afe8" }
 futures-lite = "2.1.0"
-async-lock = "3.2.0"
 async-executor = "1.8.0"
 async-channel = "2.1.1"
 log = "0.4.20"
@@ -37,13 +36,15 @@ serialport = "4.3.0"
 spin_sleep = "1.1.1"
 half = {version = "2.3.1", features = ["bytemuck"]}
 palette = "0.7.3"
+async-lock = "3.2.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 smol = "1.3.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { version="0.3.64", features=["Window"] }
+web-sys = { version="0.3.64", features=["Window", "HtmlVideoElement", "HtmlCanvasElement", "Document", "Element", "MediaStream", "Node", "CanvasRenderingContext2d", "ImageData"] }
 js-sys = "0.3.66"
 console_error_panic_hook.workspace = true
 console_log.workspace = true
 wasm-bindgen-futures.workspace = true
+wasm_thread = "0.2.0"

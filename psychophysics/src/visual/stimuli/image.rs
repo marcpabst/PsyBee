@@ -1,102 +1,101 @@
 use super::{
-    super::geometry::{Size, ToVertices},
+    super::geometry::{Rectangle, Size},
     super::pwindow::Window,
-    base::{BaseStimulus, BaseStimulusPixelShader, ShapeStimulusParams},
+    base::{BaseStimulus, BaseStimulusImplementation, BaseStimulusParams},
 };
-use bytemuck::{Pod, Zeroable};
-use futures_lite::future::block_on;
-use half::f16;
 use image;
-use std::borrow::Cow;
-use wgpu::{Device, ShaderModule};
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Pod, Zeroable)]
-pub struct ImageStimulusParams {
-    s: f32,
-}
-
-// TODO: make this a macro
-impl ShapeStimulusParams for ImageStimulusParams {}
-
-pub struct ImageStimulusShader {
-    shader: ShaderModule,
+pub(crate) struct ImageStimulusImplementation {
     image: image::DynamicImage,
+    shape: Rectangle,
 }
 
-pub type ImageStimulus<'a, G> =
-    BaseStimulus<G, ImageStimulusShader, ImageStimulusParams>;
+pub type ImageStimulus<'a> = BaseStimulus<ImageStimulusImplementation>;
 
-impl<G: ToVertices> ImageStimulus<'_, G> {
+impl ImageStimulus {
     /// Create a new image stimulus.
-    pub fn new(
-        window_handle: &Window,
-        shape: G,
-        image: image::DynamicImage,
-    ) -> Self {
-        let window = block_on(window_handle.get_window());
-        let device = &window.device;
+    ///
+    /// # Arguments
+    ///
+    /// * `window` - The window to which the stimulus will be added.
+    /// * `image` - The image to be displayed.
+    ///
+    /// # Returns
+    ///
+    /// A new image stimulus.
+    pub fn new(window: &Window, image: image::DynamicImage) -> Self {
+        let window = window.clone();
+        window.clone().run_on_render_thread(|| async move {
+            BaseStimulus::create(
+                &window.get_window_state().await.device,
+                ImageStimulusImplementation::new(&device, image),
+            )
+        })
+    }
 
-        let shader = ImageStimulusShader::new(&device, image);
+    /// Set the rectangle used to display the image on the screen.
+    ///
+    /// # Arguments
+    ///
+    /// * `shape` - A rectangle that defines the position and size of the image.
+    pub fn set_rectangle(&self, shape: Rectangle) {
+        (self.stimulus_implementation.lock_blocking()).shape = shape;
+    }
+}
 
-        let params = ImageStimulusParams { s: 3.0 };
-
-        drop(window); // this prevent a deadlock (argh, i'll have to refactor this)
-
-        let texture_size = wgpu::Extent3d {
-            width: shader.image.width(),
-            height: shader.image.height(),
-            depth_or_array_layers: 1,
-        };
-
-        let texture_data = shader.image.to_rgba8();
-        // convert to Rgba16Float
-        let texture_data: Vec<f16> = texture_data
-            .iter()
-            .map(|x| f16::from_f32(*x as f32 / 255.0))
-            .collect();
-
-        let out = BaseStimulus::create(
-            window_handle,
-            shader,
-            shape,
-            params,
-            Some(texture_size),
+impl ImageStimulusImplementation {
+    pub fn new(device: &Device, image: image::DynamicImage) -> Self {
+        // by default, we create a rectangle that fills the screen
+        let shape = Rectangle::new(
+            -Size::Pixels(image.width() as f64 / 2.0),
+            -Size::Pixels(image.height() as f64 / 2.0),
+            Size::Pixels(image.width() as f64),
+            Size::Pixels(image.height() as f64),
         );
 
-        // upload texture data
-        out.set_texture(texture_data.as_slice());
-
-        out
+        Self { image, shape }
     }
 }
 
-impl ImageStimulusShader {
-    pub fn new(device: &Device, image: image::DynamicImage) -> Self {
-        let shader: ShaderModule =
-            device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-                    "shaders/image.wgsl"
-                ))),
-            });
-
-        Self { shader, image }
+impl BaseStimulusImplementation for ImageStimulusImplementation {
+    fn get_fragment_shader_code(&self) -> String {
+        "
+        @fragment
+        fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+            return textureSample(texture, texture_sampler, in.tex_coords);
+        }
+        "
+        .to_string()
     }
-}
 
-impl BaseStimulusPixelShader<ImageStimulusParams> for ImageStimulusShader {
-    fn prepare(
-        &self,
-        params: &mut ImageStimulusParams,
-        width_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: i32,
-        height_px: i32,
-    ) {
-        // nothing to do here
+    fn get_texture_data(&self) -> Option<(Vec<u8>)> {
+        // convert from rgba to bgra
+        let texture_data: Vec<u8> = self
+            .image
+            .to_rgba8()
+            .chunks_exact(4)
+            .flat_map(|chunk| {
+                [
+                    chunk[2], // r
+                    chunk[1], // g
+                    chunk[0], // b
+                    chunk[3], // a
+                ]
+            })
+            .collect();
+
+        Some(texture_data)
     }
-    fn get_shader(&self) -> &ShaderModule {
-        &self.shader
+
+    fn get_texture_size(&self) -> wgpu::Extent3d {
+        wgpu::Extent3d {
+            width: self.image.width(),
+            height: self.image.height(),
+            depth_or_array_layers: 1,
+        }
+    }
+
+    fn get_geometry(&self) -> Box<dyn crate::visual::geometry::ToVertices> {
+        Box::new(self.shape.clone())
     }
 }

@@ -1,3 +1,5 @@
+use crate::utils::BlockingLock;
+use async_lock::Mutex;
 use futures_lite::future::block_on;
 use glyphon::cosmic_text::Align;
 use glyphon::{
@@ -7,7 +9,6 @@ use glyphon::{
 use palette::white_point::D65;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use crate::visual::color::RawRgba;
 
@@ -94,12 +95,12 @@ impl Renderable for TextStimulus {
         config: &SurfaceConfiguration,
         window_handle: &Window,
     ) -> () {
-        let conf = self.config.lock().unwrap();
+        let conf = self.config.lock_blocking();
 
         {
             // update the text buffer
-            let mut buffer = self.text_buffer.lock().unwrap();
-            let mut font_system = self.font_system.lock().unwrap();
+            let mut buffer = self.text_buffer.lock_blocking();
+            let mut font_system = self.font_system.lock_blocking();
             buffer.set_text(
                 &mut font_system,
                 &conf.text,
@@ -129,19 +130,18 @@ impl Renderable for TextStimulus {
         );
 
         self.text_renderer
-            .lock()
-            .unwrap()
+            .lock_blocking()
             .prepare(
                 device,
                 queue,
-                &mut self.font_system.lock().unwrap(),
-                &mut self.text_atlas.lock().unwrap(),
+                &mut self.font_system.lock_blocking(),
+                &mut self.text_atlas.lock_blocking(),
                 Resolution {
                     width: config.width,
                     height: config.height,
                 },
                 [TextArea {
-                    buffer: &self.text_buffer.lock().unwrap(),
+                    buffer: &self.text_buffer.lock_blocking(),
                     left: (bounds_px[0] + config.width as f64 / 2.0) as f32,
                     top: (bounds_px[1] + config.height as f64 / 2.0) as f32,
                     scale: 1.0,
@@ -153,7 +153,7 @@ impl Renderable for TextStimulus {
                     },
                     default_color: conf.color.into(),
                 }],
-                &mut self.text_cache.lock().unwrap(),
+                &mut self.text_cache.lock_blocking(),
             )
             .unwrap();
     }
@@ -163,8 +163,8 @@ impl Renderable for TextStimulus {
         view: &wgpu::TextureView,
     ) -> () {
         // Lock and dereference to get to the inner data
-        let text_renderer = self.text_renderer.lock().unwrap();
-        let atlas = self.text_atlas.lock().unwrap();
+        let text_renderer = self.text_renderer.lock_blocking();
+        let atlas = self.text_atlas.lock_blocking();
         {
             let mut rpass =
                 enc.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -191,7 +191,7 @@ impl Renderable for TextStimulus {
 
 impl TextStimulus {
     pub fn new(window_handle: &Window, config: TextStimulusConfig) -> Self {
-        let window = block_on(window_handle.get_window());
+        let window = window_handle.get_window_state_blocking();
         let device = &window.device;
         let queue = &window.queue;
         let adapter = &window.adapter;
@@ -293,12 +293,12 @@ impl TextStimulus {
         log::info!("Setting color to {:?}", color);
         let color = self.color_format.convert_to_raw_rgba(color);
         log::info!("Setting color to {:?}", color);
-        let mut conf = self.config.lock().unwrap();
+        let mut conf = self.config.lock_blocking();
         conf.color = color;
     }
 
     pub fn set_text(&mut self, text: String) {
-        let mut conf = self.config.lock().unwrap();
+        let mut conf = self.config.lock_blocking();
         conf.text = text;
     }
 }
