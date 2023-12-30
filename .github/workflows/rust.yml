@@ -14,9 +14,9 @@ jobs:
       - name: Setup | Checkout
         uses: actions/checkout@v2
       - name: Setup | Rust
-        uses: ATiltedTree/setup-rust@v1
+        uses: moonrepo/setup-rust@v1.1.0
         with:
-          rust-version: nightly
+          channel: nightly
           targets: wasm32-unknown-unknown
       - name: Build | Compile
         run: ./build.sh --example image
