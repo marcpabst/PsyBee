@@ -3,11 +3,11 @@ use crate::visual::geometry::Size;
 use crate::visual::Renderable;
 use async_lock::Mutex;
 use async_trait::async_trait;
-use bytemuck::{Pod, Zeroable};
-use half::f16;
-use nalgebra::geometry;
-use ndarray::ArrayView;
-use std::ops::Deref;
+
+
+
+
+
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ use super::super::geometry::Vertex;
 use super::super::pwindow::Window;
 use super::super::pwindow::WindowState;
 use wgpu::util::DeviceExt;
-use wgpu::{Device, Queue, ShaderModule, SurfaceConfiguration};
+use wgpu::{Device, Queue, SurfaceConfiguration};
 
 pub trait BaseStimulusImplementation {
     /// Called when `prepare()` is called on the stimulus.
@@ -39,10 +39,10 @@ pub trait BaseStimulusImplementation {
     /// * `Option<Vec<u8>>` - If the stimulus has changed, this should return `Some(texture_data)`, otherwise `None`.
     fn update(
         &mut self,
-        screen_width_mm: f64,
-        viewing_distance_mm: f64,
-        screen_width_px: u32,
-        screen_height_px: u32,
+        _screen_width_mm: f64,
+        _viewing_distance_mm: f64,
+        _screen_width_px: u32,
+        _screen_height_px: u32,
     ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
         (None, None, None)
     }
@@ -217,7 +217,7 @@ impl<S: BaseStimulusImplementation> Renderable for BaseStimulus<S> {
         );
 
         // cast to f32
-        let transform = (win_transform * stim_transform);
+        let transform = win_transform * stim_transform;
 
         queue.write_buffer(
             &(self.transform_buffer.lock_blocking()),
@@ -227,17 +227,17 @@ impl<S: BaseStimulusImplementation> Renderable for BaseStimulus<S> {
     }
 
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
-        let pipeline = (self.pipeline.lock_blocking());
+        let pipeline = self.pipeline.lock_blocking();
         let n_vertices = self.n_vertices.load(Ordering::Relaxed);
         let texture_bind_group =
             if let Some(texture_bind_group) = &self.texture_bind_group {
-                Some((texture_bind_group.lock_blocking()))
+                Some(texture_bind_group.lock_blocking())
             } else {
                 None
             };
 
-        let bind_group = (self.bind_group.lock_blocking());
-        let vertex_buffer = (self.vertex_buffer.lock_blocking());
+        let bind_group = self.bind_group.lock_blocking();
+        let vertex_buffer = self.vertex_buffer.lock_blocking();
         {
             let mut rpass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,

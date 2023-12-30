@@ -1,0 +1,634 @@
+psychophysics v0.1.0 (/Users/marc/wgpu_gratings/psychophysics)
+├── anyhow v1.0.75
+├── async-broadcast v0.6.0 (https://github.com/kuviman/async-broadcast?rev=6767b8a76cd2a1b57da0dd435488df112514afe8#6767b8a7)
+│   ├── event-listener v4.0.0
+│   │   ├── concurrent-queue v2.4.0
+│   │   │   └── crossbeam-utils v0.8.16
+│   │   │       └── cfg-if v1.0.0
+│   │   ├── parking v2.2.0
+│   │   └── pin-project-lite v0.2.13
+│   ├── event-listener-strategy v0.4.0
+│   │   ├── event-listener v4.0.0 (*)
+│   │   └── pin-project-lite v0.2.13
+│   └── futures-core v0.3.29
+├── async-channel v2.1.1
+│   ├── concurrent-queue v2.4.0 (*)
+│   ├── event-listener v4.0.0 (*)
+│   ├── event-listener-strategy v0.4.0 (*)
+│   ├── futures-core v0.3.29
+│   └── pin-project-lite v0.2.13
+├── async-executor v1.8.0
+│   ├── async-lock v3.2.0
+│   │   ├── event-listener v4.0.0 (*)
+│   │   ├── event-listener-strategy v0.4.0 (*)
+│   │   └── pin-project-lite v0.2.13
+│   ├── async-task v4.5.0
+│   ├── concurrent-queue v2.4.0 (*)
+│   ├── fastrand v2.0.1
+│   ├── futures-lite v2.1.0
+│   │   ├── fastrand v2.0.1
+│   │   ├── futures-core v0.3.29
+│   │   ├── futures-io v0.3.29
+│   │   ├── parking v2.2.0
+│   │   └── pin-project-lite v0.2.13
+│   └── slab v0.4.9
+│       [build-dependencies]
+│       └── autocfg v1.1.0
+├── async-lock v3.2.0 (*)
+├── async-trait v0.1.75 (proc-macro)
+│   ├── proc-macro2 v1.0.70
+│   │   └── unicode-ident v1.0.12
+│   ├── quote v1.0.33
+│   │   └── proc-macro2 v1.0.70 (*)
+│   └── syn v2.0.39
+│       ├── proc-macro2 v1.0.70 (*)
+│       ├── quote v1.0.33 (*)
+│       └── unicode-ident v1.0.12
+├── atomic_float v0.1.0
+├── bytemuck v1.14.0
+│   └── bytemuck_derive v1.5.0 (proc-macro)
+│       ├── proc-macro2 v1.0.70 (*)
+│       ├── quote v1.0.33 (*)
+│       └── syn v2.0.39 (*)
+├── cpal v0.15.2
+│   ├── core-foundation-sys v0.8.6
+│   ├── coreaudio-rs v0.11.3
+│   │   ├── bitflags v1.3.2
+│   │   ├── core-foundation-sys v0.8.6
+│   │   └── coreaudio-sys v0.2.14
+│   │       [build-dependencies]
+│   │       └── bindgen v0.69.1
+│   │           ├── bitflags v2.4.1
+│   │           ├── cexpr v0.6.0
+│   │           │   └── nom v7.1.3
+│   │           │       ├── memchr v2.6.4
+│   │           │       └── minimal-lexical v0.2.1
+│   │           ├── clang-sys v1.6.1
+│   │           │   ├── glob v0.3.1
+│   │           │   ├── libc v0.2.150
+│   │           │   └── libloading v0.7.4
+│   │           │       └── cfg-if v1.0.0
+│   │           │   [build-dependencies]
+│   │           │   └── glob v0.3.1
+│   │           ├── lazy_static v1.4.0
+│   │           ├── lazycell v1.3.0
+│   │           ├── peeking_take_while v0.1.2
+│   │           ├── proc-macro2 v1.0.70 (*)
+│   │           ├── quote v1.0.33 (*)
+│   │           ├── regex v1.10.2
+│   │           │   ├── aho-corasick v1.1.2
+│   │           │   │   └── memchr v2.6.4
+│   │           │   ├── memchr v2.6.4
+│   │           │   ├── regex-automata v0.4.3
+│   │           │   │   ├── aho-corasick v1.1.2 (*)
+│   │           │   │   ├── memchr v2.6.4
+│   │           │   │   └── regex-syntax v0.8.2
+│   │           │   └── regex-syntax v0.8.2
+│   │           ├── rustc-hash v1.1.0
+│   │           ├── shlex v1.2.0
+│   │           └── syn v2.0.39 (*)
+│   ├── dasp_sample v0.11.0
+│   ├── mach2 v0.4.1
+│   │   └── libc v0.2.150
+│   └── parking_lot v0.12.1
+│       ├── lock_api v0.4.11
+│       │   └── scopeguard v1.2.0
+│       │   [build-dependencies]
+│       │   └── autocfg v1.1.0
+│       └── parking_lot_core v0.9.9
+│           ├── cfg-if v1.0.0
+│           ├── libc v0.2.150
+│           └── smallvec v1.11.2
+├── env_logger v0.10.1
+│   ├── humantime v2.1.0
+│   ├── is-terminal v0.4.9
+│   │   └── rustix v0.38.26
+│   │       ├── bitflags v2.4.1
+│   │       ├── errno v0.3.8
+│   │       │   └── libc v0.2.150
+│   │       └── libc v0.2.150
+│   ├── log v0.4.20
+│   ├── regex v1.10.2 (*)
+│   └── termcolor v1.4.0
+├── fastrand v2.0.1
+├── fontdb v0.16.0
+│   ├── log v0.4.20
+│   ├── memmap2 v0.9.0
+│   │   └── libc v0.2.150
+│   ├── slotmap v1.0.7
+│   │   [build-dependencies]
+│   │   └── version_check v0.9.4
+│   ├── tinyvec v1.6.0
+│   │   └── tinyvec_macros v0.1.1
+│   └── ttf-parser v0.20.0
+├── futures-lite v2.1.0 (*)
+├── glyphon v0.3.0 (https://github.com/grovesNL/glyphon#f554de85)
+│   ├── cosmic-text v0.10.0
+│   │   ├── fontdb v0.15.0
+│   │   │   ├── log v0.4.20
+│   │   │   ├── memmap2 v0.8.0
+│   │   │   │   └── libc v0.2.150
+│   │   │   ├── slotmap v1.0.7 (*)
+│   │   │   ├── tinyvec v1.6.0 (*)
+│   │   │   └── ttf-parser v0.19.2
+│   │   ├── libm v0.2.8
+│   │   ├── log v0.4.20
+│   │   ├── rangemap v1.4.0
+│   │   ├── rustc-hash v1.1.0
+│   │   ├── rustybuzz v0.11.0
+│   │   │   ├── bitflags v1.3.2
+│   │   │   ├── bytemuck v1.14.0 (*)
+│   │   │   ├── libm v0.2.8
+│   │   │   ├── smallvec v1.11.2
+│   │   │   ├── ttf-parser v0.20.0
+│   │   │   ├── unicode-bidi-mirroring v0.1.0
+│   │   │   ├── unicode-ccc v0.1.2
+│   │   │   ├── unicode-properties v0.1.0
+│   │   │   └── unicode-script v0.5.5
+│   │   ├── self_cell v1.0.2
+│   │   ├── swash v0.1.8
+│   │   │   ├── yazi v0.1.6
+│   │   │   └── zeno v0.2.3
+│   │   ├── sys-locale v0.3.1
+│   │   ├── unicode-bidi v0.3.14
+│   │   ├── unicode-linebreak v0.1.5
+│   │   ├── unicode-script v0.5.5
+│   │   └── unicode-segmentation v1.10.1
+│   ├── etagere v0.2.10
+│   │   ├── euclid v0.22.9
+│   │   │   └── num-traits v0.2.17
+│   │   │       [build-dependencies]
+│   │   │       └── autocfg v1.1.0
+│   │   └── svg_fmt v0.4.1
+│   ├── lru v0.11.1
+│   │   └── hashbrown v0.14.3
+│   │       ├── ahash v0.8.6
+│   │       │   ├── cfg-if v1.0.0
+│   │       │   ├── once_cell v1.19.0
+│   │       │   └── zerocopy v0.7.29
+│   │       │   [build-dependencies]
+│   │       │   └── version_check v0.9.4
+│   │       └── allocator-api2 v0.2.16
+│   └── wgpu v0.18.0
+│       ├── arrayvec v0.7.4
+│       ├── cfg-if v1.0.0
+│       ├── flume v0.11.0
+│       │   ├── futures-core v0.3.29
+│       │   ├── futures-sink v0.3.29
+│       │   ├── nanorand v0.7.0
+│       │   │   └── getrandom v0.2.11
+│       │   │       ├── cfg-if v1.0.0
+│       │   │       └── libc v0.2.150
+│       │   └── spin v0.9.8
+│       │       └── lock_api v0.4.11 (*)
+│       ├── log v0.4.20
+│       ├── parking_lot v0.12.1 (*)
+│       ├── profiling v1.0.11
+│       ├── raw-window-handle v0.5.2
+│       ├── smallvec v1.11.2
+│       ├── static_assertions v1.1.0
+│       ├── wgpu-core v0.18.1
+│       │   ├── arrayvec v0.7.4
+│       │   ├── bit-vec v0.6.3
+│       │   ├── bitflags v2.4.1
+│       │   ├── codespan-reporting v0.11.1
+│       │   │   ├── termcolor v1.4.0
+│       │   │   └── unicode-width v0.1.11
+│       │   ├── log v0.4.20
+│       │   ├── naga v0.14.2
+│       │   │   ├── bit-set v0.5.3
+│       │   │   │   └── bit-vec v0.6.3
+│       │   │   ├── bitflags v2.4.1
+│       │   │   ├── codespan-reporting v0.11.1 (*)
+│       │   │   ├── hexf-parse v0.2.1
+│       │   │   ├── indexmap v2.1.0
+│       │   │   │   ├── equivalent v1.0.1
+│       │   │   │   └── hashbrown v0.14.3 (*)
+│       │   │   ├── log v0.4.20
+│       │   │   ├── num-traits v0.2.17 (*)
+│       │   │   ├── rustc-hash v1.1.0
+│       │   │   ├── spirv v0.2.0+1.5.4
+│       │   │   │   ├── bitflags v1.3.2
+│       │   │   │   └── num-traits v0.2.17 (*)
+│       │   │   ├── termcolor v1.4.0
+│       │   │   ├── thiserror v1.0.50
+│       │   │   │   └── thiserror-impl v1.0.50 (proc-macro)
+│       │   │   │       ├── proc-macro2 v1.0.70 (*)
+│       │   │   │       ├── quote v1.0.33 (*)
+│       │   │   │       └── syn v2.0.39 (*)
+│       │   │   └── unicode-xid v0.2.4
+│       │   ├── parking_lot v0.12.1 (*)
+│       │   ├── profiling v1.0.11
+│       │   ├── raw-window-handle v0.5.2
+│       │   ├── rustc-hash v1.1.0
+│       │   ├── smallvec v1.11.2
+│       │   ├── thiserror v1.0.50 (*)
+│       │   ├── wgpu-hal v0.18.1
+│       │   │   ├── arrayvec v0.7.4
+│       │   │   ├── ash v0.37.3+1.3.251
+│       │   │   │   └── libloading v0.7.4 (*)
+│       │   │   ├── bitflags v2.4.1
+│       │   │   ├── block v0.1.6
+│       │   │   ├── core-graphics-types v0.1.3
+│       │   │   │   ├── bitflags v1.3.2
+│       │   │   │   ├── core-foundation v0.9.4
+│       │   │   │   │   ├── core-foundation-sys v0.8.6
+│       │   │   │   │   └── libc v0.2.150
+│       │   │   │   └── libc v0.2.150
+│       │   │   ├── glow v0.13.0
+│       │   │   ├── gpu-alloc v0.6.0
+│       │   │   │   ├── bitflags v2.4.1
+│       │   │   │   └── gpu-alloc-types v0.3.0
+│       │   │   │       └── bitflags v2.4.1
+│       │   │   ├── gpu-descriptor v0.2.4
+│       │   │   │   ├── bitflags v2.4.1
+│       │   │   │   ├── gpu-descriptor-types v0.1.2
+│       │   │   │   │   └── bitflags v2.4.1
+│       │   │   │   └── hashbrown v0.14.3 (*)
+│       │   │   ├── khronos-egl v6.0.0
+│       │   │   │   ├── libc v0.2.150
+│       │   │   │   └── libloading v0.8.1
+│       │   │   │       └── cfg-if v1.0.0
+│       │   │   │   [build-dependencies]
+│       │   │   │   └── pkg-config v0.3.27
+│       │   │   ├── libc v0.2.150
+│       │   │   ├── libloading v0.8.1 (*)
+│       │   │   ├── log v0.4.20
+│       │   │   ├── metal v0.27.0
+│       │   │   │   ├── bitflags v2.4.1
+│       │   │   │   ├── block v0.1.6
+│       │   │   │   ├── core-graphics-types v0.1.3 (*)
+│       │   │   │   ├── foreign-types v0.5.0
+│       │   │   │   │   ├── foreign-types-macros v0.2.3 (proc-macro)
+│       │   │   │   │   │   ├── proc-macro2 v1.0.70 (*)
+│       │   │   │   │   │   ├── quote v1.0.33 (*)
+│       │   │   │   │   │   └── syn v2.0.39 (*)
+│       │   │   │   │   └── foreign-types-shared v0.3.1
+│       │   │   │   ├── log v0.4.20
+│       │   │   │   ├── objc v0.2.7
+│       │   │   │   │   ├── malloc_buf v0.0.6
+│       │   │   │   │   │   └── libc v0.2.150
+│       │   │   │   │   └── objc_exception v0.1.2
+│       │   │   │   │       [build-dependencies]
+│       │   │   │   │       └── cc v1.0.83
+│       │   │   │   │           ├── jobserver v0.1.27
+│       │   │   │   │           │   └── libc v0.2.150
+│       │   │   │   │           └── libc v0.2.150
+│       │   │   │   └── paste v1.0.14 (proc-macro)
+│       │   │   ├── naga v0.14.2 (*)
+│       │   │   ├── objc v0.2.7 (*)
+│       │   │   ├── once_cell v1.19.0
+│       │   │   ├── parking_lot v0.12.1 (*)
+│       │   │   ├── profiling v1.0.11
+│       │   │   ├── raw-window-handle v0.5.2
+│       │   │   ├── renderdoc-sys v1.0.0
+│       │   │   ├── rustc-hash v1.1.0
+│       │   │   ├── smallvec v1.11.2
+│       │   │   ├── thiserror v1.0.50 (*)
+│       │   │   └── wgpu-types v0.18.0
+│       │   │       └── bitflags v2.4.1
+│       │   └── wgpu-types v0.18.0 (*)
+│       ├── wgpu-hal v0.18.1 (*)
+│       └── wgpu-types v0.18.0 (*)
+├── half v2.3.1
+│   ├── bytemuck v1.14.0 (*)
+│   └── cfg-if v1.0.0
+├── image v0.24.7
+│   ├── bytemuck v1.14.0 (*)
+│   ├── byteorder v1.5.0
+│   ├── color_quant v1.1.0
+│   ├── exr v1.6.4
+│   │   ├── bit_field v0.10.2
+│   │   ├── flume v0.10.14
+│   │   │   ├── futures-core v0.3.29
+│   │   │   ├── futures-sink v0.3.29
+│   │   │   ├── nanorand v0.7.0 (*)
+│   │   │   ├── pin-project v1.1.3
+│   │   │   │   └── pin-project-internal v1.1.3 (proc-macro)
+│   │   │   │       ├── proc-macro2 v1.0.70 (*)
+│   │   │   │       ├── quote v1.0.33 (*)
+│   │   │   │       └── syn v2.0.39 (*)
+│   │   │   └── spin v0.9.8 (*)
+│   │   ├── half v2.3.1 (*)
+│   │   ├── lebe v0.5.2
+│   │   ├── miniz_oxide v0.7.1
+│   │   │   ├── adler v1.0.2
+│   │   │   └── simd-adler32 v0.3.7
+│   │   ├── rayon-core v1.12.0
+│   │   │   ├── crossbeam-deque v0.8.3
+│   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   ├── crossbeam-epoch v0.9.15
+│   │   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   │   ├── crossbeam-utils v0.8.16 (*)
+│   │   │   │   │   ├── memoffset v0.9.0
+│   │   │   │   │   │   [build-dependencies]
+│   │   │   │   │   │   └── autocfg v1.1.0
+│   │   │   │   │   └── scopeguard v1.2.0
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── autocfg v1.1.0
+│   │   │   │   └── crossbeam-utils v0.8.16 (*)
+│   │   │   └── crossbeam-utils v0.8.16 (*)
+│   │   ├── smallvec v1.11.2
+│   │   └── zune-inflate v0.2.54
+│   │       └── simd-adler32 v0.3.7
+│   ├── gif v0.12.0
+│   │   ├── color_quant v1.1.0
+│   │   └── weezl v0.1.7
+│   ├── jpeg-decoder v0.3.0
+│   │   └── rayon v1.8.0
+│   │       ├── either v1.9.0
+│   │       └── rayon-core v1.12.0 (*)
+│   ├── num-rational v0.4.1
+│   │   ├── num-integer v0.1.45
+│   │   │   └── num-traits v0.2.17 (*)
+│   │   │   [build-dependencies]
+│   │   │   └── autocfg v1.1.0
+│   │   └── num-traits v0.2.17 (*)
+│   │   [build-dependencies]
+│   │   └── autocfg v1.1.0
+│   ├── num-traits v0.2.17 (*)
+│   ├── png v0.17.10
+│   │   ├── bitflags v1.3.2
+│   │   ├── crc32fast v1.3.2
+│   │   │   └── cfg-if v1.0.0
+│   │   ├── fdeflate v0.3.1
+│   │   │   └── simd-adler32 v0.3.7
+│   │   ├── flate2 v1.0.28
+│   │   │   ├── crc32fast v1.3.2 (*)
+│   │   │   └── miniz_oxide v0.7.1 (*)
+│   │   └── miniz_oxide v0.7.1 (*)
+│   ├── qoi v0.4.1
+│   │   └── bytemuck v1.14.0 (*)
+│   └── tiff v0.9.0
+│       ├── flate2 v1.0.28 (*)
+│       ├── jpeg-decoder v0.3.0 (*)
+│       └── weezl v0.1.7
+├── log v0.4.20
+├── nalgebra v0.32.3
+│   ├── approx v0.5.1
+│   │   └── num-traits v0.2.17 (*)
+│   ├── matrixmultiply v0.3.8
+│   │   └── rawpointer v0.2.1
+│   │   [build-dependencies]
+│   │   └── autocfg v1.1.0
+│   ├── nalgebra-macros v0.2.1 (proc-macro)
+│   │   ├── proc-macro2 v1.0.70 (*)
+│   │   ├── quote v1.0.33 (*)
+│   │   └── syn v1.0.109
+│   │       ├── proc-macro2 v1.0.70 (*)
+│   │       ├── quote v1.0.33 (*)
+│   │       └── unicode-ident v1.0.12
+│   ├── num-complex v0.4.4
+│   │   └── num-traits v0.2.17 (*)
+│   ├── num-rational v0.4.1 (*)
+│   ├── num-traits v0.2.17 (*)
+│   ├── simba v0.8.1
+│   │   ├── approx v0.5.1 (*)
+│   │   ├── num-complex v0.4.4 (*)
+│   │   ├── num-traits v0.2.17 (*)
+│   │   ├── paste v1.0.14 (proc-macro)
+│   │   └── wide v0.7.13
+│   │       ├── bytemuck v1.14.0 (*)
+│   │       └── safe_arch v0.7.1
+│   │           └── bytemuck v1.14.0 (*)
+│   └── typenum v1.17.0
+├── ndarray v0.15.6
+│   ├── matrixmultiply v0.3.8 (*)
+│   ├── num-complex v0.4.4 (*)
+│   ├── num-integer v0.1.45 (*)
+│   ├── num-traits v0.2.17 (*)
+│   └── rawpointer v0.2.1
+├── num-traits v0.2.17 (*)
+├── palette v0.7.3
+│   ├── approx v0.5.1 (*)
+│   ├── fast-srgb8 v1.0.0
+│   ├── palette_derive v0.7.3 (proc-macro)
+│   │   ├── proc-macro2 v1.0.70 (*)
+│   │   ├── quote v1.0.33 (*)
+│   │   └── syn v2.0.39 (*)
+│   └── phf v0.11.2
+│       ├── phf_macros v0.11.2 (proc-macro)
+│       │   ├── phf_generator v0.11.2
+│       │   │   ├── phf_shared v0.11.2
+│       │   │   │   └── siphasher v0.3.11
+│       │   │   └── rand v0.8.5
+│       │   │       ├── libc v0.2.150
+│       │   │       ├── rand_chacha v0.3.1
+│       │   │       │   ├── ppv-lite86 v0.2.17
+│       │   │       │   └── rand_core v0.6.4
+│       │   │       │       └── getrandom v0.2.11 (*)
+│       │   │       └── rand_core v0.6.4 (*)
+│       │   ├── phf_shared v0.11.2 (*)
+│       │   ├── proc-macro2 v1.0.70 (*)
+│       │   ├── quote v1.0.33 (*)
+│       │   └── syn v2.0.39 (*)
+│       └── phf_shared v0.11.2 (*)
+├── rand v0.8.5 (*)
+├── raw-window-handle v0.6.0
+├── rodio v0.17.3
+│   ├── claxon v0.4.3
+│   ├── cpal v0.15.2 (*)
+│   ├── hound v3.5.1
+│   ├── lewton v0.10.2
+│   │   ├── byteorder v1.5.0
+│   │   ├── ogg v0.8.0
+│   │   │   └── byteorder v1.5.0
+│   │   └── tinyvec v1.6.0 (*)
+│   └── symphonia v0.5.3
+│       ├── lazy_static v1.4.0
+│       ├── symphonia-bundle-mp3 v0.5.3
+│       │   ├── bitflags v1.3.2
+│       │   ├── lazy_static v1.4.0
+│       │   ├── log v0.4.20
+│       │   ├── symphonia-core v0.5.3
+│       │   │   ├── arrayvec v0.7.4
+│       │   │   ├── bitflags v1.3.2
+│       │   │   ├── bytemuck v1.14.0 (*)
+│       │   │   ├── lazy_static v1.4.0
+│       │   │   └── log v0.4.20
+│       │   └── symphonia-metadata v0.5.3
+│       │       ├── encoding_rs v0.8.33
+│       │       │   └── cfg-if v1.0.0
+│       │       ├── lazy_static v1.4.0
+│       │       ├── log v0.4.20
+│       │       └── symphonia-core v0.5.3 (*)
+│       ├── symphonia-core v0.5.3 (*)
+│       └── symphonia-metadata v0.5.3 (*)
+├── serialport v4.3.0
+│   ├── bitflags v2.4.1
+│   ├── cfg-if v1.0.0
+│   ├── core-foundation-sys v0.8.6
+│   ├── io-kit-sys v0.4.0
+│   │   ├── core-foundation-sys v0.8.6
+│   │   └── mach2 v0.4.1 (*)
+│   ├── mach2 v0.4.1 (*)
+│   ├── nix v0.26.4
+│   │   ├── bitflags v1.3.2
+│   │   ├── cfg-if v1.0.0
+│   │   └── libc v0.2.150
+│   └── scopeguard v1.2.0
+├── simple_logger v4.3.0
+│   ├── colored v2.1.0
+│   │   └── lazy_static v1.4.0
+│   ├── log v0.4.20
+│   └── time v0.3.30
+│       ├── deranged v0.3.10
+│       │   └── powerfmt v0.2.0
+│       ├── itoa v1.0.9
+│       ├── libc v0.2.150
+│       ├── num_threads v0.1.6
+│       │   └── libc v0.2.150
+│       ├── powerfmt v0.2.0
+│       ├── time-core v0.1.2
+│       └── time-macros v0.2.15 (proc-macro)
+│           └── time-core v0.1.2
+├── smol v1.3.0
+│   ├── async-channel v1.9.0
+│   │   ├── concurrent-queue v2.4.0 (*)
+│   │   ├── event-listener v2.5.3
+│   │   └── futures-core v0.3.29
+│   ├── async-executor v1.8.0 (*)
+│   ├── async-fs v1.6.0
+│   │   ├── async-lock v2.8.0
+│   │   │   └── event-listener v2.5.3
+│   │   ├── blocking v1.5.1
+│   │   │   ├── async-channel v2.1.1 (*)
+│   │   │   ├── async-lock v3.2.0 (*)
+│   │   │   ├── async-task v4.5.0
+│   │   │   ├── fastrand v2.0.1
+│   │   │   ├── futures-io v0.3.29
+│   │   │   ├── futures-lite v2.1.0 (*)
+│   │   │   ├── piper v0.2.1
+│   │   │   │   ├── atomic-waker v1.1.2
+│   │   │   │   ├── fastrand v2.0.1
+│   │   │   │   └── futures-io v0.3.29
+│   │   │   └── tracing v0.1.40
+│   │   │       ├── pin-project-lite v0.2.13
+│   │   │       └── tracing-core v0.1.32
+│   │   └── futures-lite v1.13.0
+│   │       ├── fastrand v1.9.0
+│   │       ├── futures-core v0.3.29
+│   │       ├── futures-io v0.3.29
+│   │       ├── memchr v2.6.4
+│   │       ├── parking v2.2.0
+│   │       ├── pin-project-lite v0.2.13
+│   │       └── waker-fn v1.1.1
+│   │   [build-dependencies]
+│   │   └── autocfg v1.1.0
+│   ├── async-io v1.13.0
+│   │   ├── async-lock v2.8.0 (*)
+│   │   ├── cfg-if v1.0.0
+│   │   ├── concurrent-queue v2.4.0 (*)
+│   │   ├── futures-lite v1.13.0 (*)
+│   │   ├── log v0.4.20
+│   │   ├── parking v2.2.0
+│   │   ├── polling v2.8.0
+│   │   │   ├── cfg-if v1.0.0
+│   │   │   ├── libc v0.2.150
+│   │   │   └── log v0.4.20
+│   │   │   [build-dependencies]
+│   │   │   └── autocfg v1.1.0
+│   │   ├── rustix v0.37.27
+│   │   │   ├── bitflags v1.3.2
+│   │   │   ├── errno v0.3.8 (*)
+│   │   │   ├── io-lifetimes v1.0.11
+│   │   │   │   └── libc v0.2.150
+│   │   │   └── libc v0.2.150
+│   │   ├── slab v0.4.9 (*)
+│   │   ├── socket2 v0.4.10
+│   │   │   └── libc v0.2.150
+│   │   └── waker-fn v1.1.1
+│   │   [build-dependencies]
+│   │   └── autocfg v1.1.0
+│   ├── async-lock v2.8.0 (*)
+│   ├── async-net v1.8.0
+│   │   ├── async-io v1.13.0 (*)
+│   │   ├── blocking v1.5.1 (*)
+│   │   └── futures-lite v1.13.0 (*)
+│   ├── async-process v1.8.1
+│   │   ├── async-io v1.13.0 (*)
+│   │   ├── async-lock v2.8.0 (*)
+│   │   ├── async-signal v0.2.5
+│   │   │   ├── async-io v2.2.1
+│   │   │   │   ├── async-lock v3.2.0 (*)
+│   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   ├── concurrent-queue v2.4.0 (*)
+│   │   │   │   ├── futures-io v0.3.29
+│   │   │   │   ├── futures-lite v2.1.0 (*)
+│   │   │   │   ├── parking v2.2.0
+│   │   │   │   ├── polling v3.3.1
+│   │   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   │   ├── rustix v0.38.26 (*)
+│   │   │   │   │   └── tracing v0.1.40 (*)
+│   │   │   │   ├── rustix v0.38.26 (*)
+│   │   │   │   ├── slab v0.4.9 (*)
+│   │   │   │   └── tracing v0.1.40 (*)
+│   │   │   ├── cfg-if v1.0.0
+│   │   │   ├── futures-core v0.3.29
+│   │   │   ├── futures-io v0.3.29
+│   │   │   ├── rustix v0.38.26 (*)
+│   │   │   └── signal-hook-registry v1.4.1
+│   │   │       └── libc v0.2.150
+│   │   ├── cfg-if v1.0.0
+│   │   ├── event-listener v3.1.0
+│   │   │   ├── concurrent-queue v2.4.0 (*)
+│   │   │   ├── parking v2.2.0
+│   │   │   └── pin-project-lite v0.2.13
+│   │   ├── futures-lite v1.13.0 (*)
+│   │   └── rustix v0.38.26 (*)
+│   ├── blocking v1.5.1 (*)
+│   └── futures-lite v1.13.0 (*)
+├── spin_sleep v1.1.1
+├── wasm-bindgen v0.2.89
+│   ├── cfg-if v1.0.0
+│   └── wasm-bindgen-macro v0.2.89 (proc-macro)
+│       ├── quote v1.0.33 (*)
+│       └── wasm-bindgen-macro-support v0.2.89
+│           ├── proc-macro2 v1.0.70 (*)
+│           ├── quote v1.0.33 (*)
+│           ├── syn v2.0.39 (*)
+│           ├── wasm-bindgen-backend v0.2.89
+│           │   ├── bumpalo v3.14.0
+│           │   ├── log v0.4.20
+│           │   ├── once_cell v1.19.0
+│           │   ├── proc-macro2 v1.0.70 (*)
+│           │   ├── quote v1.0.33 (*)
+│           │   ├── syn v2.0.39 (*)
+│           │   └── wasm-bindgen-shared v0.2.89
+│           └── wasm-bindgen-shared v0.2.89
+├── web-time v0.2.3
+├── wgpu v0.18.0 (*)
+└── winit v0.27.5
+    ├── bitflags v1.3.2
+    ├── cocoa v0.24.1
+    │   ├── bitflags v1.3.2
+    │   ├── block v0.1.6
+    │   ├── cocoa-foundation v0.1.2
+    │   │   ├── bitflags v1.3.2
+    │   │   ├── block v0.1.6
+    │   │   ├── core-foundation v0.9.4 (*)
+    │   │   ├── core-graphics-types v0.1.3 (*)
+    │   │   ├── libc v0.2.150
+    │   │   └── objc v0.2.7 (*)
+    │   ├── core-foundation v0.9.4 (*)
+    │   ├── core-graphics v0.22.3
+    │   │   ├── bitflags v1.3.2
+    │   │   ├── core-foundation v0.9.4 (*)
+    │   │   ├── core-graphics-types v0.1.3 (*)
+    │   │   ├── foreign-types v0.3.2
+    │   │   │   └── foreign-types-shared v0.1.1
+    │   │   └── libc v0.2.150
+    │   ├── foreign-types v0.3.2 (*)
+    │   ├── libc v0.2.150
+    │   └── objc v0.2.7 (*)
+    ├── core-foundation v0.9.4 (*)
+    ├── core-graphics v0.22.3 (*)
+    ├── dispatch v0.2.0
+    ├── instant v0.1.12
+    │   └── cfg-if v1.0.0
+    ├── log v0.4.20
+    ├── objc v0.2.7 (*)
+    ├── once_cell v1.19.0
+    ├── raw-window-handle v0.4.3
+    │   └── cty v0.2.2
+    └── raw-window-handle v0.5.2

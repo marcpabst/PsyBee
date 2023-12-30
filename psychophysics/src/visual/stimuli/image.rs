@@ -4,7 +4,7 @@ use super::{
     base::{BaseStimulus, BaseStimulusImplementation},
 };
 use image;
-use wgpu::Device;
+
 
 pub struct ImageStimulusImplementation {
     image: image::DynamicImage,
@@ -88,7 +88,7 @@ impl BaseStimulusImplementation for ImageStimulusImplementation {
         .to_string()
     }
 
-    fn get_texture_data(&self) -> Option<(Vec<u8>)> {
+    fn get_texture_data(&self) -> Option<Vec<u8>> {
         // convert from rgba to bgra
         let texture_data: Vec<u8> = self
             .image

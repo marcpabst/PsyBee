@@ -3,17 +3,17 @@ use super::{
     super::pwindow::Window,
     base::{BaseStimulus, BaseStimulusImplementation},
 };
-use bytemuck::{Pod, Zeroable};
-use futures_lite::future::block_on;
-use half::f16;
+
+
+
 use image;
 use js_sys::Promise;
-use rodio::queue;
+
 use std::borrow::Cow;
 use wasm_bindgen::JsCast;
-use wasm_bindgen::JsValue;
+
 use wasm_bindgen_futures::JsFuture;
-use wgpu::{Device, Queue, ShaderModule};
+use wgpu::{Device, ShaderModule};
 
 pub struct VideoStimulusImplementation {
     pub(crate) window: Window,
@@ -56,13 +56,13 @@ impl VideoStimulus<'_> {
                     .await;
 
             // create texture size based on image size
-            let texture_size = wgpu::Extent3d {
+            let _texture_size = wgpu::Extent3d {
                 width: implementation.frame.width(),
                 height: implementation.frame.height(),
                 depth_or_array_layers: 1,
             };
 
-            let mut out = BaseStimulus::create(&window, &window_state, implementation);
+            let out = BaseStimulus::create(&window, &window_state, implementation);
 
             out
         })
@@ -80,7 +80,7 @@ impl VideoStimulusImplementation {
         video_url: String,
         shape: Rectangle,
     ) -> Self {
-        let shader: ShaderModule =
+        let _shader: ShaderModule =
             device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: None,
                 source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
@@ -210,15 +210,15 @@ impl Drop for VideoStimulusImplementation {
 impl BaseStimulusImplementation for VideoStimulusImplementation {
     fn update(
         &mut self,
-        screen_width_mm: f64,
-        viewing_distance_mm: f64,
-        screen_width_px: u32,
-        screen_height_px: u32,
+        _screen_width_mm: f64,
+        _viewing_distance_mm: f64,
+        _screen_width_px: u32,
+        _screen_height_px: u32,
     ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
         //  update the texture
         let video_id = self.html_video_id.clone();
         let canvas_id = self.html_canvas_id.clone();
-        let window = self.window.clone();
+        let _window = self.window.clone();
 
         log::info!("Updating video element with id {}", &video_id);
         let web_window = web_sys::window().expect("no global `window` exists");
@@ -275,7 +275,7 @@ impl BaseStimulusImplementation for VideoStimulusImplementation {
         "
         .to_string()
     }
-    fn get_texture_data(&self) -> Option<(Vec<u8>)> {
+    fn get_texture_data(&self) -> Option<Vec<u8>> {
         // convert from rgba to bgra
         let texture_data: Vec<u8> = self
             .frame

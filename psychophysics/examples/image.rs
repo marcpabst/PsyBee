@@ -1,10 +1,8 @@
 use psychophysics::{
     include_image,
-    input::Key,
     loop_frames, start_experiment,
-    utils::time,
     visual::geometry::{Rectangle, Size, Transformation2D},
-    visual::stimuli::{GratingsStimulus, ImageStimulus, VideoStimulus},
+    visual::stimuli::{GratingsStimulus, ImageStimulus},
     visual::Window,
 };
 
@@ -27,7 +25,7 @@ fn show_image(window: Window) {
     // );
 
     // create grating stimulus
-    let mut grating_stim = GratingsStimulus::new(
+    let _grating_stim = GratingsStimulus::new(
         &window,
         Rectangle::new(
             Size::Pixels(-250.0),

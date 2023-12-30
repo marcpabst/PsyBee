@@ -3,7 +3,7 @@ use async_channel::{bounded, Receiver, Sender};
 use async_lock::Mutex;
 
 use atomic_float::AtomicF64;
-use futures_lite::{future::block_on, Future};
+use futures_lite::{Future};
 
 use crate::visual::color::ColorFormat;
 
@@ -248,7 +248,7 @@ where
             .expect("couldn't append canvas to document body");
 
         // set canvas size
-        let canvas = winit_window.canvas();
+        let _canvas = winit_window.canvas();
         let document = web_sys::window().unwrap().document().unwrap();
         let width = document.body().unwrap().client_width();
         let height = document.body().unwrap().client_height();

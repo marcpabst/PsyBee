@@ -1,7 +1,7 @@
 #[cfg(target_arch = "wasm32")]
 use crate::request_animation_frame;
 use crate::utils::BlockingLock;
-use crate::{async_sleep, input::Key, PFutureReturns};
+use crate::{input::Key, PFutureReturns};
 use async_lock::{Mutex, MutexGuard};
 use futures_lite::Future;
 use palette::IntoColor;
@@ -22,9 +22,8 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::{closure::Closure, JsCast};
-#[cfg(target_arch = "wasm32")]
-use web_sys::console;
+use wasm_bindgen::{closure::Closure};
+
 
 use super::Renderable;
 
@@ -291,7 +290,7 @@ pub async fn render_task(window_handle: Window) {
                     {
                         // clear the frame (once the lifetime annoyance is fixed, this can be removed only a single render pass is needed
                         // using the LoadOp::Clear option)
-                        let rpass =
+                        let _rpass =
                             &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                                 label: None,
                                 color_attachments: &[Some(

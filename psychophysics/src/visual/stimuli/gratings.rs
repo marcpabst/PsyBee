@@ -1,14 +1,14 @@
 use super::{
-    super::geometry::{Size, ToVertices, Transformation2D},
+    super::geometry::{Size, ToVertices},
     super::pwindow::Window,
     base::{BaseStimulus, BaseStimulusImplementation},
 };
 use crate::utils::BlockingLock;
 use bytemuck::{Pod, Zeroable};
-use futures_lite::future::block_on;
-use std::borrow::Cow;
+
+
 use std::sync::atomic::Ordering;
-use wgpu::{Device, ShaderModule};
+use wgpu::{Device};
 
 pub struct GratingsStimulusImplementation {
     cycle_length: Size,
@@ -32,7 +32,7 @@ impl GratingsStimulus {
         window: &Window,
         shape: impl ToVertices + 'static,
         cycle_length: impl Into<Size>,
-        phase: f32,
+        _phase: f32,
     ) -> Self {
         let window = window.clone();
         let cycle_length: Size = cycle_length.into();
@@ -87,7 +87,7 @@ impl GratingsStimulus {
 
 impl GratingsStimulusImplementation {
     pub fn new(
-        device: &Device,
+        _device: &Device,
         phase: f32,
         cycle_length: Size,
         params: GratingsStimulusParams,
