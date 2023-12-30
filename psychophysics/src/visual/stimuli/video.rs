@@ -1,8 +1,7 @@
-use super::image::{ImageStimulusImplementation, ImageStimulusParams};
 use super::{
     super::geometry::{Rectangle, Size, ToVertices},
     super::pwindow::Window,
-    base::{BaseStimulus, BaseStimulusImplementation, BaseStimulusParams},
+    base::{BaseStimulus, BaseStimulusImplementation},
 };
 use bytemuck::{Pod, Zeroable};
 use futures_lite::future::block_on;
@@ -12,88 +11,61 @@ use js_sys::Promise;
 use rodio::queue;
 use std::borrow::Cow;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use wgpu::{Device, Queue, ShaderModule};
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Pod, Zeroable)]
-pub struct VideoStimulusParams {
-    s: f32,
-}
-
-pub struct VideoStimulusShader {
+pub struct VideoStimulusImplementation {
     pub(crate) window: Window,
-    pub(crate) shader: ShaderModule,
     html_video_id: String,
     html_canvas_id: String,
-    image: image::DynamicImage,
+    shape: Rectangle,
+    frame: image::DynamicImage,
 }
 
-// TODO: make this a macro
-impl BaseStimulusParams for VideoStimulusParams {}
-
-pub type VideoStimulus<'a> =
-    BaseStimulus<Rectangle, VideoStimulusShader, VideoStimulusParams>;
+pub type VideoStimulus<'a> = BaseStimulus<VideoStimulusImplementation>;
 
 impl VideoStimulus<'_> {
-    /// Create a new image stimulus.
     pub fn new(window: &Window, video_url: String) -> Self {
+        // create a shape that fills the screen
+        let shape = Rectangle::new(
+            -Size::ScreenWidth(0.5),
+            -Size::ScreenHeight(0.5),
+            Size::ScreenWidth(1.0),
+            Size::ScreenHeight(1.0),
+        );
+
+        Self::_new(window, video_url, shape)
+    }
+    pub fn new_with_rectangle(
+        window: &Window,
+        video_url: String,
+        shape: Rectangle,
+    ) -> Self {
+        Self::_new(window, video_url, shape)
+    }
+    /// Create a new image stimulus.
+    fn _new(window: &Window, video_url: String, shape: Rectangle) -> Self {
         let window = window.clone();
         window.clone().run_on_render_thread(|| async move {
-            // create a shape that fills the screen
-            let shape = Rectangle::new(
-                -Size::ScreenWidth(0.5),
-                -Size::ScreenHeight(0.5),
-                Size::ScreenWidth(1.0),
-                Size::ScreenHeight(1.0),
-            );
-
             let window_state = window.get_window_state_blocking();
             let device = &window_state.device;
 
-            let shader =
-                VideoStimulusShader::new(&window, &device, video_url).await;
-
-            let params = VideoStimulusParams { s: 3.0 };
-
-            drop(window_state); // this prevent a deadlock (argh, i'll have to refactor this)
+            let implementation =
+                VideoStimulusImplementation::new(&window, &device, video_url, shape)
+                    .await;
 
             // create texture size based on image size
             let texture_size = wgpu::Extent3d {
-                width: shader.image.width(),
-                height: shader.image.height(),
+                width: implementation.frame.width(),
+                height: implementation.frame.height(),
                 depth_or_array_layers: 1,
             };
 
-            let mut out = BaseStimulus::create(
-                &window,
-                shader,
-                shape,
-                params,
-                Some(texture_size),
-            );
+            let mut out = BaseStimulus::create(&window, &window_state, implementation);
 
             out
         })
-    }
-}
-
-impl BaseStimulusImplementation<VideoStimulusParams>
-    for ImageStimulusImplementation
-{
-    fn update(
-        &mut self,
-        params: &mut VideoStimulusParams,
-        width_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: i32,
-        height_px: i32,
-    ) -> Option<Vec<u8>> {
-        // nothing to do here
-        None
-    }
-    fn get_shader(&self) -> &ShaderModule {
-        &self.shader
     }
 }
 
@@ -101,11 +73,12 @@ impl BaseStimulusImplementation<VideoStimulusParams>
 /// just create a HTMLVideoElement and access it from the render thread. However, this does not
 /// work as web_sys will somehow lose the reference to the video element. To work around this
 /// problem, we store the video element in the DOM and access it using its id.
-impl VideoStimulusShader {
+impl VideoStimulusImplementation {
     pub async fn new(
         window: &Window,
         device: &Device,
         video_url: String,
+        shape: Rectangle,
     ) -> Self {
         let shader: ShaderModule =
             device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -177,12 +150,14 @@ impl VideoStimulusShader {
         canvas.set_width(1280); // TODO: make this configurable
         canvas.set_height(720); // TODO: make this configurable
         let ctx = canvas
-            .get_context("2d")
+            .get_context_with_context_options(
+                "2d",
+                &js_sys::eval("({ willReadFrequently: true })").unwrap(),
+            )
             .unwrap()
             .unwrap()
             .dyn_into::<web_sys::CanvasRenderingContext2d>()
             .unwrap();
-
         // draw the video to the canvas
         ctx.draw_image_with_html_video_element_and_dw_and_dh(
             &video, 0.0, 0.0, 1280.0, 720.0,
@@ -205,21 +180,20 @@ impl VideoStimulusShader {
 
         Self {
             window: window.clone(),
-            shader,
             html_video_id: video.id(),
             html_canvas_id: canvas.id(),
-            image,
+            shape,
+            frame: image,
         }
     }
 }
 
-impl Drop for VideoStimulusShader {
+impl Drop for VideoStimulusImplementation {
     fn drop(&mut self) {
         let video_id = self.html_video_id.clone();
         self.window.run_on_render_thread(|| async move {
             log::info!("Removing video element with id {}", &video_id);
-            let web_window =
-                web_sys::window().expect("no global `window` exists");
+            let web_window = web_sys::window().expect("no global `window` exists");
             let web_document = web_window
                 .document()
                 .expect("should have a document on window");
@@ -233,15 +207,14 @@ impl Drop for VideoStimulusShader {
     }
 }
 
-impl BaseStimulusImplementation<VideoStimulusParams> for VideoStimulusShader {
+impl BaseStimulusImplementation for VideoStimulusImplementation {
     fn update(
         &mut self,
-        params: &mut VideoStimulusParams,
-        width_mm: f64,
+        screen_width_mm: f64,
         viewing_distance_mm: f64,
-        width_px: i32,
-        height_px: i32,
-    ) -> Option<Vec<u8>> {
+        screen_width_px: u32,
+        screen_height_px: u32,
+    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
         //  update the texture
         let video_id = self.html_video_id.clone();
         let canvas_id = self.html_canvas_id.clone();
@@ -290,9 +263,46 @@ impl BaseStimulusImplementation<VideoStimulusParams> for VideoStimulusShader {
         // );
 
         // return
-        Some(image_data)
+        (None, None, Some(image_data))
     }
-    fn get_shader(&self) -> &ShaderModule {
-        &self.shader
+
+    fn get_fragment_shader_code(&self) -> String {
+        "
+        @fragment
+        fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+            return textureSample(texture, texture_sampler, in.tex_coords);
+        }
+        "
+        .to_string()
+    }
+    fn get_texture_data(&self) -> Option<(Vec<u8>)> {
+        // convert from rgba to bgra
+        let texture_data: Vec<u8> = self
+            .frame
+            .to_rgba8()
+            .chunks_exact(4)
+            .flat_map(|chunk| {
+                [
+                    chunk[2], // r
+                    chunk[1], // g
+                    chunk[0], // b
+                    chunk[3], // a
+                ]
+            })
+            .collect();
+
+        Some(texture_data)
+    }
+
+    fn get_texture_size(&self) -> Option<wgpu::Extent3d> {
+        Some(wgpu::Extent3d {
+            width: self.frame.width(),
+            height: self.frame.height(),
+            depth_or_array_layers: 1,
+        })
+    }
+
+    fn get_geometry(&self) -> Box<dyn ToVertices> {
+        Box::new(self.shape.clone())
     }
 }

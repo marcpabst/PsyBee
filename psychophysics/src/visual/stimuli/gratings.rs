@@ -1,90 +1,82 @@
 use super::{
     super::geometry::{Size, ToVertices, Transformation2D},
     super::pwindow::Window,
-    base::{BaseStimulus, BaseStimulusImplementation, BaseStimulusParams},
+    base::{BaseStimulus, BaseStimulusImplementation},
 };
 use crate::utils::BlockingLock;
 use bytemuck::{Pod, Zeroable};
 use futures_lite::future::block_on;
 use std::borrow::Cow;
+use std::sync::atomic::Ordering;
 use wgpu::{Device, ShaderModule};
 
-pub enum GratingFunction {
-    Sin,
-    Custom(String),
-}
-
-impl GratingFunction {
-    /// Returns valid WGSL code for the grating function.
-    pub fn to_string(&self) -> String {
-        match self {
-            GratingFunction::Sin => {
-                "sin(2.0 * PI * (x / cycle_length + phase))".to_string()
-            }
-            GratingFunction::Custom(s) => s.clone(),
-        }
-    }
-}
-
-/// The parameters for the gratings stimulus, these will be used as uniforms
-/// and made available to the shader.
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Pod, Zeroable)]
-pub struct GratingsStimulusParams {
-    pub phase: f32,
-    pub cycle_length: f32, // in pixels
-}
-
-impl ToWGSL for GratingsStimulusParams {
-    fn to_wgsl(&self) -> String {
-        format!(concat!(
-            "struct GratingsStimulusParams {{\n",
-            "phase: f32;\n",
-            "cycle_length: f32;\n",
-            "}};\n"
-        ))
-    }
-}
-
-impl BaseStimulusParams for GratingsStimulusParams {}
-
-pub struct GratingsShader {
-    shader: ShaderModule,
+pub struct GratingsStimulusImplementation {
     cycle_length: Size,
     phase: f32,
+    shape: Box<dyn ToVertices>,
+    params: GratingsStimulusParams,
 }
 
-pub type GratingsStimulus<'a, G> =
-    BaseStimulus<G, GratingsShader, GratingsStimulusParams>;
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct GratingsStimulusParams {
+    phase: f32,
+    cycle_length: f32,
+}
 
-impl<G: ToVertices> GratingsStimulus<'_, G> {
+pub type GratingsStimulus = BaseStimulus<GratingsStimulusImplementation>;
+
+impl GratingsStimulus {
     /// Create a new gratings stimulus.
     pub fn new(
-        window_handle: &Window,
-        shape: G,
-        function_string: String,
+        window: &Window,
+        shape: impl ToVertices + 'static,
         cycle_length: impl Into<Size>,
         phase: f32,
     ) -> Self {
-        let window = window_handle.get_window_state_blocking();
-        let device = &window.device;
+        let window = window.clone();
+        let cycle_length: Size = cycle_length.into();
 
-        let shader = GratingsShader::new(&device, phase, cycle_length.into());
+        window.clone().run_on_render_thread(|| async move {
+            let window_state = window.get_window_state().await;
+            let device = &window_state.device;
+            let config = &window_state.config;
 
-        let params = GratingsStimulusParams {
-            phase,
-            cycle_length: 0.0,
-        };
+            // get screen size, viewing distance
+            let screen_width_mm = window.physical_width.load(Ordering::Relaxed);
+            let viewing_distance_mm = window.viewing_distance.load(Ordering::Relaxed);
 
-        drop(window); // this prevent a deadlock (argh, i'll have to refactor this)
+            // get screen size in pixels
+            let screen_width_px = config.width;
+            let screen_height_px = config.height;
 
-        BaseStimulus::create(window_handle, shader, shape, params, None)
+            // create parameters
+            let params = GratingsStimulusParams {
+                cycle_length: cycle_length.to_pixels(
+                    screen_width_mm,
+                    viewing_distance_mm,
+                    screen_width_px,
+                    screen_height_px,
+                ) as f32,
+
+                phase: 0.0,
+            };
+
+            let implementation = GratingsStimulusImplementation::new(
+                &device,
+                0.0,
+                cycle_length,
+                params,
+                shape,
+            );
+
+            BaseStimulus::create(&window, &window_state, implementation)
+        })
     }
 
     /// Set the length of a cycle.
     pub fn set_cycle_length(&self, length: impl Into<Size>) {
-        (self.stimulus_implementation.lock_blocking()).cycle_length =
-            length.into();
+        (self.stimulus_implementation.lock_blocking()).cycle_length = length.into();
     }
 
     /// Set the phase.
@@ -93,44 +85,55 @@ impl<G: ToVertices> GratingsStimulus<'_, G> {
     }
 }
 
-impl GratingsShader {
-    pub fn new(device: &Device, phase: f32, frequency: Size) -> Self {
-        let shader: ShaderModule =
-            device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-                    "shaders/gratings.wgsl"
-                ))),
-            });
-
+impl GratingsStimulusImplementation {
+    pub fn new(
+        device: &Device,
+        phase: f32,
+        cycle_length: Size,
+        params: GratingsStimulusParams,
+        shape: impl ToVertices + 'static,
+    ) -> Self {
         Self {
-            shader,
-            cycle_length: frequency,
-            phase: phase,
+            cycle_length,
+            phase,
+            shape: Box::new(shape),
+            params,
         }
     }
 }
 
-impl BaseStimulusImplementation<GratingsStimulusParams> for GratingsShader {
-    fn update(
-        &mut self,
-        params: &mut GratingsStimulusParams,
-        width_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: i32,
-        height_px: i32,
-    ) -> Option<Vec<u8>> {
-        // update the shader params
-        params.cycle_length = self.cycle_length.to_pixels(
-            width_mm as f64,
-            viewing_distance_mm as f64,
-            width_px,
-            height_px,
-        ) as f32;
-
-        None
+impl BaseStimulusImplementation for GratingsStimulusImplementation {
+    fn get_uniform_buffer_data(&self) -> Option<&[u8]> {
+        // we need to convert the data to bytes
+        Some(bytemuck::bytes_of(&self.params))
     }
-    fn get_shader(&self) -> &ShaderModule {
-        &self.shader
+
+    fn get_geometry(&self) -> Box<dyn ToVertices> {
+        Box::new(super::super::geometry::Rectangle::new(
+            Size::ScreenWidth(-0.5),
+            Size::ScreenHeight(-0.5),
+            Size::ScreenWidth(1.0),
+            Size::ScreenHeight(1.0),
+        ))
+    }
+
+    fn get_fragment_shader_code(&self) -> String {
+        "
+        struct GratingStimulusParams {
+            phase: f32,
+            cycle_length: f32,
+        };
+        
+        @group(0) @binding(0)
+        var<uniform> params: GratingStimulusParams;
+
+        @fragment
+        fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+            let frequency = 1.0 / params.cycle_length;
+            let pos_org = vec4<f32>(in.position_org.xy, 0., 0.);
+            var alpha = sin(frequency * pos_org.x + params.phase);
+            return vec4<f32>(1.0 * alpha, 1.0 * alpha, 1.0 * alpha, 1.0);
+        }"
+        .to_string()
     }
 }

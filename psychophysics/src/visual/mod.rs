@@ -31,7 +31,6 @@ pub mod color;
 pub mod geometry;
 pub mod pwindow;
 pub mod stimuli;
-pub mod text;
 
 pub use pwindow::Window;
 
@@ -51,11 +50,7 @@ pub trait Renderable {
         window_handle: &pwindow::Window,
     ) -> ();
     /// Render the object to the screen.
-    fn render(
-        &mut self,
-        enc: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
-    ) -> ();
+    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();
     fn is_finnished(&self) -> bool {
         false
     }

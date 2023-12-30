@@ -1,22 +1,22 @@
 use crate::utils::BlockingLock;
 use crate::visual::geometry::Size;
+use crate::visual::Renderable;
 use async_lock::Mutex;
+use bytemuck::{Pod, Zeroable};
 use half::f16;
+use nalgebra::geometry;
 use ndarray::ArrayView;
-use rodio::queue;
 use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use wgpu::TextureFormat;
 
-use crate::visual::Renderable;
-use bytemuck::{Pod, Zeroable};
-
 use super::super::geometry::ToVertices;
 use super::super::geometry::Transformation2D;
 use super::super::geometry::Vertex;
 use super::super::pwindow::Window;
+use super::super::pwindow::WindowState;
 use wgpu::util::DeviceExt;
 use wgpu::{Device, Queue, ShaderModule, SurfaceConfiguration};
 
@@ -33,23 +33,29 @@ pub trait BaseStimulusImplementation {
     ///
     /// # Returns
     ///
-    /// * `Option<P>` - If the stimulus has changed, this should return `Some(params)`, otherwise `None`.
+    /// * `Option<P>` - If the stimulus has changed, this should return `Some(params as bytes)`, otherwise `None`.
     /// * `Option<Box<dyn ToVertices>>` - If the stimulus has changed, this should return `Some(geometry)`, otherwise `None`.
     /// * `Option<Vec<u8>>` - If the stimulus has changed, this should return `Some(texture_data)`, otherwise `None`.
     fn update(
         &mut self,
         screen_width_mm: f64,
         viewing_distance_mm: f64,
-        screen_width_px: i32,
-        screen_height_px: i32,
-    ) -> (Option<P>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
+        screen_width_px: u32,
+        screen_height_px: u32,
+    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
         (None, None, None)
     }
     /// Returns the the function that will be used as the fragment shader.
     fn get_fragment_shader_code(&self) -> String;
 
-    /// Returns the uniform buffer byte slice that will be used to initialize the uniform buffer.
-    /// If no uniform parameters are needed, this should return `None` (default).
+    /// Returns the data that will be used to initialize the uniform buffer.
+    ///
+    /// # Caveat
+    /// Make sure that the memory layout of whatever you convert
+    /// to bytes is the same as the memory layout of the uniform buffer
+    /// in the shader. For structs, this means that you should use the
+    /// `#[repr(C)]` attribute. See https://docs.rs/bytemuck/1.5.0/bytemuck/
+    /// for more information.
     fn get_uniform_buffer_data(&self) -> Option<&[u8]> {
         None
     }
@@ -79,14 +85,17 @@ pub trait BaseStimulusImplementation {
     }
 }
 
-/// A very flexible stimulus that can be paramterized with a custom shader and custom geometry.
-/// Takes care of many important aspects of stimulus rendering like setting-up the rednering
-/// pipeline, updating vertex, uniform, and texture buffers, applying transformations and more.
+/// A very flexible stimulus that allows a wide range of visual stimuli to be created.
+///
+/// The `BaseStimulusImplementation` will provide the fragment shader code,
+/// the uniform buffer data, the texture size and data, and the geometry while
+/// the BaseStimulus will take care of all the boilerplate code responsible for
+/// setting up the rendering pipeline and uploading the data to the GPU.
+/// It will also apply any transformations and ensure that the geometry is
+/// converted to pixel coordinates before being uploaded to the GPU.
 pub struct BaseStimulus<S: BaseStimulusImplementation> {
     /// The implementation of the stimulus.
     pub(crate) stimulus_implementation: Arc<Mutex<S>>,
-    /// The geometry, must implement the `ToVertex` trait.
-    geometry: Arc<Mutex<G>>,
     /// The rendering pipeline for the stimulus.
     pipeline: Arc<Mutex<wgpu::RenderPipeline>>,
     /// The window used to create the stimulus.
@@ -112,28 +121,11 @@ pub struct BaseStimulus<S: BaseStimulusImplementation> {
 }
 
 // todo: this should be derived
-unsafe impl<
-        G: ToVertices,
-        S: BaseStimulusImplementation<P>,
-        P: BaseStimulusParams,
-    > Send for BaseStimulus<G, S, P>
-{
-}
+unsafe impl<S: BaseStimulusImplementation> Send for BaseStimulus<S> {}
 // same here
-unsafe impl<
-        G: ToVertices,
-        S: BaseStimulusImplementation<P>,
-        P: BaseStimulusParams,
-    > Sync for BaseStimulus<G, S, P>
-{
-}
+unsafe impl<S: BaseStimulusImplementation> Sync for BaseStimulus<S> {}
 
-impl<
-        G: ToVertices,
-        S: BaseStimulusImplementation<P>,
-        P: BaseStimulusParams,
-    > Clone for BaseStimulus<G, S, P>
-{
+impl<S: BaseStimulusImplementation> Clone for BaseStimulus<S> {
     fn clone(&self) -> Self {
         Self {
             uniform_buffer: self.uniform_buffer.clone(),
@@ -141,13 +133,10 @@ impl<
             pipeline: self.pipeline.clone(),
             window: self.window.clone(),
             stimulus_implementation: self.stimulus_implementation.clone(),
-            geometry: self.geometry.clone(),
             transforms: self.transforms.clone(),
             vertex_buffer: self.vertex_buffer.clone(),
             transform_buffer: self.transform_buffer.clone(),
-            n_vertices: AtomicUsize::new(
-                self.n_vertices.load(Ordering::Relaxed),
-            ),
+            n_vertices: AtomicUsize::new(self.n_vertices.load(Ordering::Relaxed)),
             texture_size: self.texture_size.clone(),
             texture: self.texture.clone(),
             texture_bind_group: self.texture_bind_group.clone(),
@@ -155,12 +144,7 @@ impl<
     }
 }
 
-impl<
-        G: ToVertices,
-        S: BaseStimulusImplementation<P>,
-        P: BaseStimulusParams,
-    > Renderable for BaseStimulus<G, S, P>
-{
+impl<S: BaseStimulusImplementation> Renderable for BaseStimulus<S> {
     fn prepare(
         &mut self,
         _device: &Device,
@@ -169,71 +153,65 @@ impl<
         config: &SurfaceConfiguration,
         window_handle: &super::super::pwindow::Window,
     ) -> () {
-        let screen_width_mm =
-            window_handle.physical_width.load(Ordering::Relaxed);
-        let viewing_distance_mm =
-            window_handle.viewing_distance.load(Ordering::Relaxed);
-        let screen_width_px = config.width as i32;
-        let screen_height_px = config.height as i32;
+        let screen_width_mm = window_handle.physical_width.load(Ordering::Relaxed);
+        let viewing_distance_mm = window_handle.viewing_distance.load(Ordering::Relaxed);
+        let screen_width_px = config.width;
+        let screen_height_px = config.height;
 
+        let mut simp = self.stimulus_implementation.lock_blocking();
         // call the shader update function
-        let (params, tex_data) =
-            self.stimulus_implementation.lock_blocking().update(
-                &mut (self.stimulus_implementation_params.lock_blocking()),
+        let (params, geometry, tex_data) = {
+            simp.update(
                 screen_width_mm,
                 viewing_distance_mm,
                 screen_width_px,
                 screen_height_px,
-            );
+            )
+        };
 
         // if the shader returned new texture data, update the texture
         if let Some(tex_data) = tex_data {
-            let binding = self.texture.clone().unwrap();
+            let binding = self.texture.clone().expect(
+                "Texture data was returned by the implementation but no texture was specified when creating the stimulus.",
+            );
             let texture = binding.lock_blocking();
             self.set_texture(tex_data.as_slice(), &queue, &texture);
         }
 
         // if the shader returned new parameters, update the uniform buffer
         if let Some(params) = params {
-            queue.write_buffer(
-                &(self.uniform_buffer.lock_blocking()),
-                0,
-                bytemuck::cast_slice(&[params]),
-            );
+            queue.write_buffer(&(self.uniform_buffer.lock_blocking()), 0, params);
         }
 
-        let geometry = (self.geometry.lock_blocking());
-
-        // get vertices from geometry
-        let vertices = geometry.to_vertices_px(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        );
-        self.n_vertices.store(vertices.len(), Ordering::Relaxed);
-
-        // update the vertex buffer
-        queue.write_buffer(
-            &(self.vertex_buffer.lock_blocking()),
-            0,
-            bytemuck::cast_slice(&vertices),
-        );
-
-        // update the transform buffer
-        // first get the transformation matrix from the window handle
-        let win_transform = Window::transformation_matrix_to_ndc(
-            screen_width_px,
-            screen_height_px,
-        )
-        .map(|x| x as f32);
-        let stim_transform = (self.transforms.lock_blocking())
-            .to_transformation_matrix(
+        // if the shader returned new geometry, update the vertex buffer
+        if let Some(geometry) = geometry {
+            let vertices = geometry.to_vertices_px(
                 screen_width_mm,
                 viewing_distance_mm,
                 screen_width_px,
                 screen_height_px,
             );
+            self.n_vertices.store(vertices.len(), Ordering::Relaxed);
+
+            // update the vertex buffer
+            queue.write_buffer(
+                &(self.vertex_buffer.lock_blocking()),
+                0,
+                bytemuck::cast_slice(&vertices),
+            );
+        }
+
+        // update the transform buffer
+        // first get the transformation matrix from the window handle
+        let win_transform =
+            Window::transformation_matrix_to_ndc(screen_width_px, screen_height_px)
+                .map(|x| x as f32);
+        let stim_transform = (self.transforms.lock_blocking()).to_transformation_matrix(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
 
         // cast to f32
         let transform = (win_transform * stim_transform);
@@ -245,11 +223,7 @@ impl<
         );
     }
 
-    fn render(
-        &mut self,
-        enc: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
-    ) -> () {
+    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
         let pipeline = (self.pipeline.lock_blocking());
         let n_vertices = self.n_vertices.load(Ordering::Relaxed);
         let texture_bind_group =
@@ -262,23 +236,20 @@ impl<
         let bind_group = (self.bind_group.lock_blocking());
         let vertex_buffer = (self.vertex_buffer.lock_blocking());
         {
-            let mut rpass =
-                enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
-                    color_attachments: &[Some(
-                        wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                        },
-                    )],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                });
+            let mut rpass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
 
             rpass.set_pipeline(&pipeline);
             rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
@@ -294,19 +265,18 @@ impl<
     }
 }
 
-impl<
-        G: ToVertices,
-        S: BaseStimulusImplementation<P>,
-        P: BaseStimulusParams,
-    > BaseStimulus<G, S, P>
-{
+impl<S: BaseStimulusImplementation> BaseStimulus<S> {
     /// Create a new stimulus.
-    pub fn create(window_handle: &Window, implementation: S) -> Self {
-        let window = (window_handle.get_window_state_blocking());
-        let device = &window.device;
-        let surface = &window.surface;
-        let adapter = &window.adapter;
-        let sconfig = window.config.clone();
+    pub fn create(
+        window: &Window,
+        window_state: &WindowState,
+        implementation: S,
+    ) -> Self {
+        let device = &window_state.device;
+        let queue = &window_state.queue;
+        let surface = &window_state.surface;
+        let adapter = &window_state.adapter;
+        let sconfig = window_state.config.clone();
 
         // get the geometry
         let shape = implementation.get_geometry();
@@ -314,38 +284,48 @@ impl<
         let texture_size = implementation.get_texture_size();
         // get the fragment shader code
         let fragment_shader_code = implementation.get_fragment_shader_code();
+        // get the uniform buffer data
+        let params_bytes = implementation
+            .get_uniform_buffer_data()
+            .unwrap_or(&[0u8; 2]);
 
-        let width_mm = window_handle.physical_width.load(Ordering::Relaxed);
-        let viewing_distance_mm =
-            window_handle.viewing_distance.load(Ordering::Relaxed);
-        let width_px = sconfig.width as i32;
-        let height_px = sconfig.height as i32;
+        // compile the fragment shader
+        let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(
+                (include_str!("shaders/base.wgsl").to_string() + &fragment_shader_code)
+                    .into(),
+            ),
+        });
+
+        // compile the vertex shader
+        let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/base.wgsl").into()),
+        });
+
+        let width_mm = window.physical_width.load(Ordering::Relaxed);
+        let viewing_distance_mm = window.viewing_distance.load(Ordering::Relaxed);
+        let width_px = sconfig.width;
+        let height_px = sconfig.height;
 
         // create the vertex buffer
+        let vertices =
+            shape.to_vertices_px(width_mm, viewing_distance_mm, width_px, height_px);
+        let n_vertices = vertices.len();
         let vertex_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(
-                    shape
-                        .to_vertices_px(
-                            width_mm,
-                            viewing_distance_mm,
-                            width_px,
-                            height_px,
-                        )
-                        .as_slice(),
-                ),
-                usage: wgpu::BufferUsages::VERTEX
-                    | wgpu::BufferUsages::COPY_DST,
+                contents: bytemuck::cast_slice(vertices.as_slice()),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
         // create the uniform buffer #1
         let stimulus_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Stimulus Buffer"),
-                contents: stim_params.as_byteslice(),
-                usage: wgpu::BufferUsages::UNIFORM
-                    | wgpu::BufferUsages::COPY_DST,
+                contents: params_bytes,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 
         // create the uniform buffer #2 (for the transformation matrix
@@ -355,8 +335,7 @@ impl<
                 contents: bytemuck::cast_slice(
                     &nalgebra::Matrix4::<f32>::identity().as_slice(),
                 ),
-                usage: wgpu::BufferUsages::UNIFORM
-                    | wgpu::BufferUsages::COPY_DST,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 
         let uniform_bind_group_layout =
@@ -388,21 +367,20 @@ impl<
                 label: Some("uniform_bind_group_layout"),
             });
 
-        let uniform_bind_group =
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &uniform_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: stimulus_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: transform_buffer.as_entire_binding(),
-                    },
-                ],
-                label: Some("uniform_bind_group"),
-            });
+        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &uniform_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: stimulus_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: transform_buffer.as_entire_binding(),
+                },
+            ],
+            label: Some("uniform_bind_group"),
+        });
 
         // if a texture size is specified, create a texture
         let texture = if let Some(texture_size) = texture_size {
@@ -424,90 +402,80 @@ impl<
         };
 
         // if a texture is specified, create a sampler and bind group
-        let (texture_bind_group_layout, texture_bind_group) =
-            if let Some(texture) = &texture {
-                let texture_view =
-                    texture.create_view(&wgpu::TextureViewDescriptor {
-                        format: Some(wgpu::TextureFormat::Bgra8Unorm),
-                        ..Default::default()
-                    });
-                let texture_sampler =
-                    device.create_sampler(&wgpu::SamplerDescriptor {
-                        address_mode_u: wgpu::AddressMode::ClampToEdge,
-                        address_mode_v: wgpu::AddressMode::ClampToEdge,
-                        address_mode_w: wgpu::AddressMode::ClampToEdge,
-                        mag_filter: wgpu::FilterMode::Nearest,
-                        min_filter: wgpu::FilterMode::Nearest,
-                        mipmap_filter: wgpu::FilterMode::Nearest,
-                        ..Default::default()
-                    });
+        let (texture_bind_group_layout, texture_bind_group) = if let Some(texture) =
+            &texture
+        {
+            let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
+                format: Some(wgpu::TextureFormat::Bgra8Unorm),
+                ..Default::default()
+            });
+            let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            });
 
-                let texture_bind_group_layout = device
-                    .create_bind_group_layout(
-                        &wgpu::BindGroupLayoutDescriptor {
-                            entries: &[
-                                wgpu::BindGroupLayoutEntry {
-                                    binding: 0,
-                                    visibility: wgpu::ShaderStages::FRAGMENT,
-                                    ty: wgpu::BindingType::Texture {
-                                        multisampled: false,
-                                        view_dimension:
-                                            wgpu::TextureViewDimension::D2,
-                                        sample_type:
-                                            wgpu::TextureSampleType::Float {
-                                                filterable: true,
-                                            },
-                                    },
-                                    count: None,
+            let texture_bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                multisampled: false,
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                sample_type: wgpu::TextureSampleType::Float {
+                                    filterable: true,
                                 },
-                                wgpu::BindGroupLayoutEntry {
-                                    binding: 1,
-                                    visibility: wgpu::ShaderStages::FRAGMENT,
-                                    // This should match the filterable field of the
-                                    // corresponding Texture entry above.
-                                    ty: wgpu::BindingType::Sampler(
-                                        wgpu::SamplerBindingType::Filtering,
-                                    ),
-                                    count: None,
-                                },
-                            ],
-                            label: Some("texture_bind_group_layout"),
+                            },
+                            count: None,
                         },
-                    );
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            // This should match the filterable field of the
+                            // corresponding Texture entry above.
+                            ty: wgpu::BindingType::Sampler(
+                                wgpu::SamplerBindingType::Filtering,
+                            ),
+                            count: None,
+                        },
+                    ],
+                    label: Some("texture_bind_group_layout"),
+                });
 
-                let texture_bind_group =
-                    device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        layout: &texture_bind_group_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::TextureView(
-                                    &texture_view,
-                                ),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(
-                                    &texture_sampler,
-                                ),
-                            },
-                        ],
-                        label: Some("texture_bind_group"),
-                    });
+            let texture_bind_group =
+                device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &texture_bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&texture_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&texture_sampler),
+                        },
+                    ],
+                    label: Some("texture_bind_group"),
+                });
 
-                (Some(texture_bind_group_layout), Some(texture_bind_group))
-            } else {
-                (None, None)
-            };
+            (Some(texture_bind_group_layout), Some(texture_bind_group))
+        } else {
+            (None, None)
+        };
 
         // create the bind group layout (depending on whether a texture is specified)
-        let bind_group_layouts = if let Some(texture_bind_group_layout) =
-            &texture_bind_group_layout
-        {
-            vec![&uniform_bind_group_layout, &texture_bind_group_layout]
-        } else {
-            vec![&uniform_bind_group_layout]
-        };
+        let bind_group_layouts =
+            if let Some(texture_bind_group_layout) = &texture_bind_group_layout {
+                vec![&uniform_bind_group_layout, &texture_bind_group_layout]
+            } else {
+                vec![&uniform_bind_group_layout]
+            };
 
         let pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -521,31 +489,17 @@ impl<
 
         log::warn!("swapchain format: {:?}", swapchain_capabilities.formats);
 
-        // first, we create the shader module
-        let shader_module =
-            device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::Wgsl(
-                    implementation
-                        .get_vertex_shader()
-                        .unwrap_or(&String::from(include_str!(
-                            "../../shaders/default_vertex.wgsl"
-                        )))
-                        .into(),
-                ),
-            });
-
         let render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: None,
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: shader_module,
+                    module: &vertex_shader,
                     entry_point: "vs_main",
                     buffers: &[Vertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: shader_module,
+                    module: &fragment_shader,
                     entry_point: "fs_main",
                     targets: &[Some(swapchain_format.into())],
                 }),
@@ -555,18 +509,16 @@ impl<
                 multiview: None,
             });
 
-        Self {
+        let oot = Self {
             uniform_buffer: Arc::new(Mutex::new(stimulus_buffer)),
             bind_group: Arc::new(Mutex::new(uniform_bind_group)),
             pipeline: Arc::new(Mutex::new(render_pipeline)),
-            window: window_handle.clone(),
+            window: window.clone(),
             stimulus_implementation: Arc::new(Mutex::new(implementation)),
-            stimulus_implementation_params: Arc::new(Mutex::new(stim_params)),
-            geometry: Arc::new(Mutex::new(shape)),
             transforms: Arc::new(Mutex::new(Transformation2D::Identity)),
             vertex_buffer: Arc::new(Mutex::new(vertex_buffer)),
             transform_buffer: Arc::new(Mutex::new(transform_buffer)),
-            n_vertices: AtomicUsize::new(0), // will be updated in prepare
+            n_vertices: AtomicUsize::new(n_vertices),
             texture_size: if let Some(texture_size) = texture_size {
                 Some(texture_size)
             } else {
@@ -577,20 +529,28 @@ impl<
             } else {
                 None
             },
-            texture_bind_group: if let Some(texture_bind_group) =
-                texture_bind_group
-            {
+            texture_bind_group: if let Some(texture_bind_group) = texture_bind_group {
                 Some(Arc::new(Mutex::new(texture_bind_group)))
             } else {
                 None
             },
+        };
+
+        // if a texture is specified, upload the texture data
+        if let Some(texture) = &oot.texture {
+            let texture = texture.lock_blocking();
+            let texture_data = oot
+                .stimulus_implementation
+                .lock_blocking()
+                .get_texture_data()
+                .unwrap();
+            oot.set_texture(texture_data.as_slice(), &queue, &texture);
         }
+
+        oot
     }
 
-    pub fn set_transformation(
-        &mut self,
-        transform: Transformation2D,
-    ) -> &mut Self {
+    pub fn set_transformation(&mut self, transform: Transformation2D) -> &mut Self {
         *(self.transforms.lock_blocking()) = transform;
         self
     }
@@ -608,12 +568,7 @@ impl<
     /// # Panics
     ///
     /// This method will panic if the data size does not match the texture size or if no texture is specified for this stimulus.
-    pub fn set_texture(
-        &self,
-        data: &[u8],
-        queue: &Queue,
-        texture: &wgpu::Texture,
-    ) {
+    pub fn set_texture(&self, data: &[u8], queue: &Queue, texture: &wgpu::Texture) {
         // get a view of u8 from the f16 data using bytemuck
         // let data: &[u8] = bytemuck::cast_slice(data);
 
