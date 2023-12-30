@@ -18,6 +18,6 @@ jobs:
         with:
           channel: nightly
           targets: wasm32-unknown-unknown
-          components: "rust-src --toolchain nightly-2023-06-27"
+          components: "rust-src"
       - name: Build | Compile
         run: ./build.sh --example image
