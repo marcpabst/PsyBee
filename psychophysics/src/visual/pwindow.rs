@@ -7,6 +7,7 @@ use futures_lite::Future;
 use palette::IntoColor;
 
 use crate::visual::color::ColorFormat;
+use async_trait::async_trait;
 
 use atomic_float::AtomicF64;
 
@@ -253,79 +254,90 @@ pub async fn render_task(window_handle: Window) {
         let g = f.clone();
 
         *g.borrow_mut() = Some(Closure::new(move || {
-            // Set the body's text content to how many times this
-            // requestAnimationFrame callback has fired.
-
             // Schedule ourself for another requestAnimationFrame callback.
             request_animation_frame(f.borrow().as_ref().unwrap());
 
-            // check if there is a frame available
-            let try_frame = rx.try_recv();
+            let tx = tx.clone();
+            let rx = rx.clone();
+            let window_handle = window_handle.clone();
 
-            if try_frame.is_ok() {
-                let frame = try_frame.unwrap();
-                // acquire lock on frame
-                let mut frame = frame.lock_blocking();
+            let async_task = async move {
+                // check if there is a frame available
+                let try_frame = rx.try_recv();
 
-                // acquire lock on window
-                let window_lock = window_handle.get_window_state_blocking();
+                if try_frame.is_ok() {
+                    let frame = try_frame.unwrap();
+                    // acquire lock on frame
+                    let mut frame = frame.lock_blocking();
 
-                let suface_texture: wgpu::SurfaceTexture = window_lock
-                    .surface
-                    .get_current_texture()
-                    .expect("Failed to acquire next swap chain texture");
-                let view =
-                    suface_texture
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor {
+                    // acquire lock on window
+                    let window_lock = window_handle.get_window_state_blocking();
+
+                    let suface_texture: wgpu::SurfaceTexture = window_lock
+                        .surface
+                        .get_current_texture()
+                        .expect("Failed to acquire next swap chain texture");
+                    let view = suface_texture.texture.create_view(
+                        &wgpu::TextureViewDescriptor {
                             format: Some(wgpu::TextureFormat::Bgra8Unorm),
                             ..wgpu::TextureViewDescriptor::default()
-                        });
-                let mut encoder = window_lock.device.create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { label: None },
-                );
+                        },
+                    );
+                    let mut encoder = window_lock.device.create_command_encoder(
+                        &wgpu::CommandEncoderDescriptor { label: None },
+                    );
 
-                // clear the frame
-                {
-                    // clear the frame (once the lifetime annoyance is fixed, this can be removed only a single render pass is needed
-                    // using the LoadOp::Clear option)
-                    let rpass =
-                        &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                            label: None,
-                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                view: &view,
-                                resolve_target: None,
-                                ops: wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(frame.bg_color.into()),
-                                    store: wgpu::StoreOp::Store,
-                                },
-                            })],
-                            depth_stencil_attachment: None,
-                            timestamp_writes: None,
-                            occlusion_query_set: None,
-                        });
-                }
+                    // clear the frame
+                    {
+                        // clear the frame (once the lifetime annoyance is fixed, this can be removed only a single render pass is needed
+                        // using the LoadOp::Clear option)
+                        let rpass =
+                            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                label: None,
+                                color_attachments: &[Some(
+                                    wgpu::RenderPassColorAttachment {
+                                        view: &view,
+                                        resolve_target: None,
+                                        ops: wgpu::Operations {
+                                            load: wgpu::LoadOp::Clear(
+                                                frame.bg_color.into(),
+                                            ),
+                                            store: wgpu::StoreOp::Store,
+                                        },
+                                    },
+                                )],
+                                depth_stencil_attachment: None,
+                                timestamp_writes: None,
+                                occlusion_query_set: None,
+                            });
+                    }
 
-                frame.prepare(
-                    &window_lock.device,
-                    &window_lock.queue,
-                    &view,
-                    &window_lock.config,
-                    &window_handle,
-                );
+                    frame
+                        .prepare(
+                            &window_lock.device,
+                            &window_lock.queue,
+                            &view,
+                            &window_lock.config,
+                            &window_handle,
+                        )
+                        .await;
 
-                frame.render(&mut encoder, &view);
+                    frame.render(&mut encoder, &view);
 
-                window_lock.queue.submit(Some(encoder.finish()));
-                suface_texture.present();
+                    window_lock.queue.submit(Some(encoder.finish()));
+                    suface_texture.present();
 
-                // notify sender that frame has been consumed
-                let _ = tx.try_send(true);
-            }
+                    // notify sender that frame has been consumed
+                    let _ = tx.try_send(true);
+                };
+            };
+
+            // spawn the async task
+            wasm_bindgen_futures::spawn_local(async_task);
         }));
-
         request_animation_frame(g.borrow().as_ref().unwrap());
     }
+
     // on native, we submit frames when they are ready
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -378,13 +390,15 @@ pub async fn render_task(window_handle: Window) {
                         occlusion_query_set: None,
                     });
             }
-            frame.prepare(
-                &window_lock.device,
-                &window_lock.queue,
-                &view,
-                &window_lock.config,
-                &window_handle,
-            );
+            frame
+                .prepare(
+                    &window_lock.device,
+                    &window_lock.queue,
+                    &view,
+                    &window_lock.config,
+                    &window_handle,
+                )
+                .await;
             frame.render(&mut encoder, &view);
 
             window_lock.queue.submit(Some(encoder.finish()));
@@ -403,8 +417,9 @@ pub struct Frame {
     pub bg_color: wgpu::Color,
 }
 
+#[async_trait(?Send)]
 impl Renderable for Frame {
-    fn prepare(
+    async fn prepare(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -413,14 +428,16 @@ impl Renderable for Frame {
         window_handle: &Window,
     ) -> () {
         // call prepare() on all renderables
-        for renderable in &mut (self.renderables.lock_blocking()).iter_mut() {
-            renderable.prepare(device, queue, view, config, window_handle);
+        for renderable in &mut self.renderables.lock().await.iter_mut() {
+            renderable
+                .prepare(device, queue, view, config, window_handle)
+                .await;
         }
     }
 
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
         // call render() on all renderables
-        for renderable in &mut (self.renderables.lock_blocking()).iter_mut() {
+        for renderable in &mut self.renderables.lock_blocking().iter_mut() {
             renderable.render(enc, view);
         }
     }
@@ -430,7 +447,7 @@ impl Frame {
     /// Add a renderable to the frame.
     pub fn add(&mut self, renderable: &(impl Renderable + Clone + 'static)) -> () {
         let renderable = Box::new(renderable.clone());
-        (self.renderables.lock_blocking()).push(renderable);
+        self.renderables.lock_blocking().push(renderable);
     }
 }
 

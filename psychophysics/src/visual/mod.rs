@@ -34,14 +34,17 @@ pub mod stimuli;
 
 pub use pwindow::Window;
 
+use async_trait::async_trait;
 use wgpu::{Device, Queue, SurfaceConfiguration};
 
 /// Trait for all renderable objects. This mostly follows the `wgpu`
 /// recommendations for rendering middleware. This is trait is mostly
 /// used internall but can be used to create custom stimuli.
+#[async_trait(?Send)]
 pub trait Renderable {
-    /// Prepare the renderable object for rendering.
-    fn prepare(
+    /// Prepare the renderable object for rendering. By default this
+    /// function calls `prepare_async` function in a blocking manner.
+    async fn prepare(
         &mut self,
         device: &Device,
         queue: &Queue,

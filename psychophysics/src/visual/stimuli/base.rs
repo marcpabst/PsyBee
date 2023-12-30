@@ -2,6 +2,7 @@ use crate::utils::BlockingLock;
 use crate::visual::geometry::Size;
 use crate::visual::Renderable;
 use async_lock::Mutex;
+use async_trait::async_trait;
 use bytemuck::{Pod, Zeroable};
 use half::f16;
 use nalgebra::geometry;
@@ -122,6 +123,7 @@ pub struct BaseStimulus<S: BaseStimulusImplementation> {
 
 // todo: this should be derived
 unsafe impl<S: BaseStimulusImplementation> Send for BaseStimulus<S> {}
+
 // same here
 unsafe impl<S: BaseStimulusImplementation> Sync for BaseStimulus<S> {}
 
@@ -144,8 +146,9 @@ impl<S: BaseStimulusImplementation> Clone for BaseStimulus<S> {
     }
 }
 
+#[async_trait(?Send)]
 impl<S: BaseStimulusImplementation> Renderable for BaseStimulus<S> {
-    fn prepare(
+    async fn prepare(
         &mut self,
         _device: &Device,
         queue: &Queue,

@@ -15,16 +15,16 @@ fn show_image(window: Window) {
     // create image stimulus
     let mut image_stim = ImageStimulus::new(&window, thatcher);
     // create video stimulus
-    let mut video_stim = VideoStimulus::new_with_rectangle(
-        &window,
-        "movie.mp4".to_string(),
-        Rectangle::new(
-            Size::Pixels(250.0),
-            Size::Pixels(250.0),
-            Size::Pixels(500.0),
-            Size::Pixels(500.0),
-        ),
-    );
+    // let mut video_stim = VideoStimulus::new_with_rectangle(
+    //     &window,
+    //     "movie.mp4".to_string(),
+    //     Rectangle::new(
+    //         Size::Pixels(250.0),
+    //         Size::Pixels(250.0),
+    //         Size::Pixels(500.0),
+    //         Size::Pixels(500.0),
+    //     ),
+    // );
 
     // create grating stimulus
     let mut grating_stim = GratingsStimulus::new(
@@ -46,12 +46,12 @@ fn show_image(window: Window) {
 
         // transform
         image_stim.set_transformation(Transformation2D::RotationCenter(angle));
-        video_stim.set_transformation(Transformation2D::RotationCenter(-angle));
+        //video_stim.set_transformation(Transformation2D::RotationCenter(-angle));
 
         // add stimuli to frame
-        frame.add(&grating_stim);
+        //frame.add(&grating_stim);
         frame.add(&image_stim);
-        frame.add(&video_stim);
+        //frame.add(&video_stim);
 
         angle += 0.5;
     });

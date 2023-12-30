@@ -37,6 +37,7 @@ spin_sleep = "1.1.1"
 half = {version = "2.3.1", features = ["bytemuck"]}
 palette = "0.7.3"
 async-lock = "3.2.0"
+async-trait = "0.1.75"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 smol = "1.3.0"
