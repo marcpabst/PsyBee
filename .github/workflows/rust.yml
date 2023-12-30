@@ -16,9 +16,13 @@ jobs:
       - name: Setup | Rust
         uses: moonrepo/setup-rust@v1.1.0
         with:
-          bins: wasm-bindgen
+          bins: wasm-bindgen-cli@0.2.89
           channel: nightly
           targets: wasm32-unknown-unknown
           components: "rust-src"
       - name: Build | Compile
         run: ./build.sh --example image
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: pkg
