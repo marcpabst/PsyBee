@@ -36,7 +36,7 @@ pub enum Size {
     /// Fraction of the screen width.
     ScreenWidth(f64),
     /// Degrees of visual angle.
-    Deegrees(f64),
+    Degrees(f64),
     /// Millimeters.
     Millimeters(f64),
     /// Centimeters.
@@ -123,8 +123,14 @@ impl Size {
     /// # Returns
     ///
     /// The distance in millimeters.
-    fn angle_to_milimeter(angle: f64, viewing_distance_mm: f64) -> Size {
-        Size::Millimeters(2.0 * viewing_distance_mm * (angle.to_radians() / 2.0).tan())
+    fn angle_to_milimeter(
+        angle: f64,
+        viewing_distance_mm: f64,
+    ) -> Size {
+        Size::Millimeters(
+            2.0 * viewing_distance_mm
+                * (angle.to_radians() / 2.0).tan(),
+        )
     }
 
     /// Convert the given unit to pixels, taking the physical size of the screen and the viewing distance into account.
@@ -148,55 +154,100 @@ impl Size {
     ) -> f64 {
         let window_width_mm = width_mm;
         let window_width_pixels = width_px as f64;
-
-        //let window_height_mm = window_width_mm * height_px as f64 / width_px as f64;
         let window_height_pixels = height_px as f64;
 
         match self {
             Size::Pixels(pixels) => *pixels,
-            Size::ScreenWidth(normalised) => *normalised * window_width_pixels,
-            Size::ScreenHeight(normalised) => *normalised * window_height_pixels,
-            Size::Deegrees(degrees) => Size::angle_to_milimeter(
+            Size::ScreenWidth(normalised) => {
+                *normalised * window_width_pixels
+            }
+            Size::ScreenHeight(normalised) => {
+                *normalised * window_height_pixels
+            }
+            Size::Degrees(degrees) => Size::angle_to_milimeter(
                 *degrees,
                 viewing_distance_mm,
             )
-            .to_pixels(width_mm, viewing_distance_mm, width_px, height_px),
+            .to_pixels(
+                width_mm,
+                viewing_distance_mm,
+                width_px,
+                height_px,
+            ),
             Size::Millimeters(millimeters) => {
                 *millimeters * window_width_pixels / window_width_mm
             }
-            Size::Centimeters(centimeters) => Size::Millimeters(*centimeters * 10.0)
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px),
-            Size::Inches(inches) => Size::Millimeters(*inches * 25.4).to_pixels(
-                width_mm,
-                viewing_distance_mm,
-                width_px,
-                height_px,
-            ),
-            Size::Points(points) => Size::Inches(*points / 72.0).to_pixels(
-                width_mm,
-                viewing_distance_mm,
-                width_px,
-                height_px,
-            ),
+            Size::Centimeters(centimeters) => {
+                Size::Millimeters(*centimeters * 10.0).to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                )
+            }
+            Size::Inches(inches) => Size::Millimeters(*inches * 25.4)
+                .to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                ),
+            Size::Points(points) => Size::Inches(*points / 72.0)
+                .to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                ),
             Size::Default(default) => *default,
             Size::Quotient(a, b) => {
                 // first, we resolve `a` to pixels, the we divide by b
-                let a = a.to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
+                let a = a.to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                );
                 a / b
             }
             Size::Product(a, b) => {
                 // first, we resolve `a` to pixels, the we multiply with b
-                let a = a.to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
+                let a = a.to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                );
                 a * b
             }
             Size::Sum(a, b) => {
-                let a = a.to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
-                let b = b.to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
+                let a = a.to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                );
+                let b = b.to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                );
                 a + b
             }
             Size::Difference(a, b) => {
-                let a = a.to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
-                let b = b.to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
+                let a = a.to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                );
+                let b = b.to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                );
                 a - b
             }
         }
@@ -204,21 +255,34 @@ impl Size {
 }
 
 impl std::fmt::Debug for Size {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
         match self {
             Size::Pixels(pixels) => write!(f, "{}px", pixels),
-            Size::ScreenWidth(normalised) => write!(f, "{}w", normalised),
-            Size::ScreenHeight(normalised) => write!(f, "{}h", normalised),
-            Size::Deegrees(degrees) => write!(f, "{}deg", degrees),
-            Size::Millimeters(millimeters) => write!(f, "{}mm", millimeters),
-            Size::Centimeters(centimeters) => write!(f, "{}cm", centimeters),
+            Size::ScreenWidth(normalised) => {
+                write!(f, "{}w", normalised)
+            }
+            Size::ScreenHeight(normalised) => {
+                write!(f, "{}h", normalised)
+            }
+            Size::Degrees(degrees) => write!(f, "{}deg", degrees),
+            Size::Millimeters(millimeters) => {
+                write!(f, "{}mm", millimeters)
+            }
+            Size::Centimeters(centimeters) => {
+                write!(f, "{}cm", centimeters)
+            }
             Size::Inches(inches) => write!(f, "{}in", inches),
             Size::Points(points) => write!(f, "{}pt", points),
             Size::Default(default) => write!(f, "{}def", default),
             Size::Quotient(a, b) => write!(f, "({:?})/({:?})", a, b),
             Size::Product(a, b) => write!(f, "({:?})*({:?})", a, b),
             Size::Sum(a, b) => write!(f, "({:?})+({:?})", a, b),
-            Size::Difference(a, b) => write!(f, "({:?})-({:?})", a, b),
+            Size::Difference(a, b) => {
+                write!(f, "({:?})-({:?})", a, b)
+            }
         }
     }
 }
@@ -236,6 +300,8 @@ pub trait ToVertices: Send + Sync {
         width_px: u32,
         height_px: u32,
     ) -> Vec<Vertex>;
+
+    fn clone_box(&self) -> Box<dyn ToVertices>;
 }
 
 /// A rectangle with a given position and size.
@@ -301,21 +367,40 @@ impl Rectangle {
         width_px: u32,
         height_px: u32,
     ) -> [f64; 4] {
-        let left =
-            self.left
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
-        let top = self
-            .top
-            .to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
-        let width =
-            self.width
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
-        let height =
-            self.height
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
+        let left = self.left.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        );
+        let top = self.top.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        );
+        let width = self.width.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        );
+        let height = self.height.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        );
 
         [left, top, width, height]
     }
+
+    pub const FULLSCREEN: Rectangle = Rectangle {
+        left: Size::ScreenWidth(-0.5),
+        top: Size::ScreenHeight(-0.5),
+        width: Size::ScreenWidth(1.0),
+        height: Size::ScreenHeight(1.0),
+    };
 }
 
 impl Circle {
@@ -351,22 +436,30 @@ impl ToVertices for Rectangle {
         width_px: u32,
         height_px: u32,
     ) -> Vec<Vertex> {
-        let left = self
-            .left
-            .to_pixels(width_mm, viewing_distance_mm, width_px, height_px)
-            as f32;
-        let top = self
-            .top
-            .to_pixels(width_mm, viewing_distance_mm, width_px, height_px)
-            as f32;
-        let width =
-            self.width
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px)
-                as f32;
-        let height =
-            self.height
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px)
-                as f32;
+        let left = self.left.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        ) as f32;
+        let top = self.top.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        ) as f32;
+        let width = self.width.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        ) as f32;
+        let height = self.height.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        ) as f32;
 
         let vertices = vec![
             Vertex {
@@ -403,6 +496,10 @@ impl ToVertices for Rectangle {
 
         vertices
     }
+
+    fn clone_box(&self) -> Box<dyn ToVertices> {
+        Box::new(self.clone())
+    }
 }
 
 impl ToVertices for Circle {
@@ -413,24 +510,36 @@ impl ToVertices for Circle {
         width_px: u32,
         height_px: u32,
     ) -> Vec<Vertex> {
-        let center_x =
-            self.center_x
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
-        let center_y =
-            self.center_y
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
-        let radius =
-            self.radius
-                .to_pixels(width_mm, viewing_distance_mm, width_px, height_px);
+        let center_x = self.center_x.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        );
+        let center_y = self.center_y.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        );
+        let radius = self.radius.to_pixels(
+            width_mm,
+            viewing_distance_mm,
+            width_px,
+            height_px,
+        );
 
         let mut vertices = Vec::new();
 
         let n_segments = 500;
 
         for i in 0..n_segments {
-            let theta = 2.0 * std::f64::consts::PI * (i as f64 / n_segments as f64);
-            let next_theta =
-                2.0 * std::f64::consts::PI * ((i + 1) as f64 / n_segments as f64);
+            let theta = 2.0
+                * std::f64::consts::PI
+                * (i as f64 / n_segments as f64);
+            let next_theta = 2.0
+                * std::f64::consts::PI
+                * ((i + 1) as f64 / n_segments as f64);
 
             let x = center_x + radius * theta.cos();
             let y = center_y + radius * theta.sin();
@@ -456,6 +565,10 @@ impl ToVertices for Circle {
         }
 
         vertices
+    }
+
+    fn clone_box(&self) -> Box<dyn ToVertices> {
+        Box::new(self.clone())
     }
 }
 
@@ -634,7 +747,8 @@ pub struct Vertex {
 impl Vertex {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<Vertex>()
+                as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
                 wgpu::VertexAttribute {
@@ -643,12 +757,14 @@ impl Vertex {
                     format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[f32; 3]>()
+                        as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 6]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[f32; 6]>()
+                        as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32x2,
                 },

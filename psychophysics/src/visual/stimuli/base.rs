@@ -1,12 +1,7 @@
-use crate::utils::BlockingLock;
 use crate::visual::geometry::Size;
 use crate::visual::Renderable;
 use async_lock::Mutex;
 use async_trait::async_trait;
-
-
-
-
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -16,11 +11,10 @@ use wgpu::TextureFormat;
 use super::super::geometry::ToVertices;
 use super::super::geometry::Transformation2D;
 use super::super::geometry::Vertex;
-use super::super::pwindow::Window;
-use super::super::pwindow::WindowState;
+use super::super::window::Window;
+use super::super::window::WindowState;
 use wgpu::util::DeviceExt;
 use wgpu::{Device, Queue, SurfaceConfiguration};
-
 pub trait BaseStimulusImplementation {
     /// Called when `prepare()` is called on the stimulus.
     ///
@@ -154,7 +148,7 @@ impl<S: BaseStimulusImplementation> Renderable for BaseStimulus<S> {
         queue: &Queue,
         _view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
-        window_handle: &super::super::pwindow::Window,
+        window_handle: &super::super::window::Window,
     ) -> () {
         let screen_width_mm = window_handle.physical_width.load(Ordering::Relaxed);
         let viewing_distance_mm = window_handle.viewing_distance.load(Ordering::Relaxed);
@@ -186,23 +180,22 @@ impl<S: BaseStimulusImplementation> Renderable for BaseStimulus<S> {
             queue.write_buffer(&(self.uniform_buffer.lock_blocking()), 0, params);
         }
 
-        // if the shader returned new geometry, update the vertex buffer
-        if let Some(geometry) = geometry {
-            let vertices = geometry.to_vertices_px(
-                screen_width_mm,
-                viewing_distance_mm,
-                screen_width_px,
-                screen_height_px,
-            );
-            self.n_vertices.store(vertices.len(), Ordering::Relaxed);
+        // if the shader does not return new geometry, use the default geometry
+        let geometry = geometry.unwrap_or_else(|| simp.get_geometry());
+        let vertices = geometry.to_vertices_px(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
+        self.n_vertices.store(vertices.len(), Ordering::Relaxed);
 
-            // update the vertex buffer
-            queue.write_buffer(
-                &(self.vertex_buffer.lock_blocking()),
-                0,
-                bytemuck::cast_slice(&vertices),
-            );
-        }
+        // update the vertex buffer
+        queue.write_buffer(
+            &(self.vertex_buffer.lock_blocking()),
+            0,
+            bytemuck::cast_slice(&vertices),
+        );
 
         // update the transform buffer
         // first get the transformation matrix from the window handle

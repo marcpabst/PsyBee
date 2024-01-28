@@ -11,11 +11,15 @@ while [ $# -gt 0 ]; do
       shift
       cargo_args="--example $1"
       wasm_bindgen_out="./pkg/examples/$1"
+      target_wasm="./target/wasm32-unknown-unknown/release/examples/$1.wasm"
+      name="$1"
       ;;
     --bin)
       shift
       cargo_args="--bin $1"
       wasm_bindgen_out="./pkg"
+      target_wasm="./target/wasm32-unknown-unknown/release/$1.wasm"
+      name="$1"
       ;;
     *)
       echo "Unknown argument: $1"
@@ -47,48 +51,25 @@ RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals --cfg=web_sy
 # Note the usage of `--target no-modules` here which is required for passing
 # the memory import to each wasm module.
 wasm-bindgen \
-  target/wasm32-unknown-unknown/release/examples/image.wasm \
+  $target_wasm \
   --out-dir $wasm_bindgen_out \
-  --target no-modules
+  --target no-modules \
+  --no-typescript
 
-# create service worker js file
-cat > $wasm_bindgen_out/service-worker.js <<EOF
-/*! coi-serviceworker v0.1.7 - Guido Zuidhof and contributors, licensed under MIT */
-let coepCredentialless=!1;"undefined"==typeof window?(self.addEventListener("install",(()=>self.skipWaiting())),self.addEventListener("activate",(e=>e.waitUntil(self.clients.claim()))),self.addEventListener("message",(e=>{e.data&&("deregister"===e.data.type?self.registration.unregister().then((()=>self.clients.matchAll())).then((e=>{e.forEach((e=>e.navigate(e.url)))})):"coepCredentialless"===e.data.type&&(coepCredentialless=e.data.value))})),self.addEventListener("fetch",(function(e){const o=e.request;if("only-if-cached"===o.cache&&"same-origin"!==o.mode)return;const s=coepCredentialless&&"no-cors"===o.mode?new Request(o,{credentials:"omit"}):o;e.respondWith(fetch(s).then((e=>{if(0===e.status)return e;const o=new Headers(e.headers);return o.set("Cross-Origin-Embedder-Policy",coepCredentialless?"credentialless":"require-corp"),coepCredentialless||o.set("Cross-Origin-Resource-Policy","cross-origin"),o.set("Cross-Origin-Opener-Policy","same-origin"),new Response(e.body,{status:e.status,statusText:e.statusText,headers:o})})).catch((e=>console.error(e))))}))):(()=>{const e=window.sessionStorage.getItem("coiReloadedBySelf");window.sessionStorage.removeItem("coiReloadedBySelf");const o="coepdegrade"==e,s={shouldRegister:()=>!e,shouldDeregister:()=>!1,coepCredentialless:()=>!0,coepDegrade:()=>!0,doReload:()=>window.location.reload(),quiet:!1,...window.coi},r=navigator,t=r.serviceWorker&&r.serviceWorker.controller;t&&!window.crossOriginIsolated&&window.sessionStorage.setItem("coiCoepHasFailed","true");const i=window.sessionStorage.getItem("coiCoepHasFailed");if(t){const e=s.coepDegrade()&&!(o||window.crossOriginIsolated);r.serviceWorker.controller.postMessage({type:"coepCredentialless",value:!(e||i&&s.coepDegrade())&&s.coepCredentialless()}),e&&(!s.quiet&&console.log("Reloading page to degrade COEP."),window.sessionStorage.setItem("coiReloadedBySelf","coepdegrade"),s.doReload("coepdegrade")),s.shouldDeregister()&&r.serviceWorker.controller.postMessage({type:"deregister"})}!1===window.crossOriginIsolated&&s.shouldRegister()&&(window.isSecureContext?r.serviceWorker?r.serviceWorker.register(window.document.currentScript.src).then((e=>{!s.quiet&&console.log("COOP/COEP Service Worker registered",e.scope),e.addEventListener("updatefound",(()=>{!s.quiet&&console.log("Reloading page to make use of updated COOP/COEP Service Worker."),window.sessionStorage.setItem("coiReloadedBySelf","updatefound"),s.doReload()})),e.active&&!r.serviceWorker.controller&&(!s.quiet&&console.log("Reloading page to make use of COOP/COEP Service Worker."),window.sessionStorage.setItem("coiReloadedBySelf","notcontrolling"),s.doReload())}),(e=>{!s.quiet&&console.error("COOP/COEP Service Worker failed to register:",e)})):!s.quiet&&console.error("COOP/COEP Service Worker not registered, perhaps due to private mode."):!s.quiet&&console.log("COOP/COEP Service Worker not registered, a secure context is required."))})();
-EOF
+# copy service worker js file from build-assets to wasm_bindgen_out
+cp ./build-assets/service-worker.js $wasm_bindgen_out
 
-# create an index.html file
-cat > $wasm_bindgen_out/index.html <<EOF
-<!DOCTYPE html>
+# copy css file
+cp ./build-assets/style.css $wasm_bindgen_out
 
-<head>
-  <meta charset="UTF-8" />
-  <script src="./service-worker.js"></script>
-  <style>
-  * {
-      margin: 0;
-      padding: 0;
-    }
-    html, body { width: 100%; height: 100%; }
-    .hidden {
-      display: none;
-    }
-    canvas {
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-  }
-  </style>
-</head>
+# copy index.html file
+cp ./build-assets/index.html $wasm_bindgen_out
 
-<body>
-  <script src="./image.js"></script>
-  <script type="text/javascript">
-  document.onclick = function() {
-    wasm_bindgen('./image_bg.wasm').then((wasm) => {
-      //wasm.run();
-    });
-  }
-  </script>
-</body>
-</html>
-EOF
+# rename the [$name]_bg.wasm file to bg.wasm (make sure to use the name from the command line arguments)
+mv $wasm_bindgen_out/$name"_bg.wasm" $wasm_bindgen_out/bg.wasm
+
+# rename the script file to script.js
+mv $wasm_bindgen_out/$name.js $wasm_bindgen_out/script.js
+
+# use cargo server to serve the wasm-bindgen output directory
+cargo server --port 8080 --path $wasm_bindgen_out --open

@@ -1,5 +1,7 @@
 use winit::event::VirtualKeyCode;
 
+use crate::visual::Window;
+
 #[derive(Debug, Hash, Ord, PartialOrd, Clone, Copy)]
 #[repr(u32)]
 pub enum Key {
@@ -561,7 +563,10 @@ impl PartialEq<Key> for Key {
     fn eq(&self, other: &Self) -> bool {
         match self {
             Key::Any => true,
-            _ => std::mem::discriminant(self) == std::mem::discriminant(other),
+            _ => {
+                std::mem::discriminant(self)
+                    == std::mem::discriminant(other)
+            }
         }
     }
 }
@@ -580,7 +585,9 @@ impl From<winit::event::ElementState> for KeyState {
     fn from(state: winit::event::ElementState) -> Self {
         match state {
             winit::event::ElementState::Pressed => KeyState::Pressed,
-            winit::event::ElementState::Released => KeyState::Released,
+            winit::event::ElementState::Released => {
+                KeyState::Released
+            }
         }
     }
 }
@@ -590,7 +597,9 @@ impl From<KeyState> for winit::event::ElementState {
     fn from(state: KeyState) -> Self {
         match state {
             KeyState::Pressed => winit::event::ElementState::Pressed,
-            KeyState::Released => winit::event::ElementState::Released,
+            KeyState::Released => {
+                winit::event::ElementState::Released
+            }
             KeyState::Any => {
                 panic!("KeyState::Any cannot be converted to a winit::event::ElementState")
             }
@@ -603,9 +612,53 @@ impl PartialEq<KeyState> for KeyState {
     fn eq(&self, other: &Self) -> bool {
         match self {
             KeyState::Any => true,
-            _ => std::mem::discriminant(self) == std::mem::discriminant(other),
+            _ => {
+                std::mem::discriminant(self)
+                    == std::mem::discriminant(other)
+            }
         }
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeyEvent {
+    pub key: Key,
+    pub state: KeyState,
+}
+
+// allow KeyEvent to be compared with Key
+impl PartialEq<Key> for KeyEvent {
+    fn eq(&self, other: &Key) -> bool {
+        self.key == *other
+    }
+}
+
+// allow KeyEvent to be compared with Key
+impl PartialEq<KeyEvent> for Key {
+    fn eq(&self, other: &KeyEvent) -> bool {
+        *self == other.key
+    }
+}
+
 impl Eq for KeyState {}
+
+pub struct KeyPressReceiver {
+    receiver: async_broadcast::Receiver<winit::event::KeyboardInput>,
+}
+
+impl KeyPressReceiver {
+    pub fn new(window: &Window) -> Self {
+        Self {
+            receiver: window.keyboard_receiver.activate_cloned(),
+        }
+    }
+    pub fn get_keys(&mut self) -> Vec<KeyEvent> {
+        let mut keys = Vec::new();
+        while let Ok(key_event) = self.receiver.try_recv() {
+            let key = Key::from(key_event.virtual_keycode.unwrap());
+            let state = KeyState::from(key_event.state);
+            keys.push(KeyEvent { key, state });
+        }
+        return keys;
+    }
+}

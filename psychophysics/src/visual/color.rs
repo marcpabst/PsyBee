@@ -1,3 +1,9 @@
+// Copyright (c) 2024 marc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 //! This module defines the color types used in the psychophysics crate. It also
 //! defines some predefined colors that can be used in experiments.
 //!
@@ -324,8 +330,7 @@ impl ColorFormat {
     ) -> RawRgba<f32> {
         match self {
             ColorFormat::SRGBA8 => {
-                let col: Xyza<palette::white_point::D65, f32> =
-                    col.into_color();
+                let col: Xyza<palette::white_point::D65, f32> = col.into_color();
                 let col: Srgba<f32> = col.into_color();
                 RawRgba {
                     r: col.red as f32,
@@ -353,9 +358,7 @@ impl ColorFormat {
     /// # Returns
     /// * `TextureFormat` - The texture format for the swapchain.
     /// * `TextureFormat` - The texture format for the view.
-    pub fn to_wgpu_swapchain_texture_format(
-        &self,
-    ) -> (TextureFormat, TextureFormat) {
+    pub fn to_wgpu_swapchain_texture_format(&self) -> (TextureFormat, TextureFormat) {
         match self {
             ColorFormat::SRGBA8 => {
                 (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
@@ -375,9 +378,7 @@ impl ColorFormat {
     ///
     /// # Panics
     /// Panics if the color format is not supported.
-    pub fn get_wgpu_predefined_color_space(
-        &self,
-    ) -> wgpu::PredefinedColorSpace {
+    pub fn get_wgpu_predefined_color_space(&self) -> wgpu::PredefinedColorSpace {
         match self {
             ColorFormat::SRGBA8 => wgpu::PredefinedColorSpace::Srgb,
             ColorFormat::DisplayP3U8 => wgpu::PredefinedColorSpace::DisplayP3,

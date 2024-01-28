@@ -1,6 +1,5 @@
 use palette::{
-    convert::FromColorUnclamped, encoding::Srgb, white_point::D65, FromColor,
-    IntoColor,
+    convert::FromColorUnclamped, encoding::Srgb, white_point::D65, FromColor, IntoColor,
 };
 use psychophysics::{
     async_sleep,
@@ -11,10 +10,10 @@ use psychophysics::{
         geometry::Circle,
         geometry::Rectangle,
         geometry::{Size, Transformation2D},
-        pwindow::{Frame, Window},
         stimuli::gratings::GratingsStimulus,
         stimuli::image::ImageStimulus,
         text::{TextStimulus, TextStimulusConfig},
+        window::{Frame, Window},
     },
     UnwrapDuration, UnwrapKeyPressAndDuration,
 };
@@ -48,8 +47,7 @@ async fn gratings_experiment(window: Window) {
         Size::Pixels(500.0),
     );
 
-    let image_jpg =
-        image::load_from_memory(include_bytes!("wicked_witch.png")).unwrap();
+    let image_jpg = image::load_from_memory(include_bytes!("wicked_witch.png")).unwrap();
 
     let gratings = ImageStimulus::new(&window, shape, image_jpg);
 
@@ -146,5 +144,5 @@ fn main() {
     // run experiment
     start_experiment(gratings_experiment);
     // set log level to debug
-    log::set_max_level(log::LevelFilter::Debug);
+    log::set_max_level(log::LevelFilter::Info);
 }

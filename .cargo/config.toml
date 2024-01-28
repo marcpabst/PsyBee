@@ -1,2 +1,2 @@
-[alias]
-run-wasm = "run --release --package run-wasm --"
+[env]
+DYLD_FALLBACK_LIBRARY_PATH = "/Library/Frameworks/GStreamer.framework/Versions/1.0/lib"

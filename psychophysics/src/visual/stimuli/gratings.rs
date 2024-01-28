@@ -1,14 +1,18 @@
+// Copyright (c) 2024 marc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 use super::{
     super::geometry::{Size, ToVertices},
-    super::pwindow::Window,
+    super::window::Window,
     base::{BaseStimulus, BaseStimulusImplementation},
 };
-use crate::utils::BlockingLock;
 use bytemuck::{Pod, Zeroable};
 
-
 use std::sync::atomic::Ordering;
-use wgpu::{Device};
+use wgpu::Device;
 
 pub struct GratingsStimulusImplementation {
     cycle_length: Size,
@@ -19,7 +23,7 @@ pub struct GratingsStimulusImplementation {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct GratingsStimulusParams {
+pub struct GratingsStimulusParams {
     phase: f32,
     cycle_length: f32,
 }
@@ -103,18 +107,27 @@ impl GratingsStimulusImplementation {
 }
 
 impl BaseStimulusImplementation for GratingsStimulusImplementation {
+    fn update(
+        &mut self,
+        _screen_width_mm: f64,
+        _viewing_distance_mm: f64,
+        _screen_width_px: u32,
+        _screen_height_px: u32,
+    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
+        // update phase
+        self.params.phase = self.phase;
+
+        // return updated parameters
+        (Some(bytemuck::bytes_of(&self.params)), None, None)
+    }
+
     fn get_uniform_buffer_data(&self) -> Option<&[u8]> {
         // we need to convert the data to bytes
         Some(bytemuck::bytes_of(&self.params))
     }
 
     fn get_geometry(&self) -> Box<dyn ToVertices> {
-        Box::new(super::super::geometry::Rectangle::new(
-            Size::ScreenWidth(-0.5),
-            Size::ScreenHeight(-0.5),
-            Size::ScreenWidth(1.0),
-            Size::ScreenHeight(1.0),
-        ))
+        self.shape.clone_box()
     }
 
     fn get_fragment_shader_code(&self) -> String {

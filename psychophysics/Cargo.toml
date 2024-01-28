@@ -38,6 +38,17 @@ half = {version = "2.3.1", features = ["bytemuck"]}
 palette = "0.7.3"
 async-lock = "3.2.0"
 async-trait = "0.1.75"
+ort = "2.0.0-alpha.4"
+byte-slice-cast = "1.2.2"
+glib = { git = "https://github.com/gtk-rs/gtk-rs-core", version = "0.19.0" , optional = true}
+gstreamer = {version = "0.21.3", optional = true}
+gstreamer-app = {version = "0.21.2", optional = true}
+derive_builder = "0.12.0"
+strum = "0.25.0"
+strum_macros = "0.25.3"
+csv = "1.3.0"
+thiserror = "1.0.56"
+
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 smol = "1.3.0"
@@ -49,3 +60,13 @@ console_error_panic_hook.workspace = true
 console_log.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm_thread = "0.2.0"
+
+
+[dependencies.nokhwa]
+git = "https://github.com/l1npengtul/nokhwa/"
+branch = "0.10"
+# Use the native input backends, enable WGPU integration
+features = ["input-native", "output-threaded"]
+
+[features]
+gst = ["glib", "gstreamer", "gstreamer-app"]

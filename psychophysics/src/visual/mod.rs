@@ -29,10 +29,10 @@
 //! a fixation cross and a grating stimulus.
 pub mod color;
 pub mod geometry;
-pub mod pwindow;
 pub mod stimuli;
+pub mod window;
 
-pub use pwindow::Window;
+pub use window::Window;
 
 use async_trait::async_trait;
 use wgpu::{Device, Queue, SurfaceConfiguration};
@@ -50,7 +50,7 @@ pub trait Renderable {
         queue: &Queue,
         view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
-        window_handle: &pwindow::Window,
+        window_handle: &window::Window,
     ) -> ();
     /// Render the object to the screen.
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();

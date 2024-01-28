@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+
+<head>
+  <meta charset="UTF-8" />
+  <script src="./service-worker.js"></script>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+  <script src="./script.js"></script>
+  <script type="text/javascript">
+    document.onclick = function () {
+      wasm_bindgen('./bg.wasm').then((wasm) => {
+        // hide the message
+        document.querySelector('.message').remove();
+      });
+    }
+  </script>
+  <div class="message">
+    Click anywhere to start the experiment
+</body>
+
+</html>

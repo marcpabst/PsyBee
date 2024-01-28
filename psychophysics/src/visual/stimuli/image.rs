@@ -1,20 +1,24 @@
+// Copyright (c) 2024 marc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 use super::{
     super::geometry::{Rectangle, Size},
-    super::pwindow::Window,
+    super::window::Window,
     base::{BaseStimulus, BaseStimulusImplementation},
 };
+use crate::visual::geometry::ToVertices;
 use image;
-
 
 pub struct ImageStimulusImplementation {
     image: image::DynamicImage,
     shape: Rectangle,
+    update: bool, // flag to indicate that the image has changed
 }
 
-use crate::utils::BlockingLock;
-
-/// A simple image stimulus. Image are uploaded to the GPU as textures on
-/// creation and cannot be changed afterwards.
+/// A simple image stimulus.
 pub type ImageStimulus = BaseStimulus<ImageStimulusImplementation>;
 
 impl ImageStimulus {
@@ -28,7 +32,7 @@ impl ImageStimulus {
     /// # Returns
     ///
     /// A new image stimulus.
-    pub fn new(window: &Window, image: image::DynamicImage) -> Self {
+    pub fn new_pixel_size(window: &Window, image: image::DynamicImage) -> Self {
         // create a shape the size of the image
         let shape = Rectangle::new(
             -Size::Pixels(image.width() as f64 / 2.0),
@@ -40,11 +44,7 @@ impl ImageStimulus {
     }
 
     /// Create a new image stimulus with a rectangle shape.
-    pub fn new_with_rectangle(
-        window: &Window,
-        image: image::DynamicImage,
-        shape: Rectangle,
-    ) -> Self {
+    pub fn new(window: &Window, image: image::DynamicImage, shape: Rectangle) -> Self {
         Self::_new(window, image, shape)
     }
 
@@ -61,6 +61,16 @@ impl ImageStimulus {
         })
     }
 
+    /// Set the image to be displayed.
+    ///
+    /// # Arguments
+    /// * `image` - The image to be displayed.
+    pub fn set_image(&self, image: image::DynamicImage) {
+        (self.stimulus_implementation.lock_blocking()).image = image;
+        // set update flag
+        (self.stimulus_implementation.lock_blocking()).update = true;
+    }
+
     /// Set the rectangle used to display the image on the screen.
     ///
     /// # Arguments
@@ -73,11 +83,33 @@ impl ImageStimulus {
 
 impl ImageStimulusImplementation {
     pub fn new(image: image::DynamicImage, shape: Rectangle) -> Self {
-        Self { image, shape }
+        Self {
+            image,
+            shape,
+            update: true,
+        }
     }
 }
 
 impl BaseStimulusImplementation for ImageStimulusImplementation {
+    fn update(
+        &mut self,
+        _screen_width_mm: f64,
+        _viewing_distance_mm: f64,
+        _screen_width_px: u32,
+        _screen_height_px: u32,
+    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
+        // texture data (if update is true, otherwise None)
+        let texture_data = if self.update {
+            self.update = false;
+            self.get_texture_data()
+        } else {
+            None
+        };
+
+        (None, None, texture_data)
+    }
+
     fn get_fragment_shader_code(&self) -> String {
         "
         @fragment
