@@ -38,8 +38,10 @@ pub mod prelude {
     pub use crate::input::KeyPressReceiver;
     pub use crate::utils::sleep_secs;
     pub use crate::utils::BIDSEventLogger;
+    pub use crate::visual::color;
     pub use crate::visual::geometry::{Rectangle, Size};
     pub use crate::visual::stimuli::GratingsStimulus;
+    pub use crate::visual::stimuli::ShapeStimulus;
     pub use crate::visual::{stimuli::TextStimulus, Window};
     pub use crate::{loop_frames, start_experiment};
 }

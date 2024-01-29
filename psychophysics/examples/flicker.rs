@@ -1,16 +1,14 @@
 use psychophysics::prelude::*;
 
-use std::f32::consts::PI;
-
 fn flicker_experiment(
     window: Window,
 ) -> Result<(), PsychophysicsError> {
-    // wait 1s
-    sleep_secs(0.5);
-
     // set viewing distance and size of the window in mm
     window.set_viewing_distance(30.0);
     window.set_physical_width(700.00);
+
+    // wait 1s
+    sleep_secs(1.0);
 
     // create event logger that logs events to a BIDS compatible *.tsv file
     let mut event_logger = BIDSEventLogger::new(
@@ -37,11 +35,13 @@ fn flicker_experiment(
         }
     }
 
-    log::info!("Supported flicker frequencies: {:?}", divisors);
-
+    // setup color and freqs
     let mut current_hz_index = 5;
     let mut current_hz = divisors[current_hz_index] as f64;
     let mut update_every = (monitor_hz / current_hz) as usize;
+
+    let color_states = vec![color::BLACK, color::WHITE];
+    let mut color_state: usize = 0;
 
     // create text stimulus
     let start_stim = TextStimulus::new(
@@ -49,22 +49,19 @@ fn flicker_experiment(
         "Press space to start", // the text we want to display
         Rectangle::FULLSCREEN, // full screen
     );
+
     let freq_stim = TextStimulus::new(
         &window, // the window we want to display the stimulus in
         format!("{} Hz", current_hz), // the text we want to display
         Rectangle::FULLSCREEN, // full screen
     );
 
-    // create grating stimulus
-    let grating_stim = GratingsStimulus::new(
+    // create flicker stim
+    let flicker_stim = ShapeStimulus::new(
         &window, // the window we want to display the stimulus inSetting color to
         Rectangle::FULLSCREEN, // full screen
-        Size::Pixels(500000.0), // size of one period
-        0.0,     // phase in radians
+        color_states[color_state], // the color of the stimulus
     );
-
-    // variable to store the current phase of the grating
-    let mut phase = PI / 2.0;
 
     event_logger.log_cols(
         ("trial_type",),
@@ -81,14 +78,14 @@ fn flicker_experiment(
         // show frames until space key is pressed
         loop_frames!((i, frame) from window, keys = Key::Space, {
 
-            // update the phase
+            // update the color of the flicker stimulus every update_every frames
             if i % update_every == 0 {
-                phase += PI;
-                grating_stim.set_phase(phase);
+                color_state = (color_state + 1) % color_states.len();
+                flicker_stim.set_color(color_states[color_state]);
             }
 
             // add grating stimulus to the current frame
-            frame.add(&grating_stim);
+            frame.add(&flicker_stim);
             frame.add(&freq_stim);
 
             // log event

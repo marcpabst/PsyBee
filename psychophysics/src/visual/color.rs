@@ -127,6 +127,8 @@
 //! converting a color from one color space to another and back will not
 //! necessarily give you the same color.
 
+use bytemuck::Pod;
+use bytemuck::Zeroable;
 use palette::IntoColor;
 use palette::Srgba;
 use palette::Xyza;
@@ -277,19 +279,18 @@ pub const TRANSPARENT: SRGBA = SRGBA::new(0.0, 0.0, 0.0, 0.0);
 /// - `g`: The green channel of the color.
 /// - `b`: The blue channel of the color.
 /// - `a`: The alpha channel (opacity) of the color.
-#[derive(Copy, Clone, Debug)]
-pub struct RawRgba<T = f32>
-where
-    T: Into<f64> + Copy,
-{
+///
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Zeroable, Pod)]
+pub struct RawRgba {
     /// The red channel.
-    pub r: T,
+    pub r: f32,
     /// The green channel.
-    pub g: T,
+    pub g: f32,
     /// The blue channel.
-    pub b: T,
+    pub b: f32,
     /// The alpha channel.
-    pub a: T,
+    pub a: f32,
 }
 
 /// The ColorFormat defines how color is handled internally in the rendering
@@ -327,10 +328,11 @@ impl ColorFormat {
     pub fn convert_to_raw_rgba(
         &self,
         col: impl IntoColor<Xyza<palette::white_point::D65, f32>>,
-    ) -> RawRgba<f32> {
+    ) -> RawRgba {
         match self {
             ColorFormat::SRGBA8 => {
-                let col: Xyza<palette::white_point::D65, f32> = col.into_color();
+                let col: Xyza<palette::white_point::D65, f32> =
+                    col.into_color();
                 let col: Srgba<f32> = col.into_color();
                 RawRgba {
                     r: col.red as f32,
@@ -358,14 +360,18 @@ impl ColorFormat {
     /// # Returns
     /// * `TextureFormat` - The texture format for the swapchain.
     /// * `TextureFormat` - The texture format for the view.
-    pub fn to_wgpu_swapchain_texture_format(&self) -> (TextureFormat, TextureFormat) {
+    pub fn to_wgpu_swapchain_texture_format(
+        &self,
+    ) -> (TextureFormat, TextureFormat) {
         match self {
-            ColorFormat::SRGBA8 => {
-                (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
-            }
-            ColorFormat::DisplayP3U8 => {
-                (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
-            }
+            ColorFormat::SRGBA8 => (
+                TextureFormat::Bgra8Unorm,
+                TextureFormat::Bgra8UnormSrgb,
+            ),
+            ColorFormat::DisplayP3U8 => (
+                TextureFormat::Bgra8Unorm,
+                TextureFormat::Bgra8UnormSrgb,
+            ),
         }
     }
 
@@ -378,21 +384,22 @@ impl ColorFormat {
     ///
     /// # Panics
     /// Panics if the color format is not supported.
-    pub fn get_wgpu_predefined_color_space(&self) -> wgpu::PredefinedColorSpace {
+    pub fn get_wgpu_predefined_color_space(
+        &self,
+    ) -> wgpu::PredefinedColorSpace {
         match self {
             ColorFormat::SRGBA8 => wgpu::PredefinedColorSpace::Srgb,
-            ColorFormat::DisplayP3U8 => wgpu::PredefinedColorSpace::DisplayP3,
+            ColorFormat::DisplayP3U8 => {
+                wgpu::PredefinedColorSpace::DisplayP3
+            }
             _ => panic!("Unsupported color format"),
         }
     }
 }
 
 /// Implements the From trait for RawRgba<T> to convert to a wgpu::Color.
-impl<T> From<RawRgba<T>> for wgpu::Color
-where
-    T: Into<f64> + Copy,
-{
-    fn from(col: RawRgba<T>) -> Self {
+impl From<RawRgba> for wgpu::Color {
+    fn from(col: RawRgba) -> Self {
         wgpu::Color {
             r: col.r.into(),
             g: col.g.into(),
@@ -403,11 +410,8 @@ where
 }
 
 /// Implements the From trait for RawRgba<T> to convert to a glyphon::Color.
-impl<T> From<RawRgba<T>> for glyphon::Color
-where
-    T: Into<f64> + Copy,
-{
-    fn from(col: RawRgba<T>) -> Self {
+impl From<RawRgba> for glyphon::Color {
+    fn from(col: RawRgba) -> Self {
         let r: f64 = col.r.into();
         let g: f64 = col.g.into();
         let b: f64 = col.b.into();
