@@ -1,8 +1,8 @@
 use palette::{
-    convert::FromColorUnclamped, encoding::Srgb, white_point::D65, FromColor, IntoColor,
+    convert::FromColorUnclamped, encoding::Srgb, white_point::D65,
+    FromColor, IntoColor,
 };
 use psychophysics::{
-    async_sleep,
     input::Key,
     log_extra, loop_frames, start_experiment,
     visual::{
@@ -47,7 +47,9 @@ async fn gratings_experiment(window: Window) {
         Size::Pixels(500.0),
     );
 
-    let image_jpg = image::load_from_memory(include_bytes!("wicked_witch.png")).unwrap();
+    let image_jpg =
+        image::load_from_memory(include_bytes!("wicked_witch.png"))
+            .unwrap();
 
     let gratings = ImageStimulus::new(&window, shape, image_jpg);
 
@@ -134,7 +136,9 @@ async fn gratings_experiment(window: Window) {
         frame.add(&gratings);
         // rotate the image
         //rotation += 0.1;
-        gratings.set_transformation(Transformation2D::RotationCenter(rotation));
+        gratings.set_transformation(
+            Transformation2D::RotationCenter(rotation),
+        );
         // submit frame
         window.submit_frame(frame).await;
     });

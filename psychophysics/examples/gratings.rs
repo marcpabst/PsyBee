@@ -1,12 +1,4 @@
-use psychophysics::{
-    errors::{self, show_error_screen, PsychophysicsError},
-    input::KeyPressReceiver,
-    loop_frames, start_experiment,
-    utils::BIDSEventLogger,
-    visual::geometry::{Rectangle, Size},
-    visual::stimuli::GratingsStimulus,
-    visual::{stimuli::TextStimulus, Window},
-};
+use psychophysics::prelude::*;
 
 use std::f32::consts::PI;
 
@@ -14,12 +6,17 @@ fn flicker_experiment(
     window: Window,
 ) -> Result<(), PsychophysicsError> {
     // wait 1s
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    sleep_secs(0.5);
+
+    // set viewing distance and size of the window in mm
+    window.set_viewing_distance(30.0);
+    window.set_physical_width(700.00);
 
     // create event logger that logs events to a BIDS compatible *.tsv file
     let mut event_logger = BIDSEventLogger::new(
         "events.tsv",
         vec!["trial_type", "stimulus"],
+        true,
     )?;
 
     // create a key press receiver that will be used to check if the up or down key was pressed
@@ -46,10 +43,6 @@ fn flicker_experiment(
     let mut current_hz = divisors[current_hz_index] as f64;
     let mut update_every = (monitor_hz / current_hz) as usize;
 
-    // set viewing distance and size of the window in mm
-    window.set_viewing_distance(30.0);
-    window.set_physical_width(700.00);
-
     // create text stimulus
     let start_stim = TextStimulus::new(
         &window, // the window we want to display the stimulus in
@@ -59,11 +52,6 @@ fn flicker_experiment(
     let freq_stim = TextStimulus::new(
         &window, // the window we want to display the stimulus in
         format!("{} Hz", current_hz), // the text we want to display
-        Rectangle::FULLSCREEN, // full screen
-    );
-    let fixation_cross = TextStimulus::new(
-        &window, // the window we want to display the stimulus in
-        "+",     // the text we want to display
         Rectangle::FULLSCREEN, // full screen
     );
 
@@ -82,7 +70,7 @@ fn flicker_experiment(
         ("trial_type",),
         ("experiment start",),
         0.0,
-    );
+    )?;
 
     loop {
         // show text until space key is pressed to start the experiment
@@ -91,7 +79,7 @@ fn flicker_experiment(
         });
 
         // show frames until space key is pressed
-        loop_frames!((i, frame) from window, keys = Key::Return, {
+        loop_frames!((i, frame) from window, keys = Key::Space, {
 
             // update the phase
             if i % update_every == 0 {
@@ -101,11 +89,10 @@ fn flicker_experiment(
 
             // add grating stimulus to the current frame
             frame.add(&grating_stim);
-            frame.add(&fixation_cross);
             frame.add(&freq_stim);
 
             // log event
-            event_logger.log(("flicker", current_hz), 1.0 / current_hz);
+            event_logger.log(("flicker", current_hz), 1.0 / current_hz)?;
 
             // check if the up or down key was pressed
             let key = kpr.get_keys();

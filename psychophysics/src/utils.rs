@@ -3,6 +3,7 @@ use std::fmt::Display;
 use async_lock::{Mutex, MutexGuard};
 use futures_lite::future::block_on;
 
+use thiserror::Error;
 pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};
@@ -115,6 +116,7 @@ impl CSVEventLogger {
         path: P,
         columns: I,
         delimiter: u8,
+        overwrite: bool,
     ) -> Result<Self, errors::PsychophysicsError>
     where
         P: Into<std::path::PathBuf>,
@@ -126,37 +128,33 @@ impl CSVEventLogger {
         let columns: Vec<String> =
             columns.into_iter().map(Into::into).collect();
 
-        // check that all column names are unique
-        assert!(
-            check_unique_column_names(columns.clone()),
-            "column names must be unique"
-        );
+        if !check_unique_column_names(columns.clone()) {
+            return Err(
+                errors::PsychophysicsError::ColumnNamesNotUniqueError,
+            );
+        }
 
         // check if file exists
         if filepath.exists() {
             // check if file is empty
             if std::fs::metadata(&filepath).unwrap().len() > 0 {
-                return Err(errors::PsychophysicsError::FileExistsAndNotEmptyError(
+                // if overwrite is true, delete the file, otherwise return an error
+                if overwrite {
+                    std::fs::remove_file(&filepath)?;
+                } else {
+                    return Err(errors::PsychophysicsError::FileExistsAndNotEmptyError(
                     filepath.to_string_lossy().to_string()),
                 );
+                }
             }
         }
-
-        // let file = std::fs::OpenOptions::new()
-        //     .append(true)
-        //     .create(true)
-        //     .open(&filepath)
-        //     .unwrap();
-
-        // write header
 
         let mut writer = csv::WriterBuilder::new()
             .has_headers(false)
             .delimiter(delimiter)
-            .from_path(&filepath)
-            .unwrap();
+            .from_path(&filepath)?;
 
-        writer.write_record(columns.clone()).unwrap();
+        writer.write_record(columns.clone())?;
 
         Ok(Self {
             filepath,
@@ -167,7 +165,10 @@ impl CSVEventLogger {
     }
 
     /// Log an event.
-    pub fn log<I>(&mut self, column_values: I)
+    pub fn log<I>(
+        &mut self,
+        column_values: I,
+    ) -> Result<(), PsychophysicsError>
     where
         I: IntoStringVector,
     {
@@ -175,17 +176,27 @@ impl CSVEventLogger {
         let event: Vec<String> = column_values.into_string_vec();
 
         // make sure the event has the correct number of columns
-        assert_eq!(event.len(), self.columns.len());
+        if event.len() != self.columns.len() {
+            return Err(
+                errors::PsychophysicsError::DataLengthMismatchError(
+                    event.len(),
+                    self.columns.len(),
+                ),
+            );
+        }
 
         // write event to file
-        self.writer.write_record(&event).unwrap();
+        self.writer.write_record(&event)?;
+
+        Ok(())
     }
 
     pub fn log_cols<I, J>(
         &mut self,
         column_names: I,
         column_values: J,
-    ) where
+    ) -> Result<(), PsychophysicsError>
+    where
         I: IntoStringVector,
         J: IntoStringVector,
     {
@@ -195,26 +206,31 @@ impl CSVEventLogger {
             column_values.into_string_vec();
 
         // check that all column names are unique
-        assert!(
-            check_unique_column_names(column_names.clone()),
-            "you cannot use the same column name twice"
-        );
-
-        // assert that all column names are in self.columns
-        for column_name in column_names.iter() {
-            assert!(
-                self.columns.contains(column_name),
-                "column name \"{}\" is not available",
-                column_name
+        if !check_unique_column_names(column_names.clone()) {
+            return Err(
+                errors::PsychophysicsError::ColumnNamesNotUniqueError,
             );
         }
 
-        assert!(
-            column_names.len() == column_values.len(),
-            "number of column names ({}) does not match number of column values ({})",
-            column_names.len(),
-            column_values.len()
-        );
+        // assert that all column names are in self.columns
+        for column_name in column_names.iter() {
+            if !self.columns.contains(column_name) {
+                return Err(
+                    errors::PsychophysicsError::ColumnNameDoesNotExistError(
+                        column_name.clone(),
+                    ),
+                );
+            }
+        }
+
+        if column_names.len() != column_values.len() {
+            return Err(
+                errors::PsychophysicsError::DataLengthMismatchError(
+                    column_values.len(),
+                    column_names.len(),
+                ),
+            );
+        }
 
         // we need to cal self.log() with the correct order of columns, replacing missing columns with an empty string
         let mut new_column_values: Vec<String> =
@@ -232,7 +248,7 @@ impl CSVEventLogger {
             }
         }
 
-        self.log(new_column_values);
+        self.log(new_column_values)
     }
 }
 
@@ -245,6 +261,7 @@ impl BIDSEventLogger {
     pub fn new<P, I, S>(
         path: P,
         columns: I,
+        overwrite: bool,
     ) -> Result<Self, PsychophysicsError>
     where
         P: Into<std::path::PathBuf>,
@@ -260,10 +277,12 @@ impl BIDSEventLogger {
             )
         })?;
 
-        assert!(
-            path_str.ends_with("events.tsv"),
-            "path must end with \"*events.tsv\""
-        );
+        if !path_str.ends_with("events.tsv") {
+            return Err(PsychophysicsError::InvalidBIDSPathError(
+                path_str.to_string(),
+                "path must end with \"*events.tsv\"".to_string(),
+            ));
+        }
 
         // add mandatory columns "onset" and "duration"
         let columns: Vec<String> =
@@ -273,7 +292,9 @@ impl BIDSEventLogger {
         let columns: Vec<String> =
             mandatory_columns.into_iter().chain(columns).collect();
 
-        let logger = CSVEventLogger::new(path, columns, '\t' as u8)?;
+        let logger = CSVEventLogger::new(
+            path, columns, '\t' as u8, overwrite,
+        )?;
 
         Ok(Self {
             logger,
@@ -282,7 +303,11 @@ impl BIDSEventLogger {
     }
 
     /// Log an event.
-    pub fn log<I>(&mut self, columns_values: I, duration: f64)
+    pub fn log<I>(
+        &mut self,
+        columns_values: I,
+        duration: f64,
+    ) -> Result<(), PsychophysicsError>
     where
         I: IntoStringVector,
     {
@@ -301,7 +326,7 @@ impl BIDSEventLogger {
                 .collect();
 
         // log event
-        self.logger.log(columns_values);
+        self.logger.log(columns_values)
     }
 
     /// Log an event with the given column names and values.
@@ -310,7 +335,8 @@ impl BIDSEventLogger {
         column_names: I,
         column_values: J,
         duration: f64,
-    ) where
+    ) -> Result<(), PsychophysicsError>
+    where
         I: IntoStringVector,
         J: IntoStringVector,
     {
@@ -337,6 +363,10 @@ impl BIDSEventLogger {
                 .collect();
 
         // log event
-        self.logger.log_cols(column_names, column_values);
+        self.logger.log_cols(column_names, column_values)
     }
+}
+
+pub fn sleep_secs(secs: f64) {
+    std::thread::sleep(std::time::Duration::from_secs_f64(secs));
 }

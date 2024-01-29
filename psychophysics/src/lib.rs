@@ -32,6 +32,18 @@ pub mod utils;
 pub mod visual;
 use winit::event_loop::EventLoop;
 
+// the prelude
+pub mod prelude {
+    pub use crate::errors::PsychophysicsError;
+    pub use crate::input::KeyPressReceiver;
+    pub use crate::utils::sleep_secs;
+    pub use crate::utils::BIDSEventLogger;
+    pub use crate::visual::geometry::{Rectangle, Size};
+    pub use crate::visual::stimuli::GratingsStimulus;
+    pub use crate::visual::{stimuli::TextStimulus, Window};
+    pub use crate::{loop_frames, start_experiment};
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread;
 #[cfg(target_arch = "wasm32")]
@@ -533,7 +545,7 @@ macro_rules! loop_frames {
             let timeout_duration = $(Some(web_time::Duration::from_secs_f64($timeout));)? None as Option<web_time::Duration>;
 
             let keys_vec: Vec<Key> = $($keys.into_iter().map(|k| k.into()).collect();)? vec![] as Vec<Key>;
-            let keystate: KeyState = $($keystate;)? KeyState::Any;
+            let keystate: KeyState = $($keystate;)? KeyState::Pressed;
 
             let mut keyboard_receiver = $win.keyboard_receiver.activate_cloned();
             let mut $frame_i = 0;

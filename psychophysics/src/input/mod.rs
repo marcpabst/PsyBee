@@ -655,7 +655,7 @@ impl KeyPressReceiver {
     pub fn get_keys(&mut self) -> Vec<KeyEvent> {
         let mut keys = Vec::new();
         while let Ok(key_event) = self.receiver.try_recv() {
-            let key = Key::from(key_event.virtual_keycode.unwrap());
+            let key = Key::from(key_event.virtual_keycode.unwrap()); // TODO: this should never fail but we should handle it anyway
             let state = KeyState::from(key_event.state);
             keys.push(KeyEvent { key, state });
         }
