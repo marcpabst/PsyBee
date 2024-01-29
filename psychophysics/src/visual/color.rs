@@ -144,14 +144,15 @@ use wgpu::TextureFormat;
 /// ```
 #[macro_export]
 macro_rules! srgb_hex {
-    ($hex:expr) => {
+    ($hex:expr) => {{
+        use $crate::visual::color::SRGBA;
         SRGBA::new(
             (($hex >> 16) & 0xff) as f32 / 255.0,
             (($hex >> 8) & 0xff) as f32 / 255.0,
             ($hex & 0xff) as f32 / 255.0,
             1.0,
         )
-    };
+    }};
 }
 
 /// Represents an RGBA color value in the sRGB color space with each channel having 32 bits of
