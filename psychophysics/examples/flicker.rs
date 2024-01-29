@@ -56,7 +56,7 @@ fn flicker_experiment(
     let mut kpr: KeyPressReceiver = KeyPressReceiver::new(&window);
 
     // find all available freqs for the monitor by dividing the monitor hz by 2 until we reach 1
-    let mut available_freqs =
+    let available_freqs =
         find_possible_refresh_rates(MONITOR_HZ, 1.0);
 
     log::info!("Available freqs: {:?}", available_freqs);

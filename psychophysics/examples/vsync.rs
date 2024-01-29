@@ -15,14 +15,22 @@ fn flicker_experiment(
         color_states[color_state], // the color of the stimulus
     );
 
+    // create a key press receiver that will be used to check if the up or down key was pressed
+    let mut kpr = KeyPressReceiver::new(&window);
+
     loop_frames!(frame from window, keys = Key::Escape, {
 
         // update the color of the flicker stimulus every update_every frames
 
+        color_state = (color_state + 1) % color_states.len();
+        flicker_stim.set_color(color_states[color_state]);
+
+
+        // check if the space key was pressed
+        if kpr.get_keys().was_pressed(Key::Space) {
+            // if so, break out of the loop
             color_state = (color_state + 1) % color_states.len();
-            flicker_stim.set_color(color_states[color_state]);
-
-
+        }
         // add grating stimulus to the current frame
          frame.add(&flicker_stim);
     });
