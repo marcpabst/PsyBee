@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use winit::event::VirtualKeyCode;
 
 use crate::visual::Window;
@@ -642,23 +644,59 @@ impl PartialEq<KeyEvent> for Key {
 
 impl Eq for KeyState {}
 
+/// A struct that can be used to receive key press events.
 pub struct KeyPressReceiver {
     receiver: async_broadcast::Receiver<winit::event::KeyboardInput>,
 }
 
+/// Contains a vector of key events. This is returned by the `get_keys` method of the `KeyPressReceiver`.
+/// Implements `Deref` so that it can be used as a vector of `KeyEvent`s.
+pub struct KeyEventVec(Vec<KeyEvent>);
+
+impl KeyEventVec {
+    /// Check if the given KeyEventVec contains the provided key in the `Pressed` state.
+    pub fn was_pressed(&self, key: Key) -> bool {
+        self.iter()
+            .any(|k| k == &key && k.state == KeyState::Pressed)
+    }
+
+    /// Check if the given KeyEventVec contains the provided key in the `Released` state.
+    pub fn was_released(&self, key: Key) -> bool {
+        self.iter()
+            .any(|k| k == &key && k.state == KeyState::Released)
+    }
+}
+
+impl Deref for KeyEventVec {
+    type Target = Vec<KeyEvent>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl KeyPressReceiver {
+    /// Create a new KeyPressReceiver for the given window.
     pub fn new(window: &Window) -> Self {
         Self {
             receiver: window.keyboard_receiver.activate_cloned(),
         }
     }
-    pub fn get_keys(&mut self) -> Vec<KeyEvent> {
+
+    /// Returns a vector of key events that have been received since the last call to `get_keys`.
+    /// Calling this method clears the internal buffer of key events for this receiver.
+    pub fn get_keys(&mut self) -> KeyEventVec {
         let mut keys = Vec::new();
         while let Ok(key_event) = self.receiver.try_recv() {
             let key = Key::from(key_event.virtual_keycode.unwrap()); // TODO: this should never fail but we should handle it anyway
             let state = KeyState::from(key_event.state);
             keys.push(KeyEvent { key, state });
         }
-        return keys;
+        return KeyEventVec(keys);
+    }
+
+    /// Flushes the internal buffer of key events for this receiver without returning them.
+    /// This is slightly more efficient than calling `get_keys` and ignoring the result.
+    pub fn flush(&mut self) {
+        while let Ok(_) = self.receiver.try_recv() {}
     }
 }

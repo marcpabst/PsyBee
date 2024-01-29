@@ -3,7 +3,6 @@ use std::fmt::Display;
 use async_lock::{Mutex, MutexGuard};
 use futures_lite::future::block_on;
 
-use thiserror::Error;
 pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};
@@ -187,6 +186,7 @@ impl CSVEventLogger {
 
         // write event to file
         self.writer.write_record(&event)?;
+        self.writer.flush()?;
 
         Ok(())
     }

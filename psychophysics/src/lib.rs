@@ -1,4 +1,3 @@
-#![recursion_limit = "512"]
 use async_broadcast::broadcast;
 use async_channel::{bounded, Receiver, Sender};
 use async_lock::Mutex;
@@ -25,9 +24,11 @@ use winit::event_loop::ControlFlow;
 // this is behind a feature flag because it is not yet stable
 #[cfg(feature = "gst")]
 pub mod camera;
+
 pub mod errors;
 pub mod input;
 pub mod onnx;
+pub mod serial;
 pub mod utils;
 pub mod visual;
 use winit::event_loop::EventLoop;
@@ -35,7 +36,9 @@ use winit::event_loop::EventLoop;
 // the prelude
 pub mod prelude {
     pub use crate::errors::PsychophysicsError;
+    pub use crate::input::Key;
     pub use crate::input::KeyPressReceiver;
+    pub use crate::serial::SerialPort;
     pub use crate::utils::sleep_secs;
     pub use crate::utils::BIDSEventLogger;
     pub use crate::visual::color;
@@ -246,7 +249,7 @@ where
 
         let video_mode = video_modes
             .filter(|video_mode| {
-                video_mode.refresh_rate_millihertz() == 120_000
+                video_mode.refresh_rate_millihertz() == 60_000
             })
             .max_by_key(|video_mode| {
                 video_mode.refresh_rate_millihertz()

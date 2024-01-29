@@ -1,5 +1,31 @@
 use psychophysics::prelude::*;
 
+// CONFIGURATION
+const KEY_FREQ_UP: Key = Key::F;
+const KEY_FREQ_DOWN: Key = Key::A;
+const KEY_START: Key = Key::Space;
+const KEY_STOP: Key = Key::D;
+const KEY_LOG: Key = Key::S;
+
+const MONITOR_HZ: f64 = 60.0; // TODO: get this from the window
+
+fn find_possible_refresh_rates(
+    refresh_rate: f64,
+    min_rate: f64,
+) -> Vec<f64> {
+    let mut possible_rates = Vec::new();
+
+    // step throug all integers up to the refresh rate
+    for i in 1..(refresh_rate as usize) {
+        let rate = refresh_rate / i as f64;
+        if rate >= min_rate * 2.0 {
+            possible_rates.push(rate / 2.0);
+        }
+    }
+
+    possible_rates
+}
+// EXPERIMENT
 fn flicker_experiment(
     window: Window,
 ) -> Result<(), PsychophysicsError> {
@@ -7,38 +33,38 @@ fn flicker_experiment(
     window.set_viewing_distance(30.0);
     window.set_physical_width(700.00);
 
-    // wait 1s
+    // wait 1s (TODO: remove this)
     sleep_secs(1.0);
 
     // create event logger that logs events to a BIDS compatible *.tsv file
     let mut event_logger = BIDSEventLogger::new(
         "events.tsv",
-        vec!["trial_type", "stimulus"],
+        ["type", "freq", "key"],
         true,
     )?;
+
+    // open serial port
+    let mut serial_port = SerialPort::open_or_dummy(
+        "/dev/ttyACM0".to_string(),
+        9600,
+        1000,
+    );
+
+    event_logger.log_cols(("type",), ("experiment start",), 0.0)?;
 
     // create a key press receiver that will be used to check if the up or down key was pressed
     let mut kpr: KeyPressReceiver = KeyPressReceiver::new(&window);
 
-    // calculate the supported flicker frequencies based on the monitor refresh rate
-    let monitor_hz: f64 = 120.0;
-    let (max_hz, min_hz) = (monitor_hz, 1.0);
+    // find all available freqs for the monitor by dividing the monitor hz by 2 until we reach 1
+    let mut available_freqs =
+        find_possible_refresh_rates(MONITOR_HZ, 1.0);
 
-    // find all divisors of the monitor refresh rate that are between min_hz and max_hz
-    let mut divisors = Vec::new();
-    for i in 1..=monitor_hz as usize {
-        if monitor_hz % i as f64 == 0.0
-            && i as f64 <= max_hz
-            && i as f64 >= min_hz
-        {
-            divisors.push(i);
-        }
-    }
+    log::info!("Available freqs: {:?}", available_freqs);
 
     // setup color and freqs
-    let mut current_hz_index = 5;
-    let mut current_hz = divisors[current_hz_index] as f64;
-    let mut update_every = (monitor_hz / current_hz) as usize;
+    let mut current_hz_index = 0;
+    let mut current_hz = available_freqs[current_hz_index] as f64;
+    let mut update_every = (MONITOR_HZ / current_hz / 2.0) as usize;
 
     let color_states = vec![color::BLACK, color::WHITE];
     let mut color_state: usize = 0;
@@ -53,7 +79,12 @@ fn flicker_experiment(
     let freq_stim = TextStimulus::new(
         &window, // the window we want to display the stimulus in
         format!("{} Hz", current_hz), // the text we want to display
-        Rectangle::FULLSCREEN, // full screen
+        Rectangle::new(
+            -Size::ScreenWidth(0.5),
+            -Size::ScreenHeight(0.5),
+            Size::Pixels(500.0),
+            Size::Pixels(500.0),
+        ), // full screen
     );
 
     // create flicker stim
@@ -63,20 +94,16 @@ fn flicker_experiment(
         color_states[color_state], // the color of the stimulus
     );
 
-    event_logger.log_cols(
-        ("trial_type",),
-        ("experiment start",),
-        0.0,
-    )?;
-
     loop {
         // show text until space key is pressed to start the experiment
-        loop_frames!(frame from window, keys = Key::Space, {
+        loop_frames!(frame from window, keys = KEY_START, {
             frame.add(&start_stim);
         });
 
+        event_logger.log_cols(("type",), ("block start",), 0.0)?;
+
         // show frames until space key is pressed
-        loop_frames!((i, frame) from window, keys = Key::Space, {
+        loop_frames!((i, frame) from window, keys = KEY_STOP, {
 
             // update the color of the flicker stimulus every update_every frames
             if i % update_every == 0 {
@@ -85,34 +112,44 @@ fn flicker_experiment(
             }
 
             // add grating stimulus to the current frame
-            frame.add(&flicker_stim);
+             frame.add(&flicker_stim);
             frame.add(&freq_stim);
 
             // log event
-            event_logger.log(("flicker", current_hz), 1.0 / current_hz)?;
+            event_logger.log_cols(
+                 ("type", "freq"),
+                ("flicker", current_hz),
+                0.0,
+            )?;
 
-            // check if the up or down key was pressed
-            let key = kpr.get_keys();
-            if key.iter().any(|k| k.key == Key::Up && k.state == KeyState::Pressed) {
-                if current_hz_index < divisors.len() - 1 {
-                    current_hz_index += 1;
-                    current_hz = divisors[current_hz_index] as f64;
-                    update_every = (monitor_hz / current_hz) as usize;
-                    freq_stim.set_text(format!("{} Hz", current_hz));
+            // get all keys that were pressed since the last frame
+            let keys = kpr.get_keys();
+
+            if !keys.is_empty() {
+                if keys.was_pressed(KEY_LOG) {
+                    event_logger.log_cols(("type", "key"), ("keydown", "space"), 0.0)?;
+                } else if keys.was_released(KEY_LOG) {
+                    event_logger.log_cols(("type", "key"), ("keyup", "space"), 0.0)?;
                 }
-            } else if key.iter().any(|k| k.key == Key::Down && k.state == KeyState::Pressed) {
-                if current_hz_index > 0 {
-                    current_hz_index -= 1;
-                    current_hz = divisors[current_hz_index] as f64;
-                    update_every = (monitor_hz / current_hz) as usize;
-                    freq_stim.set_text(format!("{} Hz", current_hz));
+
+                if keys.was_pressed(KEY_FREQ_UP) {
+                    current_hz_index = (current_hz_index + 1) % available_freqs.len();
+
+                } else if keys.was_pressed(KEY_FREQ_DOWN) {
+                    current_hz_index = (current_hz_index + available_freqs.len() - 1) % available_freqs.len();
+
                 }
+                current_hz = available_freqs[current_hz_index] as f64;
+                update_every = (MONITOR_HZ / current_hz / 2.0) as usize;
+                freq_stim.set_text(format!("{:.2} Hz", current_hz));
             }
+
+
+
         });
     }
 }
 
 fn main() {
-    // run experiment
     start_experiment(flicker_experiment);
 }

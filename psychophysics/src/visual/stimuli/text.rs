@@ -140,8 +140,8 @@ impl Renderable for TextStimulus {
                 &mut self.font_system.lock_blocking(),
                 &mut self.text_atlas.lock_blocking(),
                 Resolution {
-                    width: config.width,
-                    height: config.height,
+                    width: screen_width_px,
+                    height: screen_height_px,
                 },
                 [TextArea {
                     buffer: &self.text_buffer.lock_blocking(),
@@ -162,6 +162,7 @@ impl Renderable for TextStimulus {
             )
             .unwrap();
     }
+
     fn render(
         &mut self,
         enc: &mut wgpu::CommandEncoder,

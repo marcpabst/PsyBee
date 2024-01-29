@@ -8,6 +8,7 @@ use crate::loop_frames;
 use crate::visual::geometry::Rectangle;
 use crate::visual::stimuli::TextStimulus;
 use crate::visual::window::Window;
+use serialport;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -37,6 +38,10 @@ pub enum PsychophysicsError {
     // custom errors
     #[error("{0}")]
     CustomError(String),
+
+    // serial port errors
+    #[error("{0}")]
+    SerialPortError(#[from] serialport::Error),
 }
 
 // macro that error with the given message
