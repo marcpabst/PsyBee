@@ -1,68 +1,36 @@
-use psychophysics::{
-    include_image, loop_frames, start_experiment,
-    visual::geometry::{Rectangle, Size, Transformation2D},
-    visual::stimuli::{GratingsStimulus, ImageStimulus},
-    visual::{stimuli::TextStimulus, Window},
-};
+use psychophysics::prelude::*;
 
-fn show_vsync(window: Window) {
-    let color1 = psychophysics::visual::color::SRGBA::new(
-        255.0 / 255.0,
-        128.0 / 255.0,
-        128.0 / 255.0,
-        1.0,
+// EXPERIMENT
+fn flicker_experiment(
+    window: Window,
+) -> Result<(), PsychophysicsError> {
+    // create flicker stim
+    let color_states = vec![color::RED, color::GREEN];
+    let mut color_state = 0;
+    let flicker_stim = ShapeStimulus::new(
+        &window, // the window we want to display the stimulus inSetting color to
+        Rectangle::FULLSCREEN, // full screen
+        color_states[color_state], // the color of the stimulus
     );
 
-    let color2 = psychophysics::visual::color::SRGBA::new(
-        128.0 / 255.0,
-        255.0 / 255.0,
-        128.0 / 255.0,
-        1.0,
-    );
+    loop_frames!(frame from window, keys = Key::Escape, {
 
-    // create text stimulus
-    let mut text_stim = TextStimulus::new(
-        &window,
-        psychophysics::visual::stimuli::text::TextStimulusConfig {
-            text: "VSYNC".into(),
-            color: psychophysics::visual::color::RawRgba {
-                r: 255.0 / 255.0,
-                g: 128.0 / 255.0,
-                b: 128.0 / 255.0,
-                a: 1.0,
-            },
-            font_size: Size::Pixels(100.0),
-            font_weight: glyphon::Weight::BOLD,
-            ..Default::default()
-        },
-    );
+        // update the color of the flicker stimulus every update_every frames
 
-    // set color
-    text_stim.set_color(color1);
+            color_state = (color_state + 1) % color_states.len();
+            flicker_stim.set_color(color_states[color_state]);
 
-    let mut col_flag = false;
 
-    // show frames until space key is pressed
-    loop_frames!(frame from window, keys = Key::Space, {
-
-        // swap colors every frame
-        if col_flag {
-            text_stim.set_color(color1);
-        } else {
-            text_stim.set_color(color2);
-        }
-
-        col_flag = !col_flag;
-
-        // add text stimulus to frame
-        frame.add(&text_stim);
+        // add grating stimulus to the current frame
+         frame.add(&flicker_stim);
     });
 
     // close window
     window.close();
+
+    Ok(())
 }
 
 fn main() {
-    // run experiment
-    start_experiment(show_vsync);
+    start_experiment(flicker_experiment);
 }
