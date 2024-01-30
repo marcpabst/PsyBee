@@ -238,8 +238,6 @@ impl TextStimulus {
                 screen_height_px,
             );
 
-            log::info!("Font size in pixels: {}", font_size_px);
-
             let line_height_px = config.line_height.to_pixels(
                 screen_width_mm,
                 viewing_distance_mm,
@@ -288,8 +286,6 @@ impl TextStimulus {
                     line_height_px as f32,
                 ),
             );
-
-            log::info!("Setting size to {}x{}", width, height);
 
             let physical_width = (width as f64 * scale_factor) as f32;
             let physical_height =

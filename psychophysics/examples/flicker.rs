@@ -1,4 +1,4 @@
-use psychophysics::{prelude::*, serial::SerialPortTrait};
+use psychophysics::{prelude::*, ExperimentManager, WindowOptions};
 
 // CONFIGURATION
 const KEY_FREQ_UP: Key = Key::F;
@@ -9,22 +9,6 @@ const KEY_LOG: Key = Key::S;
 
 const MONITOR_HZ: f64 = 60.0; // TODO: get this from the window
 
-fn find_possible_refresh_rates(
-    refresh_rate: f64,
-    min_rate: f64,
-) -> Vec<f64> {
-    let mut possible_rates = Vec::new();
-
-    // step throug all integers up to the refresh rate
-    for i in 1..(refresh_rate as usize) {
-        let rate = refresh_rate / i as f64;
-        if rate >= min_rate * 2.0 {
-            possible_rates.push(rate / 2.0);
-        }
-    }
-
-    possible_rates
-}
 // EXPERIMENT
 fn flicker_experiment(
     window: Window,
@@ -34,7 +18,6 @@ fn flicker_experiment(
     window.set_physical_width(700.00);
 
     // wait 1s (TODO: remove this)
-    sleep_secs(1.0);
 
     // create event logger that logs events to a BIDS compatible *.tsv file
     let mut event_logger = BIDSEventLogger::new(
@@ -44,23 +27,22 @@ fn flicker_experiment(
     )?;
 
     // open serial port
-    let mut serial_port = SerialPort::open(
-        "COM3".to_string(),
-        115200,
-        1000,
-    )?;
-
-
-
-
-    
+    let mut serial_port =
+        SerialPort::open_or_dummy("COM3".to_string(), 115200, 1000);
 
     // create a key press receiver that will be used to check if the up or down key was pressed
     let mut kpr: KeyPressReceiver = KeyPressReceiver::new(&window);
 
     // find all available freqs for the monitor by dividing the monitor hz by 2 until we reach 1
-    let available_freqs =
-        find_possible_refresh_rates(MONITOR_HZ, 1.0);
+    let mut available_freqs = Vec::new();
+
+    // step throug all integers up to the refresh rate
+    for i in 1..(MONITOR_HZ as usize) {
+        let rate = MONITOR_HZ / i as f64;
+        if rate >= 1.0 * 2.0 {
+            available_freqs.push(rate / 2.0);
+        }
+    }
 
     log::info!("Available freqs: {:?}", available_freqs);
 
@@ -110,7 +92,11 @@ fn flicker_experiment(
 
             // update the color of the flicker stimulus every update_every frames
             if i % update_every == 0 {
-                serial_port.write_bytes(&[1])?;
+
+                // this is the trigger we send to the EEG system
+                let trigger = color_state as u8 + 1;
+                serial_port.write_u8(trigger)?;
+
                 color_state = (color_state + 1) % color_states.len();
                 flicker_stim.set_color(color_states[color_state]);
 
@@ -126,7 +112,7 @@ fn flicker_experiment(
             frame.add(&flicker_stim);
             frame.add(&freq_stim);
 
-     
+
 
             // get all keys that were pressed since the last frame
             let keys = kpr.get_keys();
@@ -143,7 +129,7 @@ fn flicker_experiment(
                 if keys.was_pressed(KEY_FREQ_UP) {
                     current_hz_index = (current_hz_index + 1) % available_freqs.len();
                         // send a start Iinteger 2 as byte to the serial port
-                       
+
 
                 } else if keys.was_pressed(KEY_FREQ_DOWN) {
                     current_hz_index = (current_hz_index + available_freqs.len() - 1) % available_freqs.len();
@@ -153,7 +139,7 @@ fn flicker_experiment(
                 update_every = (MONITOR_HZ / current_hz / 2.0) as usize;
                 freq_stim.set_text(format!("{:.2} Hz", current_hz));
             }
-            
+
 
 
         });
@@ -161,5 +147,21 @@ fn flicker_experiment(
 }
 
 fn main() {
-    start_experiment(flicker_experiment);
+    // create experiment manager
+    let mut em = ExperimentManager::new();
+    // get all available monitors
+    let monitors = em.get_available_monitors();
+
+    // select the second monitor if available, otherwise use the first
+    let monitor = monitors
+        .get(1)
+        .unwrap_or(monitors.first().expect("No monitor found!"));
+
+    // create window options (here, we use the highest resolution of the chosen monitor)
+    let window_options = WindowOptions::FullscreenHighestResolution {
+        monitor: Some(monitor.clone()),
+        refresh_rate: Some(MONITOR_HZ),
+    };
+    // start experiment (this will block until the experiment is finished)
+    em.run_experiment(window_options, flicker_experiment);
 }

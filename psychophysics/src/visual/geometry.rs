@@ -27,7 +27,7 @@ use nalgebra::{Matrix3, Matrix4};
 /// // create a unit that is 10% of the screen height
 /// let unit = Size::ScreenHeight(0.1);
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Size {
     // Physical pixels
     Pixels(f64),
@@ -249,39 +249,6 @@ impl Size {
                     height_px,
                 );
                 a - b
-            }
-        }
-    }
-}
-
-impl std::fmt::Debug for Size {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        match self {
-            Size::Pixels(pixels) => write!(f, "{}px", pixels),
-            Size::ScreenWidth(normalised) => {
-                write!(f, "{}w", normalised)
-            }
-            Size::ScreenHeight(normalised) => {
-                write!(f, "{}h", normalised)
-            }
-            Size::Degrees(degrees) => write!(f, "{}deg", degrees),
-            Size::Millimeters(millimeters) => {
-                write!(f, "{}mm", millimeters)
-            }
-            Size::Centimeters(centimeters) => {
-                write!(f, "{}cm", centimeters)
-            }
-            Size::Inches(inches) => write!(f, "{}in", inches),
-            Size::Points(points) => write!(f, "{}pt", points),
-            Size::Default(default) => write!(f, "{}def", default),
-            Size::Quotient(a, b) => write!(f, "({:?})/({:?})", a, b),
-            Size::Product(a, b) => write!(f, "({:?})*({:?})", a, b),
-            Size::Sum(a, b) => write!(f, "({:?})+({:?})", a, b),
-            Size::Difference(a, b) => {
-                write!(f, "({:?})-({:?})", a, b)
             }
         }
     }

@@ -27,8 +27,7 @@ use wasm_bindgen::closure::Closure;
 
 use super::Renderable;
 
-/// This is the main window struct. It contains all the information needed to render stimuli and control the graphics pipeline.
-/// Since the window might be shared across threads, you will usually have access to it through a WindowHandle.
+/// Internal window state. This is used to store the winit window, the wgpu device, the wgpu queue, etc.
 pub struct WindowState {
     // the winit window
     pub window: winit::window::Window,
@@ -48,8 +47,8 @@ pub struct WindowState {
     pub config: wgpu::SurfaceConfiguration,
 }
 
-/// A Window that represents an open window.
-/// It also stores the channels used for communication between the main task, the render task and the experiment task.
+/// A Window represents a window on the screen. It is used to create stimuli and to submit them to the screen for rendering.
+/// Each window has a render task that is responsible for rendering stimuli to the screen.
 #[derive(Clone)]
 pub struct Window {
     /// The window state. This contains the actual winit window, the wgpu device, the wgpu queue, etc.

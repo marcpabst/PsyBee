@@ -6,15 +6,6 @@
 use crate::errors::PsychophysicsError;
 use serialport;
 
-pub trait SerialPortTrait {
-    fn write(&mut self, data: &str)
-        -> Result<(), PsychophysicsError>;
-    fn write_bytes(
-        &mut self,
-        data: &[u8],
-    ) -> Result<(), PsychophysicsError>;
-}
-
 /// A serial port. Wraprs a backend serial port.
 pub enum SerialPort {
     RealSerialPort(Box<dyn serialport::SerialPort>),
@@ -66,7 +57,7 @@ impl SerialPort {
     }
 
     /// Creates a dummy serial port.
-    pub fn dummy() -> Self {
+    pub fn open_dummy() -> Self {
         SerialPort::DummySerialPort
     }
 
@@ -80,33 +71,76 @@ impl SerialPort {
     }
 }
 
-
-impl SerialPortTrait for SerialPort {
+impl SerialPort {
     /// Writes a string to the serial port.
-    fn write(
+    ///
+    /// # Arguments
+    /// * `data` - The data to be written to the serial port.
+    ///
+    /// # Example
+    /// ```
+    /// use psychophysics::serial::SerialPortTrait;
+    ///
+    /// let mut serial_port = psychophysics::serial::SerialPort::open_dummy();
+    /// serial_port.write_str("Hello World!");
+    /// ```
+    pub fn write_str(
         &mut self,
         data: &str,
     ) -> Result<(), PsychophysicsError> {
-        match self {
-            SerialPort::RealSerialPort(backend) => {
-                backend.write(data.as_bytes())?;
-                Ok(())
-            }
-            SerialPort::DummySerialPort => Ok(()),
-        }
+        self.write_bytes(data.as_bytes())
     }
+
+    /// Same as write_str but appends a newline character.
+    pub fn writeln_str(
+        &mut self,
+        data: &str,
+    ) -> Result<(), PsychophysicsError> {
+        self.write_bytes(format!("{}\n", data).as_bytes())
+    }
+
     /// Writes a slice of bytes to the serial port.
-    fn write_bytes(
+    ///
+    /// # Arguments
+    ///  * `data` - The data to be written to the serial port.
+    ///
+    /// # Example
+    /// ```
+    /// use psychophysics::serial::SerialPortTrait;
+    ///
+    /// let mut serial_port = psychophysics::serial::SerialPort::open_dummy();
+    /// serial_port.write_bytes(&[1, 2, 3, 4, 5]);
+    /// ```
+    pub fn write_bytes(
         &mut self,
         data: &[u8],
     ) -> Result<(), PsychophysicsError> {
         match self {
             SerialPort::RealSerialPort(backend) => {
                 backend.write(data)?;
+                backend.flush()?;
                 Ok(())
             }
             SerialPort::DummySerialPort => Ok(()),
         }
     }
 
+    /// Writes a u8 to the serial port.
+    ///
+    /// # Arguments
+    /// * `data` - The data to be written to the serial port.
+    ///
+    /// # Example
+    /// ```
+    /// use psychophysics::serial::SerialPortTrait;
+    ///
+    /// let mut serial_port = psychophysics::serial::SerialPort::open_dummy();
+    /// serial_port.write_u8(1);
+    /// ```
+    pub fn write_u8(
+        &mut self,
+        data: u8,
+    ) -> Result<(), PsychophysicsError> {
+        self.write_bytes(&[data])
+    }
 }

@@ -4,6 +4,7 @@ use async_lock::Mutex;
 
 use atomic_float::AtomicF64;
 use futures_lite::Future;
+use winit::monitor::VideoMode;
 
 use crate::visual::color::ColorFormat;
 
@@ -47,7 +48,7 @@ pub mod prelude {
     pub use crate::visual::stimuli::ImageStimulus;
     pub use crate::visual::stimuli::ShapeStimulus;
     pub use crate::visual::{stimuli::TextStimulus, Window};
-    pub use crate::{loop_frames, start_experiment};
+    pub use crate::{loop_frames};
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -217,101 +218,303 @@ pub trait FutureReturnTrait: Future<Output = ()> + 'static {}
 #[cfg(target_arch = "wasm32")]
 impl<F> FutureReturnTrait for F where F: Future<Output = ()> + 'static {}
 
-pub fn start_experiment<F>(experiment_fn: F) -> ()
-where
-    F: FnOnce(Window) -> Result<(), errors::PsychophysicsError>
-        + 'static
-        + Send,
-{
-    let event_loop = EventLoop::new();
 
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        simple_logger::SimpleLogger::new().env().init().unwrap();
-        log::set_max_level(log::LevelFilter::Info);
-        // get monitor
-        let monitor = event_loop.available_monitors().nth(1).unwrap_or_else(|| {
-            println!("No secondary monitor found, using primary monitor");
-            event_loop
-                .primary_monitor()
-                .expect("No primary monitor found")
-        });
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Monitor {
+    pub name: String,
+    handle: winit::monitor::MonitorHandle,
+}
 
-        log::info!("Monitor informaton: {:?}", monitor);
+/// Options for creating a window. The ExperimentManager will try to find a video mode that satisfies the provided constraints.
+/// See documentation of the variants for more information.
+pub enum WindowOptions {
+    Windowed {
+        /// The width and height of the window in pixels. Defaults to 800x600 (px).
+        resolution: Option<(u32, u32)>,
+    },
+    /// Match the given constraints exactly. You can set any of the constraints to `None` to use the default value.
+    FullscreenExact {
+        /// The monitor to use. Defaults to the primary monitor.
+        monitor: Option<Monitor>,
+        /// The width and height of the window in pixels. Defaults to the width of the first supported video mode of the selected monitor.
+        resolution: Option<(u32, u32)>,
+        /// The refresh rate to use in Hz. Defaults to the refresh rate of the first supported video mode of the selected monitor.
+        refresh_rate: Option<f64>,
+    },
+    /// Select window configuration that satisfies the given constraints and has the highest refresh rate.
+    FullscreenHighestRefreshRate{
+        monitor: Option<Monitor>,
+        resolution: Option<(u32, u32)>,
+    },
+    /// Select the highest resolution that satisfies the given constraints and has the highest resolution.
+    FullscreenHighestResolution{
+        monitor: Option<Monitor>,
+        refresh_rate: Option<f64>,
+    },
+}
 
-        // find video mode with resoltion that matches the monitor size
-        let video_modes =
-            monitor.video_modes().filter(|video_mode| {
-                video_mode.size().width as u32
-                    == monitor.size().width as u32
-                    && video_mode.size().height as u32
-                        == monitor.size().height as u32
-            });
+impl WindowOptions {
 
-        let video_mode = video_modes
-            .filter(|video_mode| {
-                video_mode.refresh_rate_millihertz() == 60_000
-            })
-            .max_by_key(|video_mode| {
-                video_mode.refresh_rate_millihertz()
-            })
-            .expect("Could not find a suitable video mode");
-
-        let true_size = video_mode.size();
-
-        log::info!("Selected video mode: {:?}", video_mode);
-
-        let winit_window = winit::window::WindowBuilder::new()
-            // make exclusive fullscreen
-            .with_fullscreen(Some(
-                winit::window::Fullscreen::Exclusive(video_mode),
-            ))
-            .with_title("Metal".to_string())
-            .with_inner_size(true_size)
-            .build(&event_loop)
-            .unwrap();
-
-        // hide cursor
-        winit_window.set_cursor_visible(false);
-
-        // run
-        smol::block_on(run(event_loop, winit_window, experiment_fn));
+    pub fn fullscreen(&self) -> bool {
+        match self {
+            WindowOptions::Windowed { .. } => false,
+            WindowOptions::FullscreenExact { .. } => true,
+            WindowOptions::FullscreenHighestRefreshRate { .. } => true,
+            WindowOptions::FullscreenHighestResolution { .. } => true
+        }
     }
-    #[cfg(target_arch = "wasm32")]
-    {
-        let winit_window =
-            winit::window::Window::new(&event_loop).unwrap();
-        std::panic::set_hook(Box::new(
-            console_error_panic_hook::hook,
-        ));
-        console_log::init().expect("could not initialize logger");
-        use winit::platform::web::WindowExtWebSys;
-        // On wasm, append the canvas to the document body
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| doc.body())
-            .and_then(|body| {
-                body.append_child(&web_sys::Element::from(
-                    winit_window.canvas(),
-                ))
-                .ok()
-            })
-            .expect("couldn't append canvas to document body");
 
-        // set canvas size
-        let _canvas = winit_window.canvas();
-        let document = web_sys::window().unwrap().document().unwrap();
-        let width = document.body().unwrap().client_width();
-        let height = document.body().unwrap().client_height();
-        winit_window.set_inner_size(winit::dpi::LogicalSize::new(
-            width as f64,
-            height as f64,
-        ));
-        wasm_bindgen_futures::spawn_local(run(
-            event_loop,
-            winit_window,
-            experiment_fn,
-        ));
+    pub fn monitor(&self) -> Option<Monitor> {
+        match self {
+            WindowOptions::Windowed { .. } => None,
+            WindowOptions::FullscreenExact { monitor, .. } => monitor.clone(),
+            WindowOptions::FullscreenHighestRefreshRate { monitor, .. } => monitor.clone(),
+            WindowOptions::FullscreenHighestResolution { monitor, .. } => monitor.clone(),
+        }
+    }
+
+    pub fn resolution(&self) -> Option<(u32, u32)> {
+        match self {
+            WindowOptions::Windowed { resolution, .. } => *resolution,
+            WindowOptions::FullscreenExact { resolution, .. } => *resolution,
+            WindowOptions::FullscreenHighestRefreshRate { resolution, .. } => *resolution,
+            WindowOptions::FullscreenHighestResolution { .. } => None,
+        }
+    }
+
+    pub fn refresh_rate(&self) -> Option<f64> {
+        match self {
+            WindowOptions::Windowed { .. } => None,
+            WindowOptions::FullscreenExact { refresh_rate, .. } => *refresh_rate,
+            WindowOptions::FullscreenHighestRefreshRate { .. } => None,
+            WindowOptions::FullscreenHighestResolution { refresh_rate, .. } => *refresh_rate,
+        }
+    }
+
+
+}
+
+/// The ExperimentManager is the root element of the psychophysics library.
+/// It is responsible for creating and managing window(s) and for running
+/// one or more experiment(s). The ExperimentManager is a singleton and
+/// can be created using the `new` method. No more than one ExperimentManager
+/// can exist at any given time.
+pub struct ExperimentManager {
+    event_loop: Option<EventLoop<()>>,
+}
+
+impl ExperimentManager {
+
+    /// Create a new ExperimentManager.
+    pub fn new() -> Self {
+        Self {
+            event_loop: Some(EventLoop::new()),
+        }
+    }
+
+    fn event_loop(&self) -> &EventLoop<()> {
+        self.event_loop.as_ref().expect("Event loop has already been consumed. This is a bug, please report it.")
+    }
+
+    pub fn get_available_monitors(&self) -> Vec<Monitor> {
+        
+        let mut monitors = vec![];
+        for (i, handle) in self.event_loop().available_monitors().enumerate() {
+            monitors.push(Monitor {
+                name: handle.name().unwrap_or(format!("Unnamed monitor {}", i)),
+                handle: handle,
+            });
+        }
+        monitors
+    }
+
+    /// Starts the experiment. This will block until the experiment is finished and exit the program afterwards.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `experiment_fn` - The function that is your experiment. This function will be called with a `Window` object that you can use to create stimuli and submit frames to the window.
+    pub fn run_experiment<F>(&mut self, window_options : WindowOptions, experiment_fn: F) -> ()
+    where
+        F: FnOnce(Window) -> Result<(), errors::PsychophysicsError>
+            + 'static
+            + Send,
+    {
+        let  event_loop = self.event_loop();
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            simple_logger::SimpleLogger::new().env().init().unwrap();
+            log::set_max_level(log::LevelFilter::Info);
+
+            // set up window
+            let winit_window: winit::window::Window;
+
+            if window_options.fullscreen() {
+                log::info!("Creating fullscreen window");
+                
+                // get monitor
+                let monitor_handle = if let Some(monitor) = window_options.monitor() {
+                    monitor.handle
+                } else {
+                    event_loop.primary_monitor().expect("No primary monitor found. If a screen is connected, this is a bug, please report it.")
+                };
+
+                // filter by resolution if specified
+                let video_modes: Vec<VideoMode> = if let Some(resolution) = window_options.resolution() {
+                    monitor_handle.video_modes().filter(|video_mode| {
+                        video_mode.size().width as u32 == resolution.0 && video_mode.size().height as u32 == resolution.1
+                    }).collect()
+                } else {
+                    monitor_handle.video_modes().collect()
+                };
+
+                // filter by refresh rate if specified
+                let mut video_modes: Vec<VideoMode> = if let Some(refresh_rate) = window_options.refresh_rate() {
+                    video_modes.into_iter().filter(|video_mode| {
+                        video_mode.refresh_rate_millihertz() as f64 / 1000.0 == refresh_rate
+                    }).collect()
+                } else {
+                    video_modes
+                };
+
+                // if 
+                
+                // sort by refresh rate
+                video_modes.sort_by(|a, b| {
+                    a.refresh_rate_millihertz().cmp(&b.refresh_rate_millihertz())
+                });
+
+                // sort by resolution (width*height)
+                video_modes.sort_by(|a, b| {
+                    (a.size().width * a.size().height).cmp(&(b.size().width * b.size().height))
+                });
+
+                // match the type of window_options
+                let video_mode = match window_options {
+                    WindowOptions::FullscreenExact { .. } => {
+                        video_modes.first().expect("No suitable video modes found, please check your window options.").clone()
+                    },
+                    WindowOptions::FullscreenHighestRefreshRate { .. } => {
+                        // filter by refresh rate
+                      video_modes.clone().into_iter().filter(|video_mode| {
+                            video_mode.refresh_rate_millihertz() == video_modes.last().unwrap().refresh_rate_millihertz()
+                        }).collect::<Vec<VideoMode>>().first().expect("No suitable video modes found, please check your window options.").clone()
+                    },
+                    WindowOptions::FullscreenHighestResolution { .. } => {
+                        // filter by resolution
+                        video_modes.clone().into_iter().filter(|video_mode| {
+                            video_mode.size().width * video_mode.size().height == video_modes.last().unwrap().size().width * video_modes.last().unwrap().size().height
+                        }).collect::<Vec<VideoMode>>().first().expect("No suitable video modes found, please check your window options.").clone()
+                    },
+                    _ => panic!("Invalid window options")
+                };
+
+                // create window
+                winit_window = winit::window::WindowBuilder::new()
+                // make exclusive fullscreen
+                .with_fullscreen(Some(winit::window::Fullscreen::Exclusive(video_mode)))
+                .with_title("Experiment".to_string())
+                .build(&event_loop)
+                .unwrap();
+
+            } else {
+                // we just create a window on the specified monitor
+                let monitor_handle = if let Some(monitor) = window_options.monitor() {
+                    monitor.handle
+                } else {
+                    event_loop.primary_monitor().expect("No primary monitor found")
+                };
+
+                winit_window = winit::window::WindowBuilder::new()
+                // make exclusive fullscreen
+                .with_fullscreen(None)
+                .with_title("Experiment".to_string())
+                .build(&event_loop)
+                .unwrap();
+
+            }
+        
+
+        
+
+            // get all available monitors and video modes
+
+
+
+            // // get monitor
+            // let monitor = event_loop.available_monitors().nth(1).unwrap_or_else(|| {
+            //     println!("No secondary monitor found, using primary monitor");
+            //     event_loop
+            //         .primary_monitor()
+            //         .expect("No primary monitor found")
+            // });
+
+            // // find video mode with resoltion that matches the monitor size
+            // let video_modes =
+            //     monitor.video_modes().filter(|video_mode| {
+            //         video_mode.size().width as u32
+            //             == monitor.size().width as u32
+            //             && video_mode.size().height as u32
+            //                 == monitor.size().height as u32
+            //     });
+
+            // let video_mode = video_modes
+            //     .filter(|video_mode| {
+            //         video_mode.refresh_rate_millihertz() == 60_000
+            //     })
+            //     .max_by_key(|video_mode| {
+            //         video_mode.refresh_rate_millihertz()
+            //     })
+            //     .expect("Could not find a suitable video mode");
+
+            // let true_size = video_mode.size();
+
+            // log::info!("Selected video mode: {:?}", video_mode);
+
+          
+            // hide cursor
+            winit_window.set_cursor_visible(false);
+
+            // run
+            let event_loop = self.event_loop.take().expect("Event loop has already been consumed. This is a bug, please report it.");
+            smol::block_on(run(event_loop, winit_window, experiment_fn));
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let winit_window =
+                winit::window::Window::new(&event_loop).unwrap();
+            std::panic::set_hook(Box::new(
+                console_error_panic_hook::hook,
+            ));
+            console_log::init().expect("could not initialize logger");
+            use winit::platform::web::WindowExtWebSys;
+            // On wasm, append the canvas to the document body
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| doc.body())
+                .and_then(|body| {
+                    body.append_child(&web_sys::Element::from(
+                        winit_window.canvas(),
+                    ))
+                    .ok()
+                })
+                .expect("couldn't append canvas to document body");
+
+            // set canvas size
+            let _canvas = winit_window.canvas();
+            let document = web_sys::window().unwrap().document().unwrap();
+            let width = document.body().unwrap().client_width();
+            let height = document.body().unwrap().client_height();
+            winit_window.set_inner_size(winit::dpi::LogicalSize::new(
+                width as f64,
+                height as f64,
+            ));
+            wasm_bindgen_futures::spawn_local(run(
+                event_loop,
+                winit_window,
+                experiment_fn,
+            ));
+        }
     }
 }
 
@@ -328,6 +531,7 @@ async fn run<F>(
         "Main task is running on thread {:?}",
         std::thread::current().id()
     );
+
 
     let size = winit_window.inner_size();
 
@@ -373,14 +577,6 @@ async fn run<F>(
         TextureFormat::Bgra8Unorm,
         TextureFormat::Bgra8UnormSrgb,
     ];
-
-    // log supported texture formats
-    log::info!("Supported texture formats:");
-    for format in swapchain_capabilities.formats {
-        log::info!("{:?}", format);
-    }
-
-    log::info!("Selected swapchain format: {:?}", swapchain_format);
 
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -547,6 +743,39 @@ async fn run<F>(
 }
 
 #[macro_export]
+/// This is a convenience macro for running a loop that submits frames to the window.
+/// It takes a window and a body of code that is executed on every iteration of the loop.
+/// The loop will run until you `break` out of it, the provided timeout is reached, 
+/// or one of the provided keys is pressed.
+/// 
+/// # Example
+///
+/// ```no_run
+/// loop_frames!(frame from window, keys = Key::Escape, {
+///    // set frame color to white
+///    frame.set_bg_color(color::WHITE);
+///    // add stimuli to frame
+///    frame.add(&my_stimulus);
+/// });
+/// ```
+/// 
+/// # Notes about delays
+/// 
+/// Every iteration of the loop, the macro will fetch a new frame from the window,
+/// run the body of code, and submit the frame to the window. Note that this approach
+/// blocks until the frame is submitted to the window. This also means that you handling
+/// events will incur a delay of up to one frame. If you want to handle events without
+/// this kind of delay, consider using a callback function instead. Callbacks will be run
+/// within the main render loop, so they will not suffer from this kind of delay.
+/// 
+/// Alternatively, you can also fetch frames from the window manually using the `get_frame_try` method,
+/// which will only return a frame if one is available but will not block otherwise. This will also work
+/// in a multi-window setup where you want to submit frames to different windows within the same loop,
+/// even if the windows have different refresh rates/and or run out-of-sync.
+/// 
+/// Lastly, you can opt to spawn a separate thread that submits frames to the window. However, this
+/// means that you have to take care of synchronisation yourself, e.g., by using channels or by putting
+/// any shared data behind a mutex.
 macro_rules! loop_frames {
     ( ($frame_i:ident, $frame:ident) from $win:expr $(, keys = $keys:expr)? $(, keystate = $keystate:expr)? $(, timeout = $timeout:expr)?, $body:block) => {
         {
