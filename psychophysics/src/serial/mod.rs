@@ -69,7 +69,18 @@ impl SerialPort {
     pub fn dummy() -> Self {
         SerialPort::DummySerialPort
     }
+
+    pub fn unwrap(self) -> Box<dyn serialport::SerialPort> {
+        match self {
+            SerialPort::RealSerialPort(backend) => backend,
+            SerialPort::DummySerialPort => {
+                panic!("unwrap() called on dummy serial port")
+            }
+        }
+    }
 }
+
+
 impl SerialPortTrait for SerialPort {
     /// Writes a string to the serial port.
     fn write(
@@ -97,4 +108,5 @@ impl SerialPortTrait for SerialPort {
             SerialPort::DummySerialPort => Ok(()),
         }
     }
+
 }

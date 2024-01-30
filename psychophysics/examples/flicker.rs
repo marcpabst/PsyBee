@@ -1,4 +1,4 @@
-use psychophysics::prelude::*;
+use psychophysics::{prelude::*, serial::SerialPortTrait};
 
 // CONFIGURATION
 const KEY_FREQ_UP: Key = Key::F;
@@ -44,13 +44,16 @@ fn flicker_experiment(
     )?;
 
     // open serial port
-    let mut serial_port = SerialPort::open_or_dummy(
-        "/dev/ttyACM0".to_string(),
-        9600,
+    let mut serial_port = SerialPort::open(
+        "COM3".to_string(),
+        115200,
         1000,
-    );
+    )?;
 
-    event_logger.log_cols(("type",), ("experiment start",), 0.0)?;
+
+
+
+    
 
     // create a key press receiver that will be used to check if the up or down key was pressed
     let mut kpr: KeyPressReceiver = KeyPressReceiver::new(&window);
@@ -66,7 +69,7 @@ fn flicker_experiment(
     let mut current_hz = available_freqs[current_hz_index] as f64;
     let mut update_every = (MONITOR_HZ / current_hz / 2.0) as usize;
 
-    let color_states = vec![color::BLACK, color::WHITE];
+    let color_states = vec![color::BLACK, color::RED];
     let mut color_state: usize = 0;
 
     // create text stimulus
@@ -107,20 +110,23 @@ fn flicker_experiment(
 
             // update the color of the flicker stimulus every update_every frames
             if i % update_every == 0 {
+                serial_port.write_bytes(&[1])?;
                 color_state = (color_state + 1) % color_states.len();
                 flicker_stim.set_color(color_states[color_state]);
+
+              // log event
+              event_logger.log_cols(
+                ("type", "freq"),
+               ("flicker", current_hz),
+               0.0,
+           )?;
             }
 
             // add grating stimulus to the current frame
-             frame.add(&flicker_stim);
+            frame.add(&flicker_stim);
             frame.add(&freq_stim);
 
-            // log event
-            event_logger.log_cols(
-                 ("type", "freq"),
-                ("flicker", current_hz),
-                0.0,
-            )?;
+     
 
             // get all keys that were pressed since the last frame
             let keys = kpr.get_keys();
@@ -128,12 +134,16 @@ fn flicker_experiment(
             if !keys.is_empty() {
                 if keys.was_pressed(KEY_LOG) {
                     event_logger.log_cols(("type", "key"), ("keydown", "space"), 0.0)?;
+                    serial_port.write_bytes(&[5])?;
                 } else if keys.was_released(KEY_LOG) {
                     event_logger.log_cols(("type", "key"), ("keyup", "space"), 0.0)?;
+                    serial_port.write_bytes(&[6])?;
                 }
 
                 if keys.was_pressed(KEY_FREQ_UP) {
                     current_hz_index = (current_hz_index + 1) % available_freqs.len();
+                        // send a start Iinteger 2 as byte to the serial port
+                       
 
                 } else if keys.was_pressed(KEY_FREQ_DOWN) {
                     current_hz_index = (current_hz_index + available_freqs.len() - 1) % available_freqs.len();
@@ -143,7 +153,7 @@ fn flicker_experiment(
                 update_every = (MONITOR_HZ / current_hz / 2.0) as usize;
                 freq_stim.set_text(format!("{:.2} Hz", current_hz));
             }
-
+            
 
 
         });

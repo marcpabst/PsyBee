@@ -48,7 +48,7 @@ strum = "0.25.0"
 strum_macros = "0.25.3"
 csv = "1.3.0"
 thiserror = "1.0.56"
-facetracking = { git = "https://github.com/marcpabst/facetracking-rs", version = "0.1.0-alpha.1" }
+facetracking = { git = "https://github.com/marcpabst/facetracking-rs", version = "0.1.0-alpha.1" , optional= true}
 imageproc = "0.23.0"
 
 
@@ -72,3 +72,4 @@ features = ["input-native", "output-threaded"]
 
 [features]
 gst = ["glib", "gstreamer", "gstreamer-app"]
+face = ["facetracking"]

@@ -331,17 +331,23 @@ async fn run<F>(
 
     let size = winit_window.inner_size();
 
-    let instance = wgpu::Instance::default();
+    let instance_desc = wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN | wgpu::Backends::METAL,
+        // use defaults for the rest
+        ..Default::default()
+    };
 
+    let instance = wgpu::Instance::new(instance_desc);
     let surface =
         unsafe { instance.create_surface(&winit_window) }.unwrap();
 
+
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
+            power_preference: wgpu::PowerPreference::HighPerformance,
             force_fallback_adapter: false,
             // Request an adapter which can render to our surface
-            compatible_surface: Some(&surface),
+            compatible_surface: Some(&surface), 
         })
         .await
         .expect("Failed to find an appropiate graphics adapter. This is likely a bug, please report it.");
