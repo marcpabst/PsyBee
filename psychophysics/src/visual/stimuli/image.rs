@@ -32,7 +32,10 @@ impl ImageStimulus {
     /// # Returns
     ///
     /// A new image stimulus.
-    pub fn new_pixel_size(window: &Window, image: image::DynamicImage) -> Self {
+    pub fn new_pixel_size(
+        window: &Window,
+        image: image::DynamicImage,
+    ) -> Self {
         // create a shape the size of the image
         let shape = Rectangle::new(
             -Size::Pixels(image.width() as f64 / 2.0),
@@ -44,12 +47,20 @@ impl ImageStimulus {
     }
 
     /// Create a new image stimulus with a rectangle shape.
-    pub fn new(window: &Window, image: image::DynamicImage, shape: Rectangle) -> Self {
+    pub fn new(
+        window: &Window,
+        image: image::DynamicImage,
+        shape: Rectangle,
+    ) -> Self {
         Self::_new(window, image, shape)
     }
 
     /// Internal function to create a new image stimulus.
-    fn _new(window: &Window, image: image::DynamicImage, shape: Rectangle) -> Self {
+    fn _new(
+        window: &Window,
+        image: image::DynamicImage,
+        shape: Rectangle,
+    ) -> Self {
         let window = window.clone();
         window.clone().run_on_render_thread(|| async move {
             let window_state = window.get_window_state().await;
@@ -98,7 +109,8 @@ impl BaseStimulusImplementation for ImageStimulusImplementation {
         _viewing_distance_mm: f64,
         _screen_width_px: u32,
         _screen_height_px: u32,
-    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
+    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>)
+    {
         // texture data (if update is true, otherwise None)
         let texture_data = if self.update {
             self.update = false;
@@ -147,7 +159,9 @@ impl BaseStimulusImplementation for ImageStimulusImplementation {
         })
     }
 
-    fn get_geometry(&self) -> Box<dyn crate::visual::geometry::ToVertices> {
+    fn get_geometry(
+        &self,
+    ) -> Box<dyn crate::visual::geometry::ToVertices> {
         Box::new(self.shape.clone())
     }
 }

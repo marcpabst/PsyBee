@@ -28,7 +28,7 @@ fn flicker_experiment(
 
         // check if the space key was pressed
         if kpr.get_keys().was_pressed(Key::Space) {
-            // if so, break out of the loop
+            // if so, skip one frame
             color_state = (color_state + 1) % color_states.len();
         }
         // add grating stimulus to the current frame

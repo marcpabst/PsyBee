@@ -44,6 +44,7 @@ pub mod prelude {
     pub use crate::visual::color;
     pub use crate::visual::geometry::{Rectangle, Size};
     pub use crate::visual::stimuli::GratingsStimulus;
+    pub use crate::visual::stimuli::ImageStimulus;
     pub use crate::visual::stimuli::ShapeStimulus;
     pub use crate::visual::{stimuli::TextStimulus, Window};
     pub use crate::{loop_frames, start_experiment};

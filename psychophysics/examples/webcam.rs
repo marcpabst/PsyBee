@@ -1,10 +1,17 @@
+use std::sync::Arc;
+
+use facetracking::face_landmarks;
 use psychophysics::camera;
-use psychophysics::{
-    include_image, loop_frames, start_experiment,
-    visual::geometry::{Rectangle, Size, Transformation2D},
-    visual::stimuli::{GratingsStimulus, ImageStimulus},
-    visual::{stimuli::TextStimulus, Window},
-};
+use psychophysics::prelude::*;
+
+use facetracking::face_detection::model_blazeface::BlazefaceModel;
+use facetracking::face_detection::FaceDetectionModel;
+use facetracking::face_landmarks::model_mediapipe::MediapipeFaceLandmarksModel;
+use facetracking::face_landmarks::FaceLandmarksModel;
+use facetracking::utils::{SharedState, State};
+
+use imageproc::drawing::{draw_cross_mut, draw_hollow_rect_mut};
+use imageproc::rect::Rect;
 
 fn show_image(
     window: Window,
@@ -17,10 +24,10 @@ fn show_image(
         &window,
         thatcher,
         Rectangle::new(
-            Size::Pixels(-350.0),
-            Size::Pixels(-320.0),
-            Size::Pixels(700.0),
-            Size::Pixels(500.0),
+            Size::ScreenWidth(-0.4),
+            Size::ScreenHeight(-0.4),
+            Size::ScreenWidth(0.8),
+            Size::ScreenHeight(0.8),
         ),
     );
 
@@ -32,6 +39,10 @@ fn show_image(
 
     // spawn new thread
     let thread = std::thread::spawn(|| {
+        // create face detection model
+        let face_detection_model = BlazefaceModel::new();
+        let face_landmarks_model = MediapipeFaceLandmarksModel::new();
+
         // list camras
         let camera_manager = camera::CameraManager::new();
         let cameras = camera_manager.cameras();
@@ -43,14 +54,53 @@ fn show_image(
         let stream = camera.open_with_callback(mode, move |frame| {
             let image: image::RgbImage = frame.into();
 
+            let mut dimage = image::DynamicImage::ImageRgb8(image);
+
+            // flip image
+            dimage = dimage.fliph();
+
+            // detect face
+            let face_bbox = face_detection_model.run(&dimage);
+            let face_bbox_rect = Rect::at(
+                face_bbox.origin().0 as i32,
+                face_bbox.origin().1 as i32,
+            )
+            .of_size(
+                face_bbox.width() as u32,
+                face_bbox.height() as u32,
+            );
+
+            // detect landmarks
+            let (landmarks, _) = face_landmarks_model
+                .run(&dimage, Some(face_bbox.to_tuple()));
+
+            let face_landmarks = landmarks.get_landmarks();
+
+            for landmark in face_landmarks {
+                draw_cross_mut(
+                    &mut dimage,
+                    image::Rgba([0, 255, 0, 1]),
+                    landmark.x as i32,
+                    landmark.y as i32,
+                );
+            }
+
+            // plot face bbox on image
+            draw_hollow_rect_mut(
+                &mut dimage,
+                face_bbox_rect,
+                image::Rgba([255, 0, 0, 1]),
+            );
+
             // update image stimulus
-            image_stim_clone
-                .set_image(image::DynamicImage::ImageRgb8(image));
+            image_stim_clone.set_image(dimage);
         });
     });
 
     // show frames until space key is pressed
     loop_frames!(frame from window, keys = Key::Space, {
+        // set frame color to white
+        frame.set_bg_color(color::WHITE);
         // add stimuli to frame
         frame.add(&image_stim);
     });
