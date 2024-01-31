@@ -28,6 +28,7 @@ use wasm_bindgen::closure::Closure;
 use super::Renderable;
 
 /// Internal window state. This is used to store the winit window, the wgpu device, the wgpu queue, etc.
+#[derive(Debug)]
 pub struct WindowState {
     // the winit window
     pub window: winit::window::Window,
@@ -49,7 +50,7 @@ pub struct WindowState {
 
 /// A Window represents a window on the screen. It is used to create stimuli and to submit them to the screen for rendering.
 /// Each window has a render task that is responsible for rendering stimuli to the screen.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Window {
     /// The window state. This contains the actual winit window, the wgpu device, the wgpu queue, etc.
     pub state: Arc<Mutex<WindowState>>,
@@ -476,6 +477,7 @@ pub async fn render_task(window_handle: Window) {
 /// A frame is a collection of renderables that will be rendered together.
 /// Rendering is lazy, i.e. the prepare() and render() functions of the renderables
 /// will only be called once the frame is submitted to the render task.
+#[derive(Clone)]
 pub struct Frame {
     renderables: Arc<Mutex<Vec<Box<dyn Renderable>>>>,
     color_format: ColorFormat,

@@ -297,7 +297,7 @@ pub struct RawRgba {
 /// The ColorFormat defines how color is handled internally in the rendering
 /// pipeline. It is used to convert colors to the appropriate color space
 /// before rendering.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum ColorFormat {
     /// Indicates that the rendering pipeline should use the sRGB color space
     /// with 8 bits per channel (32 bits per pixel). This is the default color

@@ -160,5 +160,5 @@ fn main() {
         refresh_rate: Some(MONITOR_HZ),
     };
     // start experiment (this will block until the experiment is finished)
-    em.run_experiment(window_options, flicker_experiment);
+    em.run_experiment(&window_options, flicker_experiment);
 }

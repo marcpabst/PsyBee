@@ -13,8 +13,25 @@ print(mons)
 
 win_opts = psy.WindowOptions()
 
-def my_experiment():
-    print("Hello Worldd!")
+
+def my_experiment(window):
+    shape1 = psy.ShapeStimulus(window, (1, 0, 0))
+    shape2 = psy.ShapeStimulus(window, (0, 1, 0))
+    current_shape = shape1
+    print(window)
+
+    for i in range(10000):
+        frame = window.get_frame()
+        frame.add(current_shape)
+        window.submit_frame(frame)
+
+        # every 10 frames, switch the shape
+        if i % 10 == 0:
+            if current_shape == shape1:
+                current_shape = shape2
+            else:
+                current_shape = shape1
+
 
 # Run the experiment 
 em.run_experiment(win_opts, my_experiment)
