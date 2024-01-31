@@ -7,7 +7,7 @@ const KEY_START: Key = Key::Space;
 const KEY_STOP: Key = Key::D;
 const KEY_LOG: Key = Key::S;
 
-const MONITOR_HZ: f64 = 60.0; // TODO: get this from the window
+const MONITOR_HZ: f64 = 60.0;
 
 // EXPERIMENT
 fn flicker_experiment(
@@ -16,8 +16,6 @@ fn flicker_experiment(
     // set viewing distance and size of the window in mm
     window.set_viewing_distance(30.0);
     window.set_physical_width(700.00);
-
-    // wait 1s (TODO: remove this)
 
     // create event logger that logs events to a BIDS compatible *.tsv file
     let mut event_logger = BIDSEventLogger::new(
@@ -28,7 +26,7 @@ fn flicker_experiment(
 
     // open serial port
     let mut serial_port =
-        SerialPort::open_or_dummy("COM3".to_string(), 115200, 1000);
+        SerialPort::open_or_dummy("COM3", 115200, 1000);
 
     // create a key press receiver that will be used to check if the up or down key was pressed
     let mut kpr: KeyPressReceiver = KeyPressReceiver::new(&window);
@@ -112,8 +110,6 @@ fn flicker_experiment(
             frame.add(&flicker_stim);
             frame.add(&freq_stim);
 
-
-
             // get all keys that were pressed since the last frame
             let keys = kpr.get_keys();
 
@@ -149,10 +145,11 @@ fn flicker_experiment(
 fn main() {
     // create experiment manager
     let mut em = ExperimentManager::new();
+
     // get all available monitors
     let monitors = em.get_available_monitors();
 
-    // select the second monitor if available, otherwise use the first
+    // select the second monitor if available, otherwise use the primary one
     let monitor = monitors
         .get(1)
         .unwrap_or(monitors.first().expect("No monitor found!"));

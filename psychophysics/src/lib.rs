@@ -4,6 +4,7 @@ use async_lock::Mutex;
 
 use atomic_float::AtomicF64;
 use futures_lite::Future;
+use strum_macros::Display;
 use winit::monitor::VideoMode;
 
 use crate::visual::color::ColorFormat;
@@ -225,8 +226,10 @@ pub struct Monitor {
     handle: winit::monitor::MonitorHandle,
 }
 
+
 /// Options for creating a window. The ExperimentManager will try to find a video mode that satisfies the provided constraints.
 /// See documentation of the variants for more information.
+#[derive(Debug, Clone, PartialEq)]
 pub enum WindowOptions {
     Windowed {
         /// The width and height of the window in pixels. Defaults to 800x600 (px).
@@ -294,6 +297,7 @@ impl WindowOptions {
 
 }
 
+#[derive(Debug)]
 /// The ExperimentManager is the root element of the psychophysics library.
 /// It is responsible for creating and managing window(s) and for running
 /// one or more experiment(s). The ExperimentManager is a singleton and
@@ -313,7 +317,7 @@ impl ExperimentManager {
     }
 
     fn event_loop(&self) -> &EventLoop<()> {
-        self.event_loop.as_ref().expect("Event loop has already been consumed. This is a bug, please report it.")
+        self.event_loop.as_ref().expect("Event loop has already been consumed. This is likely a bug, please report it.")
     }
 
     pub fn get_available_monitors(&self) -> Vec<Monitor> {
@@ -333,7 +337,7 @@ impl ExperimentManager {
     /// # Arguments
     /// 
     /// * `experiment_fn` - The function that is your experiment. This function will be called with a `Window` object that you can use to create stimuli and submit frames to the window.
-    pub fn run_experiment<F>(&mut self, window_options : WindowOptions, experiment_fn: F) -> ()
+    pub fn run_experiment<F>(&mut self, window_options : &WindowOptions, experiment_fn: F) -> ()
     where
         F: FnOnce(Window) -> Result<(), errors::PsychophysicsError>
             + 'static
@@ -350,7 +354,6 @@ impl ExperimentManager {
             let winit_window: winit::window::Window;
 
             if window_options.fullscreen() {
-                log::info!("Creating fullscreen window");
                 
                 // get monitor
                 let monitor_handle = if let Some(monitor) = window_options.monitor() {
@@ -433,48 +436,11 @@ impl ExperimentManager {
                 .unwrap();
 
             }
-        
-
-        
-
-            // get all available monitors and video modes
-
-
-
-            // // get monitor
-            // let monitor = event_loop.available_monitors().nth(1).unwrap_or_else(|| {
-            //     println!("No secondary monitor found, using primary monitor");
-            //     event_loop
-            //         .primary_monitor()
-            //         .expect("No primary monitor found")
-            // });
-
-            // // find video mode with resoltion that matches the monitor size
-            // let video_modes =
-            //     monitor.video_modes().filter(|video_mode| {
-            //         video_mode.size().width as u32
-            //             == monitor.size().width as u32
-            //             && video_mode.size().height as u32
-            //                 == monitor.size().height as u32
-            //     });
-
-            // let video_mode = video_modes
-            //     .filter(|video_mode| {
-            //         video_mode.refresh_rate_millihertz() == 60_000
-            //     })
-            //     .max_by_key(|video_mode| {
-            //         video_mode.refresh_rate_millihertz()
-            //     })
-            //     .expect("Could not find a suitable video mode");
-
-            // let true_size = video_mode.size();
-
-            // log::info!("Selected video mode: {:?}", video_mode);
-
           
             // hide cursor
             winit_window.set_cursor_visible(false);
-
+            winit_window.focus_window();
+            
             // run
             let event_loop = self.event_loop.take().expect("Event loop has already been consumed. This is a bug, please report it.");
             smol::block_on(run(event_loop, winit_window, experiment_fn));
