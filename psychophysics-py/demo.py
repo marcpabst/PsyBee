@@ -6,34 +6,33 @@
 
 import psychophysics_py as psy
 
-# Create ExperimentManager
+# Create an experiment manager
 em = psy.ExperimentManager()
-mons = em.get_available_monitors()
-print(mons)
+# Get a monitor (0 is usually the laptop screen, 1 the first external
+# monitor, etc.)
+monitor = em.get_available_monitors()[-1]
 
-win_opts = psy.WindowOptions()
+# Use the full screen of the second monitor at 60 Hz, select the highest
+# resolution available
+win_opts = psy.WindowOptions(mode = "fullscreen_highest_resolution", 
+                             monitor = monitor, 
+                             refresh_rate = 60)
 
-
+# Define the experiment
 def my_experiment(window):
-    shape1 = psy.ShapeStimulus(window, (1, 0, 0))
-    shape2 = psy.ShapeStimulus(window, (0, 1, 0))
-    current_shape = shape1
-    print(window)
+    colors = [(1, 0, 0), (0, 0, 1)]
+    color_index = 0
+    stim = psy.ShapeStimulus(window, (0, 0, 0))
 
-    for i in range(10000):
+    for i in range(100000):
         frame = window.get_frame()
-        frame.add(current_shape)
+        frame.add(stim)
         window.submit_frame(frame)
 
-        # every 10 frames, switch the shape
-        if i % 10 == 0:
-            if current_shape == shape1:
-                current_shape = shape2
-            else:
-                current_shape = shape1
+        # every 4 frames, switch the color
 
+        color_index = (color_index + 1) % len(colors)
+        stim.set_color(colors[color_index])
 
 # Run the experiment 
 em.run_experiment(win_opts, my_experiment)
-
-    

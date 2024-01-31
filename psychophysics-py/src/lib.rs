@@ -5,6 +5,8 @@ use psychophysics::{
 };
 use pyo3::{prelude::*, types::PyFunction, Python};
 
+use send_wrapper::SendWrapper;
+
 #[pyclass(unsendable, name = "ExperimentManager")]
 pub struct PyExperimentManager(ExperimentManager);
 
@@ -38,33 +40,27 @@ impl PyExperimentManager {
         window_options: &PyWindowOptions,
         experiment_fn: Py<PyFunction>,
     ) {
-        // create rust FnOnce(Window) -> Result<(), errors::PsychophysicsError> + 'static + Send,
         let rust_experiment_fn = move |window: Window| -> Result<
             (),
             errors::PsychophysicsError,
         > {
-            println!("Calling python function");
-            // check
-            unsafe {
-                let py = Python::assume_gil_acquired();
-                // Python::with_gil(
-                //     // create a new python function that takes a Window as argument
-                //     |py| -> PyResult<()> {
+            Python::with_gil(|py| -> PyResult<()> {
                 let pywin = PyWindow(window);
-                // call the python function with the window as argument
-                //experiment_fn.call1(py, (pywin,)).unwrap();
-                println!("Got the interpreter");
                 experiment_fn.call1(py, (pywin,)).unwrap();
-                //         Ok(())
-                //     },
-                // )
-                // .unwrap();
-                println!("Returned from python function");
-            }
+                Ok(())
+            })
+            .unwrap();
             Ok(())
         };
 
-        self.0.run_experiment(&window_options.0, rust_experiment_fn);
+        // wrap self in a SendWrapper so that it can be sent through the magic barrier
+        let mut self_wrapper = SendWrapper::new(self);
+
+        py.allow_threads(move || {
+            self_wrapper
+                .0
+                .run_experiment(&window_options.0, rust_experiment_fn)
+        });
     }
 }
 
@@ -117,15 +113,46 @@ impl PyFrame {
     }
 }
 
+/// An object that contains the options for a window.
 #[pyclass(name = "WindowOptions")]
 pub struct PyWindowOptions(WindowOptions);
 
 #[pymethods]
 impl PyWindowOptions {
-    #[new]
     /// Create a new WindowOptions object.
-    fn __new__() -> Self {
-        PyWindowOptions(WindowOptions::Windowed { resolution: None })
+    #[new]
+    #[pyo3(signature = (mode = "windowed", resolution = None, monitor = None, refresh_rate = None))]
+    fn __new__(
+        mode: &str,
+        resolution: Option<(u32, u32)>,
+        monitor: Option<&PyMonitor>,
+        refresh_rate: Option<f64>,
+    ) -> Self {
+        match mode {
+            "windowed" => PyWindowOptions(WindowOptions::Windowed {
+                resolution: None,
+            }),
+            "fullscreen_exact" => {
+                PyWindowOptions(WindowOptions::FullscreenExact {
+                    resolution: resolution,
+                    monitor: monitor.map(|m| m.0.clone()),
+                    refresh_rate: refresh_rate,
+                })
+            }
+            "fullscreen_highest_resolution" => PyWindowOptions(
+                WindowOptions::FullscreenHighestResolution {
+                    monitor: monitor.map(|m| m.0.clone()),
+                    refresh_rate: refresh_rate,
+                },
+            ),
+            "fullscreen_highest_refresh_rate" => PyWindowOptions(
+                WindowOptions::FullscreenHighestRefreshRate {
+                    monitor: monitor.map(|m| m.0.clone()),
+                    resolution: resolution,
+                },
+            ),
+            _ => panic!("Unknown mode: {}", mode),
+        }
     }
 
     fn __repr__(&self) -> String {
@@ -148,6 +175,12 @@ impl PyShapeStimulus {
                 color.0, color.1, color.2, 1.0,
             ),
         ))
+    }
+
+    fn set_color(&mut self, color: (f32, f32, f32)) {
+        self.0.set_color(psychophysics::visual::color::SRGBA::new(
+            color.0, color.1, color.2, 1.0,
+        ));
     }
 }
 
