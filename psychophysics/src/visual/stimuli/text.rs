@@ -23,6 +23,7 @@ use crate::visual::Renderable;
 
 use crate::visual::color::ColorFormat;
 
+/// A text stimulus.
 pub struct TextStimulus {
     config: Arc<Mutex<TextStimulusConfig>>,
     text_atlas: Arc<Mutex<TextAtlas>>,

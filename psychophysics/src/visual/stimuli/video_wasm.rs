@@ -4,8 +4,6 @@ use super::{
     base::{BaseStimulus, BaseStimulusImplementation},
 };
 
-
-
 use image;
 use js_sys::Promise;
 
@@ -23,7 +21,8 @@ pub struct VideoStimulusImplementation {
     frame: image::DynamicImage,
 }
 
-pub type VideoStimulus<'a> = BaseStimulus<VideoStimulusImplementation>;
+pub type VideoStimulus<'a> =
+    BaseStimulus<VideoStimulusImplementation>;
 
 impl VideoStimulus<'_> {
     pub fn new(window: &Window, video_url: String) -> Self {
@@ -45,15 +44,20 @@ impl VideoStimulus<'_> {
         Self::_new(window, video_url, shape)
     }
     /// Create a new image stimulus.
-    fn _new(window: &Window, video_url: String, shape: Rectangle) -> Self {
+    fn _new(
+        window: &Window,
+        video_url: String,
+        shape: Rectangle,
+    ) -> Self {
         let window = window.clone();
         window.clone().run_on_render_thread(|| async move {
             let window_state = window.get_window_state_blocking();
             let device = &window_state.device;
 
-            let implementation =
-                VideoStimulusImplementation::new(&window, &device, video_url, shape)
-                    .await;
+            let implementation = VideoStimulusImplementation::new(
+                &window, &device, video_url, shape,
+            )
+            .await;
 
             // create texture size based on image size
             let _texture_size = wgpu::Extent3d {
@@ -62,7 +66,11 @@ impl VideoStimulus<'_> {
                 depth_or_array_layers: 1,
             };
 
-            let out = BaseStimulus::create(&window, &window_state, implementation);
+            let out = BaseStimulus::create(
+                &window,
+                &window_state,
+                implementation,
+            );
 
             out
         })
@@ -80,15 +88,17 @@ impl VideoStimulusImplementation {
         video_url: String,
         shape: Rectangle,
     ) -> Self {
-        let _shader: ShaderModule =
-            device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        let _shader: ShaderModule = device.create_shader_module(
+            wgpu::ShaderModuleDescriptor {
                 label: None,
-                source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-                    "shaders/image.wgsl"
-                ))),
-            });
+                source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(
+                    include_str!("shaders/image.wgsl"),
+                )),
+            },
+        );
 
-        let web_window = web_sys::window().expect("no global `window` exists");
+        let web_window =
+            web_sys::window().expect("no global `window` exists");
         let web_document = web_window
             .document()
             .expect("should have a document on window");
@@ -130,9 +140,10 @@ impl VideoStimulusImplementation {
         video.set_src(video_url.as_str());
 
         // convert the onload event to a future
-        let onload_future = JsFuture::from(Promise::new(&mut |resolve, _| {
-            video.set_oncanplay(Some(&resolve));
-        }));
+        let onload_future =
+            JsFuture::from(Promise::new(&mut |resolve, _| {
+                video.set_oncanplay(Some(&resolve));
+            }));
 
         log::info!("Waiting for video to load ...");
 
@@ -152,7 +163,8 @@ impl VideoStimulusImplementation {
         let ctx = canvas
             .get_context_with_context_options(
                 "2d",
-                &js_sys::eval("({ willReadFrequently: true })").unwrap(),
+                &js_sys::eval("({ willReadFrequently: true })")
+                    .unwrap(),
             )
             .unwrap()
             .unwrap()
@@ -172,7 +184,8 @@ impl VideoStimulusImplementation {
 
         // convert to image
         let image = image::DynamicImage::ImageRgba8(
-            image::RgbaImage::from_raw(1280, 720, image_data).unwrap(),
+            image::RgbaImage::from_raw(1280, 720, image_data)
+                .unwrap(),
         );
 
         // play the video in the canvas
@@ -192,8 +205,12 @@ impl Drop for VideoStimulusImplementation {
     fn drop(&mut self) {
         let video_id = self.html_video_id.clone();
         self.window.run_on_render_thread(|| async move {
-            log::info!("Removing video element with id {}", &video_id);
-            let web_window = web_sys::window().expect("no global `window` exists");
+            log::info!(
+                "Removing video element with id {}",
+                &video_id
+            );
+            let web_window =
+                web_sys::window().expect("no global `window` exists");
             let web_document = web_window
                 .document()
                 .expect("should have a document on window");
@@ -214,14 +231,16 @@ impl BaseStimulusImplementation for VideoStimulusImplementation {
         _viewing_distance_mm: f64,
         _screen_width_px: u32,
         _screen_height_px: u32,
-    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
+    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>)
+    {
         //  update the texture
         let video_id = self.html_video_id.clone();
         let canvas_id = self.html_canvas_id.clone();
         let _window = self.window.clone();
 
         log::info!("Updating video element with id {}", &video_id);
-        let web_window = web_sys::window().expect("no global `window` exists");
+        let web_window =
+            web_sys::window().expect("no global `window` exists");
         let web_document = web_window
             .document()
             .expect("should have a document on window");

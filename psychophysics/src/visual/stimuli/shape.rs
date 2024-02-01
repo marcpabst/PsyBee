@@ -25,6 +25,7 @@ pub struct ShapeStimulusParams {
     color: RawRgba,
 }
 
+/// A simple shape stimulus.
 pub type ShapeStimulus = BaseStimulus<ShapeStimulusImplementation>;
 
 impl ShapeStimulus {

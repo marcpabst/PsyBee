@@ -28,7 +28,9 @@ pub struct GratingsStimulusParams {
     cycle_length: f32,
 }
 
-pub type GratingsStimulus = BaseStimulus<GratingsStimulusImplementation>;
+/// A simple gratings stimulus.
+pub type GratingsStimulus =
+    BaseStimulus<GratingsStimulusImplementation>;
 
 impl GratingsStimulus {
     /// Create a new gratings stimulus.
@@ -47,8 +49,10 @@ impl GratingsStimulus {
             let config = &window_state.config;
 
             // get screen size, viewing distance
-            let screen_width_mm = window.physical_width.load(Ordering::Relaxed);
-            let viewing_distance_mm = window.viewing_distance.load(Ordering::Relaxed);
+            let screen_width_mm =
+                window.physical_width.load(Ordering::Relaxed);
+            let viewing_distance_mm =
+                window.viewing_distance.load(Ordering::Relaxed);
 
             // get screen size in pixels
             let screen_width_px = config.width;
@@ -74,13 +78,18 @@ impl GratingsStimulus {
                 shape,
             );
 
-            BaseStimulus::create(&window, &window_state, implementation)
+            BaseStimulus::create(
+                &window,
+                &window_state,
+                implementation,
+            )
         })
     }
 
     /// Set the length of a cycle.
     pub fn set_cycle_length(&self, length: impl Into<Size>) {
-        (self.stimulus_implementation.lock_blocking()).cycle_length = length.into();
+        (self.stimulus_implementation.lock_blocking()).cycle_length =
+            length.into();
     }
 
     /// Set the phase.
@@ -113,7 +122,8 @@ impl BaseStimulusImplementation for GratingsStimulusImplementation {
         _viewing_distance_mm: f64,
         _screen_width_px: u32,
         _screen_height_px: u32,
-    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>) {
+    ) -> (Option<&[u8]>, Option<Box<dyn ToVertices>>, Option<Vec<u8>>)
+    {
         // update phase
         self.params.phase = self.phase;
 

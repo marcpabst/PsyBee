@@ -5147,6 +5147,7 @@ version = "0.1.0"
 dependencies = [
  "psychophysics",
  "pyo3",
+ "send_wrapper",
 ]
 
 [[package]]
@@ -6239,6 +6240,12 @@ checksum = "836fa6a3e1e547f9a2c4040802ec865b5d85f4014efe00555d7090a3dcaa1090"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "send_wrapper"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
 
 [[package]]
 name = "serde"
