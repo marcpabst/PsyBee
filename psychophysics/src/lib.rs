@@ -29,7 +29,8 @@ pub mod camera;
 
 pub mod errors;
 pub mod input;
-pub mod onnx;
+
+#[cfg(feature = "serial")]
 pub mod serial;
 pub mod utils;
 pub mod visual;
@@ -40,6 +41,9 @@ pub mod prelude {
     pub use crate::errors::PsychophysicsError;
     pub use crate::input::Key;
     pub use crate::input::KeyPressReceiver;
+    #[cfg(feature = "serial")]
+    pub use crate::serial;
+    #[cfg(feature = "serial")]
     pub use crate::serial::SerialPort;
     pub use crate::utils::sleep_secs;
     pub use crate::utils::BIDSEventLogger;

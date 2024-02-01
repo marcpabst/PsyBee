@@ -1,0 +1,8 @@
+[app]
+name = "hello-world"
+stylized-name = "Hello World"
+domain = "childvisionlab.co.uk"
+template-pack = "wgpu"
+
+[apple]
+development-team = "697W2CS7L2"

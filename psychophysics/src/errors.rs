@@ -5,10 +5,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use crate::loop_frames;
-use crate::visual::geometry::Rectangle;
-use crate::visual::stimuli::TextStimulus;
-use crate::visual::window::Window;
-use serialport;
+use crate::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -40,6 +37,7 @@ pub enum PsychophysicsError {
     CustomError(String),
 
     // serial port errors
+    #[cfg(feature = "serial")]
     #[error("{0}")]
     SerialPortError(#[from] serialport::Error),
 }
