@@ -1,4 +1,5 @@
-# High-performance, low-latency, cross-platform psychophysics experiments in Python and Rust
+# psychophysics-rs
+## High-performance, low-latency, cross-platform psychophysics experiments in Python and Rust
 
 `psychophysics-rs` is a framework for writing psychophysics experiments. While making use of Rust's speed, safety, and strong typing, it also provides a fully-featured Python API (`psychophysics-py`). It is designed to be fast, accurate, and cross-platform. It is still in early development, so it is not really ready for use yet.
 
