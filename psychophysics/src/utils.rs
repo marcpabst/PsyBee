@@ -1,21 +1,11 @@
 use std::fmt::Display;
 
-use async_lock::{Mutex, MutexGuard};
+use async_lock::{Mutex, MutexGuard, RwLock};
 use futures_lite::future::block_on;
 
 pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};
-
-pub trait BlockingLock<T: ?Sized> {
-    fn lock_blocking(&self) -> MutexGuard<'_, T>;
-}
-
-impl<T: ?Sized> BlockingLock<T> for Mutex<T> {
-    fn lock_blocking(&self) -> MutexGuard<'_, T> {
-        block_on(self.lock())
-    }
-}
 
 /// Includes an image as a reference to a byte array.
 /// This is useful for including images in the binary.

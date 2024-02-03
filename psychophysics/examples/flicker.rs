@@ -1,18 +1,35 @@
-use psychophysics::{prelude::*, ExperimentManager, WindowOptions};
+use psychophysics::{
+    prelude::*, ExperimentManager, WindowManager, WindowOptions,
+};
 
 // CONFIGURATION
-const KEY_FREQ_UP: Key = Key::F;
-const KEY_FREQ_DOWN: Key = Key::A;
+const KEY_FREQ_UP: Key = Key::KeyF;
+const KEY_FREQ_DOWN: Key = Key::KeyA;
 const KEY_START: Key = Key::Space;
-const KEY_STOP: Key = Key::D;
-const KEY_LOG: Key = Key::S;
+const KEY_STOP: Key = Key::KeyD;
+const KEY_LOG: Key = Key::KeyS;
 
 const MONITOR_HZ: f64 = 60.0;
 
 // EXPERIMENT
 fn flicker_experiment(
-    window: Window,
+    wm: WindowManager,
 ) -> Result<(), PsychophysicsError> {
+    log::info!("Starting flicker experiment");
+
+    let monitors = wm.get_available_monitors();
+    let monitor = monitors
+        .get(1)
+        .unwrap_or(monitors.first().expect("No monitor found!"));
+
+    let window_options: WindowOptions =
+        WindowOptions::FullscreenHighestResolution {
+            monitor: Some(monitor.clone()),
+            refresh_rate: Some(MONITOR_HZ),
+        };
+
+    let window = wm.create_window(&window_options);
+
     // set viewing distance and size of the window in mm
     window.set_viewing_distance(30.0);
     window.set_physical_width(700.00);
@@ -28,8 +45,8 @@ fn flicker_experiment(
     let mut serial_port =
         SerialPort::open_or_dummy("COM3", 115200, 1000);
 
-    // create a key press receiver that will be used to check if the up or down key was pressed
-    let mut kpr: KeyPressReceiver = KeyPressReceiver::new(&window);
+    // create a event receiver
+    let mut event_receiver = PhysicalInputReceiver::new(&window);
 
     // find all available freqs for the monitor by dividing the monitor hz by 2 until we reach 1
     let mut available_freqs = Vec::new();
@@ -51,6 +68,8 @@ fn flicker_experiment(
 
     let color_states = vec![color::BLACK, color::RED];
     let mut color_state: usize = 0;
+
+    log::info!("Creating stimuli");
 
     // create text stimulus
     let start_stim = TextStimulus::new(
@@ -76,6 +95,8 @@ fn flicker_experiment(
         Rectangle::FULLSCREEN, // full screen
         color_states[color_state], // the color of the stimulus
     );
+
+    log::info!("Starting flicker loop");
 
     loop {
         // show text until space key is pressed to start the experiment
@@ -111,23 +132,23 @@ fn flicker_experiment(
             frame.add(&freq_stim);
 
             // get all keys that were pressed since the last frame
-            let keys = kpr.get_keys();
+            let inputs = event_receiver.get_inputs();
 
-            if !keys.is_empty() {
-                if keys.was_pressed(KEY_LOG) {
+            if !inputs.is_empty() {
+                if inputs.key_pressed(KEY_LOG) {
                     event_logger.log_cols(("type", "key"), ("keydown", "space"), 0.0)?;
                     serial_port.write_bytes(&[5])?;
-                } else if keys.was_released(KEY_LOG) {
+                } else if inputs.key_released(KEY_LOG) {
                     event_logger.log_cols(("type", "key"), ("keyup", "space"), 0.0)?;
                     serial_port.write_bytes(&[6])?;
                 }
 
-                if keys.was_pressed(KEY_FREQ_UP) {
+                if inputs.key_pressed(KEY_FREQ_UP) {
                     current_hz_index = (current_hz_index + 1) % available_freqs.len();
                         // send a start Iinteger 2 as byte to the serial port
 
 
-                } else if keys.was_pressed(KEY_FREQ_DOWN) {
+                } else if inputs.key_pressed(KEY_FREQ_DOWN) {
                     current_hz_index = (current_hz_index + available_freqs.len() - 1) % available_freqs.len();
 
                 }
@@ -143,22 +164,26 @@ fn flicker_experiment(
 }
 
 fn main() {
-    // create experiment manager
-    let mut em = ExperimentManager::new();
+    // // get all available monitors
+    // let monitors = em.get_available_monitors();
 
-    // get all available monitors
-    let monitors = em.get_available_monitors();
+    // // select the second monitor if available, otherwise use the primary one
+    // let monitor = monitors
+    //     .get(1)
+    //     .unwrap_or(monitors.first().expect("No monitor found!"));
 
-    // select the second monitor if available, otherwise use the primary one
-    let monitor = monitors
-        .get(1)
-        .unwrap_or(monitors.first().expect("No monitor found!"));
+    // // create window options (here, we use the highest resolution of the chosen monitor)
+    // let window_options = WindowOptions::FullscreenHighestResolution {
+    //     monitor: Some(monitor.clone()),
+    //     refresh_rate: Some(MONITOR_HZ),
+    // };
 
-    // create window options (here, we use the highest resolution of the chosen monitor)
-    let window_options = WindowOptions::FullscreenHighestResolution {
-        monitor: Some(monitor.clone()),
-        refresh_rate: Some(MONITOR_HZ),
-    };
+    // let window_options = WindowOptions::Windowed {
+    //     resolution: Some((800, 600)),
+    // };
+
     // start experiment (this will block until the experiment is finished)
-    em.run_experiment(&window_options, flicker_experiment);
+    let mut em = smol::block_on(ExperimentManager::new());
+
+    em.run_experiment(flicker_experiment);
 }

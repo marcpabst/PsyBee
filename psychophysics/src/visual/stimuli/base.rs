@@ -117,12 +117,6 @@ pub struct BaseStimulus<S: BaseStimulusImplementation> {
     texture_bind_group: Option<Arc<Mutex<wgpu::BindGroup>>>,
 }
 
-// todo: this should be derived
-unsafe impl<S: BaseStimulusImplementation> Send for BaseStimulus<S> {}
-
-// same here
-unsafe impl<S: BaseStimulusImplementation> Sync for BaseStimulus<S> {}
-
 impl<S: BaseStimulusImplementation> Clone for BaseStimulus<S> {
     fn clone(&self) -> Self {
         Self {
@@ -292,10 +286,12 @@ impl<S: BaseStimulusImplementation> BaseStimulus<S> {
         window_state: &WindowState,
         implementation: S,
     ) -> Self {
-        let device = &window_state.device;
-        let queue = &window_state.queue;
+        let gpu_state = window.get_gpu_state_blocking();
+
+        let device = &gpu_state.device;
+        let queue = &gpu_state.queue;
         let surface = &window_state.surface;
-        let adapter = &window_state.adapter;
+        let adapter = &gpu_state.adapter;
         let sconfig = window_state.config.clone();
 
         // get the geometry

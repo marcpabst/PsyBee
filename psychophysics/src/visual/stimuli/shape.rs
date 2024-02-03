@@ -41,27 +41,23 @@ impl ShapeStimulus {
         let color_format = window.color_format;
         let color = color_format.convert_to_raw_rgba(color);
 
-        window.clone().run_on_render_thread(move || async move {
-            // get window state
-            let window_state = window.get_window_state_blocking();
-            // convert color to raw rgba
+        // window.clone().run_on_render_thread(move || async move {
+        // get window state
+        let window_state = window.get_window_state_blocking();
+        // convert color to raw rgba
 
-            // create parameters
-            let params = ShapeStimulusParams { color };
+        // create parameters
+        let params = ShapeStimulusParams { color };
 
-            let implementation = ShapeStimulusImplementation::new(
-                color,
-                color_format,
-                params,
-                shape,
-            );
+        let implementation = ShapeStimulusImplementation::new(
+            color,
+            color_format,
+            params,
+            shape,
+        );
 
-            BaseStimulus::create(
-                &window,
-                &window_state,
-                implementation,
-            )
-        })
+        BaseStimulus::create(&window, &window_state, implementation)
+        // })
     }
 
     /// Set the color of the stimulus.

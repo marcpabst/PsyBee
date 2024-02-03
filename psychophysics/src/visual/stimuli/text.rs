@@ -1,4 +1,3 @@
-use crate::utils::BlockingLock;
 use async_lock::Mutex;
 use async_trait::async_trait;
 use futures_lite::future::block_on;
@@ -210,113 +209,112 @@ impl TextStimulus {
             ..Default::default()
         };
 
-        window.clone().run_on_render_thread(|| async move {
-            let window_state = window.get_window_state_blocking();
-            let device = &window_state.device;
-            let queue = &window_state.queue;
-            let sconfig = window_state.config.clone();
+        //window.clone().run_on_render_thread(|| async move {
+        log::info!("Creating text stimulus");
+        let gpu_state = window.get_gpu_state_blocking();
+        let window_state = window.get_window_state_blocking();
 
-            let swapchain_format = wgpu::TextureFormat::Bgra8Unorm;
+        let device = &gpu_state.device;
+        let queue = &gpu_state.queue;
+        let sconfig = window_state.config.clone();
 
-            let screen_width_mm =
-                window.physical_width.load(Ordering::Relaxed);
-            let viewing_distance_mm =
-                window.viewing_distance.load(Ordering::Relaxed);
-            let screen_width_px = sconfig.width;
-            let screen_height_px = sconfig.height;
+        let swapchain_format = wgpu::TextureFormat::Bgra8Unorm;
 
-            let bounds_px = config.bounds.to_pixels(
-                screen_width_mm,
-                viewing_distance_mm,
-                screen_width_px,
-                screen_height_px,
-            );
+        let screen_width_mm =
+            window.physical_width.load(Ordering::Relaxed);
+        let viewing_distance_mm =
+            window.viewing_distance.load(Ordering::Relaxed);
+        let screen_width_px = sconfig.width;
+        let screen_height_px = sconfig.height;
 
-            let font_size_px = config.font_size.to_pixels(
-                screen_width_mm,
-                viewing_distance_mm,
-                screen_width_px,
-                screen_height_px,
-            );
+        let bounds_px = config.bounds.to_pixels(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
 
-            let line_height_px = config.line_height.to_pixels(
-                screen_width_mm,
-                viewing_distance_mm,
-                screen_width_px,
-                screen_height_px,
-            );
+        let font_size_px = config.font_size.to_pixels(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
 
-            let width: f64 = bounds_px[2] as f64;
-            let height: f64 = bounds_px[3] as f64;
+        let line_height_px = config.line_height.to_pixels(
+            screen_width_mm,
+            viewing_distance_mm,
+            screen_width_px,
+            screen_height_px,
+        );
 
-            let scale_factor = 1.0;
+        let width: f64 = bounds_px[2] as f64;
+        let height: f64 = bounds_px[3] as f64;
 
-            // Set up text renderer
-            // load fonts
-            let plex_fonts = vec![
-                include_bytes!("./assets/IBMPlexSans-Regular.ttf")
-                    .to_vec(),
-                include_bytes!("./assets/IBMPlexSans-Bold.ttf")
-                    .to_vec(),
-                include_bytes!("./assets/IBMPlexSans-Italic.ttf")
-                    .to_vec(),
-                include_bytes!("./assets/IBMPlexSans-BoldItalic.ttf")
-                    .to_vec(),
-            ];
+        let scale_factor = 1.0;
 
-            let mut font_system = FontSystem::new();
+        // Set up text renderer
+        // load fonts
+        let plex_fonts = vec![
+            include_bytes!("./assets/IBMPlexSans-Regular.ttf")
+                .to_vec(),
+            include_bytes!("./assets/IBMPlexSans-Bold.ttf").to_vec(),
+            include_bytes!("./assets/IBMPlexSans-Italic.ttf")
+                .to_vec(),
+            include_bytes!("./assets/IBMPlexSans-BoldItalic.ttf")
+                .to_vec(),
+        ];
 
-            for plex_font in plex_fonts {
-                font_system.db_mut().load_font_data(plex_font);
-            }
+        let mut font_system = FontSystem::new();
 
-            let cache = SwashCache::new();
-            let mut atlas =
-                TextAtlas::new(device, queue, swapchain_format);
-            let text_renderer = TextRenderer::new(
-                &mut atlas,
-                &device,
-                MultisampleState::default(),
-                None,
-            );
+        for plex_font in plex_fonts {
+            font_system.db_mut().load_font_data(plex_font);
+        }
 
-            let mut buffer = Buffer::new(
-                &mut font_system,
-                Metrics::new(
-                    font_size_px as f32,
-                    line_height_px as f32,
-                ),
-            );
+        let cache = SwashCache::new();
+        let mut atlas =
+            TextAtlas::new(device, queue, swapchain_format);
+        let text_renderer = TextRenderer::new(
+            &mut atlas,
+            &device,
+            MultisampleState::default(),
+            None,
+        );
 
-            let physical_width = (width as f64 * scale_factor) as f32;
-            let physical_height =
-                (height as f64 * scale_factor) as f32;
+        let mut buffer = Buffer::new(
+            &mut font_system,
+            Metrics::new(font_size_px as f32, line_height_px as f32),
+        );
 
-            buffer.set_size(
-                &mut font_system,
-                physical_width,
-                physical_height,
-            );
+        let physical_width = (width as f64 * scale_factor) as f32;
+        let physical_height = (height as f64 * scale_factor) as f32;
 
-            buffer.set_text(
-                &mut font_system,
-                &config.text,
-                Attrs::new().family(Family::Name("IBM Plex Sans")),
-                Shaping::Advanced,
-            );
-            buffer.lines[0].set_align(Some(Align::Center));
-            buffer.shape_until_scroll(&mut font_system);
+        buffer.set_size(
+            &mut font_system,
+            physical_width,
+            physical_height,
+        );
 
-            Self {
-                config: Arc::new(Mutex::new(config)),
-                text_atlas: Arc::new(Mutex::new(atlas)),
-                text_renderer: Arc::new(Mutex::new(text_renderer)),
-                font_system: Arc::new(Mutex::new(font_system)),
-                text_buffer: Arc::new(Mutex::new(buffer)),
-                text_cache: Arc::new(Mutex::new(cache)),
-                color_format: window.color_format,
-            }
-        })
+        buffer.set_text(
+            &mut font_system,
+            &config.text,
+            Attrs::new().family(Family::Name("IBM Plex Sans")),
+            Shaping::Advanced,
+        );
+        buffer.lines[0].set_align(Some(Align::Center));
+        buffer.shape_until_scroll(&mut font_system);
+
+        Self {
+            config: Arc::new(Mutex::new(config)),
+            text_atlas: Arc::new(Mutex::new(atlas)),
+            text_renderer: Arc::new(Mutex::new(text_renderer)),
+            font_system: Arc::new(Mutex::new(font_system)),
+            text_buffer: Arc::new(Mutex::new(buffer)),
+            text_cache: Arc::new(Mutex::new(cache)),
+            color_format: window.color_format,
+        }
+
+        // })
     }
 
     pub fn set_color(

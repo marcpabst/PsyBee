@@ -43,47 +43,44 @@ impl GratingsStimulus {
         let window = window.clone();
         let cycle_length: Size = cycle_length.into();
 
-        window.clone().run_on_render_thread(|| async move {
-            let window_state = window.get_window_state().await;
-            let device = &window_state.device;
-            let config = &window_state.config;
+        // window.clone().run_on_render_thread(|| async move {
+        let window_state = window.get_window_state_blocking();
+        let gpu_state = window.get_gpu_state_blocking();
+        let device = &gpu_state.device;
+        let config = &window_state.config;
 
-            // get screen size, viewing distance
-            let screen_width_mm =
-                window.physical_width.load(Ordering::Relaxed);
-            let viewing_distance_mm =
-                window.viewing_distance.load(Ordering::Relaxed);
+        // get screen size, viewing distance
+        let screen_width_mm =
+            window.physical_width.load(Ordering::Relaxed);
+        let viewing_distance_mm =
+            window.viewing_distance.load(Ordering::Relaxed);
 
-            // get screen size in pixels
-            let screen_width_px = config.width;
-            let screen_height_px = config.height;
+        // get screen size in pixels
+        let screen_width_px = config.width;
+        let screen_height_px = config.height;
 
-            // create parameters
-            let params = GratingsStimulusParams {
-                cycle_length: cycle_length.to_pixels(
-                    screen_width_mm,
-                    viewing_distance_mm,
-                    screen_width_px,
-                    screen_height_px,
-                ) as f32,
+        // create parameters
+        let params = GratingsStimulusParams {
+            cycle_length: cycle_length.to_pixels(
+                screen_width_mm,
+                viewing_distance_mm,
+                screen_width_px,
+                screen_height_px,
+            ) as f32,
 
-                phase: 0.0,
-            };
+            phase: 0.0,
+        };
 
-            let implementation = GratingsStimulusImplementation::new(
-                &device,
-                0.0,
-                cycle_length,
-                params,
-                shape,
-            );
+        let implementation = GratingsStimulusImplementation::new(
+            &device,
+            0.0,
+            cycle_length,
+            params,
+            shape,
+        );
 
-            BaseStimulus::create(
-                &window,
-                &window_state,
-                implementation,
-            )
-        })
+        BaseStimulus::create(&window, &window_state, implementation)
+        //})
     }
 
     /// Set the length of a cycle.
