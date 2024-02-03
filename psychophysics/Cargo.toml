@@ -51,6 +51,7 @@ facetracking = { git = "https://github.com/marcpabst/facetracking-rs", version =
 imageproc = "0.23.0"
 cocoa = "0.25.0"
 pollster = "0.3.0"
+rapier2d = "0.18.0"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

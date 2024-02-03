@@ -30,6 +30,7 @@
 pub mod color;
 pub mod geometry;
 pub mod stimuli;
+pub mod stimuli_new;
 pub mod window;
 
 pub use window::Window;
@@ -53,7 +54,11 @@ pub trait Renderable {
         window_handle: &window::Window,
     ) -> ();
     /// Render the object to the screen.
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();
+    fn render(
+        &mut self,
+        enc: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+    ) -> ();
     fn is_finnished(&self) -> bool {
         false
     }

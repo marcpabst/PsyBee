@@ -28,6 +28,16 @@ pub struct ShapeStimulusParams {
 /// A simple shape stimulus.
 pub type ShapeStimulus = BaseStimulus<ShapeStimulusImplementation>;
 
+/// impl Debug for ShapeStimulus
+impl std::fmt::Debug for ShapeStimulus {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        f.debug_struct("ShapeStimulus").finish()
+    }
+}
+
 impl ShapeStimulus {
     /// Create a new gratings stimulus.
     pub fn new(

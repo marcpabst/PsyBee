@@ -104,12 +104,29 @@ impl PhysicalInput {
             winit::event::DeviceEvent::MouseWheel { .. } => {
                 Some(PhysicalInput::RawMouseWheelInput(event))
             }
-            winit::event::DeviceEvent::Motion { .. } => {
-                Some(PhysicalInput::RawMouseMovementInput(event))
-            }
             winit::event::DeviceEvent::Button { .. } => {
                 Some(PhysicalInput::RawMouseButtonInput(event))
             }
+            _ => None,
+        }
+    }
+
+    /// try to convert a PhysicalInput to a winit window event
+    pub fn to_winit_window_event(
+        &self,
+    ) -> Option<winit::event::WindowEvent> {
+        match self {
+            PhysicalInput::KeyInput(event) => Some(event.clone()),
+            PhysicalInput::MouseWheelInput(event) => {
+                Some(event.clone())
+            }
+            PhysicalInput::CursorMovementInput(event) => {
+                Some(event.clone())
+            }
+            PhysicalInput::MouseButtonInput(event) => {
+                Some(event.clone())
+            }
+            PhysicalInput::TouchInput(event) => Some(event.clone()),
             _ => None,
         }
     }

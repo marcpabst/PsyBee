@@ -5,7 +5,6 @@ use async_lock::Mutex;
 use atomic_float::AtomicF64;
 use futures_lite::future::block_on;
 use futures_lite::Future;
-use strum_macros::Display;
 use winit::monitor::VideoMode;
 
 use crate::visual::color::ColorFormat;
@@ -18,7 +17,6 @@ use input::Key;
 use wgpu::TextureFormat;
 
 use std::fmt::Formatter;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -51,8 +49,6 @@ pub mod prelude {
     pub use crate::input::PhysicalInputReceiver;
     pub use crate::loop_frames;
     #[cfg(feature = "serial")]
-    pub use crate::serial;
-    #[cfg(feature = "serial")]
     pub use crate::serial::SerialPort;
     pub use crate::utils::sleep_secs;
     pub use crate::utils::BIDSEventLogger;
@@ -62,6 +58,7 @@ pub mod prelude {
     pub use crate::visual::stimuli::ImageStimulus;
     pub use crate::visual::stimuli::ShapeStimulus;
     pub use crate::visual::{stimuli::TextStimulus, Window};
+    pub use crate::visual::geometry::Transformation2D;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -241,7 +238,6 @@ pub struct GPUState {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
 }
-
 
 /// The ExperimentManager is the root element of the psychophysics library.
 /// It is responsible for creating and managing window(s) and for running
@@ -485,7 +481,7 @@ impl ExperimentManager {
         }
 
         // hide cursor
-        winit_window.set_cursor_visible(false);
+        // winit_window.set_cursor_visible(false);
         winit_window.focus_window();
 
         log::info!("winit window created");
@@ -805,31 +801,32 @@ impl ExperimentManager {
                             new_size
                         );
             
-                    //     if let  Some(window) = self.get_window_by_id(id) {
-                    //     //
-                    //     let mut pwindow =
-                    //         window.state.lock_blocking();
-                    //     pwindow.config.width = new_size.width.max(1);
-                    //     pwindow.config.height =
-                    //         new_size.height.max(1);
-                    //     pwindow.surface.configure(
-                    //         &pwindow.device,
-                    //         &pwindow.config,
-                    //     );
+                        if let  Some(window) = self.get_window_by_id(id) {
+                        //
+                        let mut window_state =
+                            window.state.lock_blocking();
+                            let gpu_state = self.gpu_state.lock_blocking();
+                        window_state.config.width = new_size.width.max(1);
+                        window_state.config.height =
+                            new_size.height.max(1);
+                        window_state.surface.configure(
+                            &gpu_state.device,
+                            &window_state.config,
+                        );
 
-                    //     // on macos, the window size is not updated automatically
-                    //     pwindow.window.request_redraw();
+                        // on macos, the window size is not updated automatically
+                        window_state.window.request_redraw();
 
-                    //     // update window size
-                    //     window.width_px.store(
-                    //         new_size.width as u32,
-                    //         Ordering::Relaxed,
-                    //     );
-                    //     window.height_px.store(
-                    //         new_size.height as u32,
-                    //         Ordering::Relaxed,
-                    //     );
-                    // }
+                        // update window size
+                        window.width_px.store(
+                            new_size.width as u32,
+                            Ordering::Relaxed,
+                        );
+                        window.height_px.store(
+                            new_size.height as u32,
+                            Ordering::Relaxed,
+                        );
+                    }
                 }
                   
                     // handle window events

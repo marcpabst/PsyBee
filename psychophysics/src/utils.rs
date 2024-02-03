@@ -3,6 +3,41 @@ use std::fmt::Display;
 use async_lock::{Mutex, MutexGuard, RwLock};
 use futures_lite::future::block_on;
 
+pub(crate) trait AtomicExt<T> {
+    fn load_relaxed(&self) -> T;
+    fn store_relaxed(&self, value: T);
+}
+
+impl AtomicExt<f64> for atomic_float::AtomicF64 {
+    fn load_relaxed(&self) -> f64 {
+        self.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn store_relaxed(&self, value: f64) {
+        self.store(value, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+impl AtomicExt<f32> for atomic_float::AtomicF32 {
+    fn load_relaxed(&self) -> f32 {
+        self.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn store_relaxed(&self, value: f32) {
+        self.store(value, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+impl AtomicExt<usize> for std::sync::atomic::AtomicUsize {
+    fn load_relaxed(&self) -> usize {
+        self.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn store_relaxed(&self, value: usize) {
+        self.store(value, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};
@@ -79,8 +114,7 @@ where
     I: IntoIterator<Item = S>,
     S: Into<String> + 'static,
 {
-    let column_names: Vec<String> =
-        column_names.into_iter().map(Into::into).collect();
+    let column_names: Vec<String> = column_names.into_iter().map(Into::into).collect();
 
     // check that all column names are unique
     let mut unique_column_names = column_names.clone();
@@ -114,13 +148,10 @@ impl CSVEventLogger {
     {
         let filepath = path.into();
 
-        let columns: Vec<String> =
-            columns.into_iter().map(Into::into).collect();
+        let columns: Vec<String> = columns.into_iter().map(Into::into).collect();
 
         if !check_unique_column_names(columns.clone()) {
-            return Err(
-                errors::PsychophysicsError::ColumnNamesNotUniqueError,
-            );
+            return Err(errors::PsychophysicsError::ColumnNamesNotUniqueError);
         }
 
         // check if file exists
@@ -132,8 +163,8 @@ impl CSVEventLogger {
                     std::fs::remove_file(&filepath)?;
                 } else {
                     return Err(errors::PsychophysicsError::FileExistsAndNotEmptyError(
-                    filepath.to_string_lossy().to_string()),
-                );
+                        filepath.to_string_lossy().to_string(),
+                    ));
                 }
             }
         }
@@ -154,10 +185,7 @@ impl CSVEventLogger {
     }
 
     /// Log an event.
-    pub fn log<I>(
-        &mut self,
-        column_values: I,
-    ) -> Result<(), PsychophysicsError>
+    pub fn log<I>(&mut self, column_values: I) -> Result<(), PsychophysicsError>
     where
         I: IntoStringVector,
     {
@@ -166,12 +194,10 @@ impl CSVEventLogger {
 
         // make sure the event has the correct number of columns
         if event.len() != self.columns.len() {
-            return Err(
-                errors::PsychophysicsError::DataLengthMismatchError(
-                    event.len(),
-                    self.columns.len(),
-                ),
-            );
+            return Err(errors::PsychophysicsError::DataLengthMismatchError(
+                event.len(),
+                self.columns.len(),
+            ));
         }
 
         // write event to file
@@ -190,48 +216,36 @@ impl CSVEventLogger {
         I: IntoStringVector,
         J: IntoStringVector,
     {
-        let column_names: Vec<String> =
-            column_names.into_string_vec();
-        let column_values: Vec<String> =
-            column_values.into_string_vec();
+        let column_names: Vec<String> = column_names.into_string_vec();
+        let column_values: Vec<String> = column_values.into_string_vec();
 
         // check that all column names are unique
         if !check_unique_column_names(column_names.clone()) {
-            return Err(
-                errors::PsychophysicsError::ColumnNamesNotUniqueError,
-            );
+            return Err(errors::PsychophysicsError::ColumnNamesNotUniqueError);
         }
 
         // assert that all column names are in self.columns
         for column_name in column_names.iter() {
             if !self.columns.contains(column_name) {
-                return Err(
-                    errors::PsychophysicsError::ColumnNameDoesNotExistError(
-                        column_name.clone(),
-                    ),
-                );
+                return Err(errors::PsychophysicsError::ColumnNameDoesNotExistError(
+                    column_name.clone(),
+                ));
             }
         }
 
         if column_names.len() != column_values.len() {
-            return Err(
-                errors::PsychophysicsError::DataLengthMismatchError(
-                    column_values.len(),
-                    column_names.len(),
-                ),
-            );
+            return Err(errors::PsychophysicsError::DataLengthMismatchError(
+                column_values.len(),
+                column_names.len(),
+            ));
         }
 
         // we need to cal self.log() with the correct order of columns, replacing missing columns with an empty string
-        let mut new_column_values: Vec<String> =
-            Vec::with_capacity(self.columns.len());
+        let mut new_column_values: Vec<String> = Vec::with_capacity(self.columns.len());
 
         for column in self.columns.iter() {
             if column_names.contains(column) {
-                let i = column_names
-                    .iter()
-                    .position(|x| x == column)
-                    .unwrap();
+                let i = column_names.iter().position(|x| x == column).unwrap();
                 new_column_values.push(column_values[i].clone());
             } else {
                 new_column_values.push("".to_string());
@@ -275,16 +289,11 @@ impl BIDSEventLogger {
         }
 
         // add mandatory columns "onset" and "duration"
-        let columns: Vec<String> =
-            columns.into_iter().map(Into::into).collect();
-        let mandatory_columns =
-            vec!["onset".to_string(), "duration".to_string()];
-        let columns: Vec<String> =
-            mandatory_columns.into_iter().chain(columns).collect();
+        let columns: Vec<String> = columns.into_iter().map(Into::into).collect();
+        let mandatory_columns = vec!["onset".to_string(), "duration".to_string()];
+        let columns: Vec<String> = mandatory_columns.into_iter().chain(columns).collect();
 
-        let logger = CSVEventLogger::new(
-            path, columns, '\t' as u8, overwrite,
-        )?;
+        let logger = CSVEventLogger::new(path, columns, '\t' as u8, overwrite)?;
 
         Ok(Self {
             logger,
@@ -302,18 +311,16 @@ impl BIDSEventLogger {
         I: IntoStringVector,
     {
         // convert to vector
-        let columns_values: Vec<String> =
-            columns_values.into_string_vec();
+        let columns_values: Vec<String> = columns_values.into_string_vec();
 
         // calculate onset and duration
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let columns_values: Vec<String> =
-            vec![onset.to_string(), duration.to_string()]
-                .into_iter()
-                .chain(columns_values.into_iter())
-                .collect();
+        let columns_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
+            .into_iter()
+            .chain(columns_values.into_iter())
+            .collect();
 
         // log event
         self.logger.log(columns_values)
@@ -331,26 +338,22 @@ impl BIDSEventLogger {
         J: IntoStringVector,
     {
         // convert to vector
-        let column_names: Vec<String> =
-            column_names.into_string_vec();
-        let column_values: Vec<String> =
-            column_values.into_string_vec();
+        let column_names: Vec<String> = column_names.into_string_vec();
+        let column_values: Vec<String> = column_values.into_string_vec();
 
         // calculate onset and duration
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let column_names: Vec<String> =
-            vec!["onset".to_string(), "duration".to_string()]
-                .into_iter()
-                .chain(column_names.into_iter())
-                .collect();
+        let column_names: Vec<String> = vec!["onset".to_string(), "duration".to_string()]
+            .into_iter()
+            .chain(column_names.into_iter())
+            .collect();
 
-        let column_values: Vec<String> =
-            vec![onset.to_string(), duration.to_string()]
-                .into_iter()
-                .chain(column_values.into_iter())
-                .collect();
+        let column_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
+            .into_iter()
+            .chain(column_values.into_iter())
+            .collect();
 
         // log event
         self.logger.log_cols(column_names, column_values)

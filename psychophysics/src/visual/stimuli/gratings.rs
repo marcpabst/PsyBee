@@ -32,6 +32,15 @@ pub struct GratingsStimulusParams {
 pub type GratingsStimulus =
     BaseStimulus<GratingsStimulusImplementation>;
 
+impl std::fmt::Debug for GratingsStimulus {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        f.debug_struct("GratingsStimulus").finish()
+    }
+}
+
 impl GratingsStimulus {
     /// Create a new gratings stimulus.
     pub fn new(
@@ -44,40 +53,51 @@ impl GratingsStimulus {
         let cycle_length: Size = cycle_length.into();
 
         // window.clone().run_on_render_thread(|| async move {
-        let window_state = window.get_window_state_blocking();
-        let gpu_state = window.get_gpu_state_blocking();
-        let device = &gpu_state.device;
-        let config = &window_state.config;
 
-        // get screen size, viewing distance
-        let screen_width_mm =
-            window.physical_width.load(Ordering::Relaxed);
-        let viewing_distance_mm =
-            window.viewing_distance.load(Ordering::Relaxed);
+        let (implementation, window_state) = {
+            let window_state = window.get_window_state_blocking();
+            let gpu_state = window.get_gpu_state_blocking();
+            let device = &gpu_state.device;
+            let config = &window_state.config;
 
-        // get screen size in pixels
-        let screen_width_px = config.width;
-        let screen_height_px = config.height;
+            // get screen size, viewing distance
+            let screen_width_mm =
+                window.physical_width.load(Ordering::Relaxed);
+            let viewing_distance_mm =
+                window.viewing_distance.load(Ordering::Relaxed);
 
-        // create parameters
-        let params = GratingsStimulusParams {
-            cycle_length: cycle_length.to_pixels(
-                screen_width_mm,
-                viewing_distance_mm,
-                screen_width_px,
-                screen_height_px,
-            ) as f32,
+            // get screen size in pixels
+            let screen_width_px = config.width;
+            let screen_height_px = config.height;
 
-            phase: 0.0,
+            // create parameters
+            let params = GratingsStimulusParams {
+                cycle_length: cycle_length.to_pixels(
+                    screen_width_mm,
+                    viewing_distance_mm,
+                    screen_width_px,
+                    screen_height_px,
+                ) as f32,
+
+                phase: 0.0,
+            };
+
+            log::info!(
+                "Creating gratings stimulus with cycle length: {}",
+                params.cycle_length
+            );
+
+            (
+                GratingsStimulusImplementation::new(
+                    &device,
+                    0.0,
+                    cycle_length,
+                    params,
+                    shape,
+                ),
+                window_state,
+            )
         };
-
-        let implementation = GratingsStimulusImplementation::new(
-            &device,
-            0.0,
-            cycle_length,
-            params,
-            shape,
-        );
 
         BaseStimulus::create(&window, &window_state, implementation)
         //})

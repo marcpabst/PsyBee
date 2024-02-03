@@ -164,24 +164,6 @@ fn flicker_experiment(
 }
 
 fn main() {
-    // // get all available monitors
-    // let monitors = em.get_available_monitors();
-
-    // // select the second monitor if available, otherwise use the primary one
-    // let monitor = monitors
-    //     .get(1)
-    //     .unwrap_or(monitors.first().expect("No monitor found!"));
-
-    // // create window options (here, we use the highest resolution of the chosen monitor)
-    // let window_options = WindowOptions::FullscreenHighestResolution {
-    //     monitor: Some(monitor.clone()),
-    //     refresh_rate: Some(MONITOR_HZ),
-    // };
-
-    // let window_options = WindowOptions::Windowed {
-    //     resolution: Some((800, 600)),
-    // };
-
     // start experiment (this will block until the experiment is finished)
     let mut em = smol::block_on(ExperimentManager::new());
 

@@ -2,7 +2,7 @@ use crate::input::Key;
 #[cfg(target_arch = "wasm32")]
 use crate::request_animation_frame;
 use crate::GPUState;
-use async_lock::{Mutex, MutexGuard};
+use async_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use futures_lite::Future;
 use palette::IntoColor;
 
@@ -45,9 +45,9 @@ pub struct WindowState {
 #[derive(Clone, Debug)]
 pub struct Window {
     /// The window state. This contains the actual winit window, the wgpu device, the wgpu queue, etc.
-    pub state: Arc<Mutex<WindowState>>,
+    pub state: Arc<RwLock<WindowState>>,
     /// The GPU state
-    pub gpu_state: Arc<Mutex<crate::GPUState>>,
+    pub gpu_state: Arc<RwLock<GPUState>>,
     /// Broadcast receiver for keyboard events. Used by the main window task to send keyboard events to the experiment task.
     pub physical_input_receiver:
         async_broadcast::InactiveReceiver<PhysicalInput>,
@@ -79,28 +79,46 @@ pub struct Window {
     >,
 }
 
+trait SyncTestTrait: Send + Sync {}
+
+struct MyBox(*mut u8);
+
+impl SyncTestTrait for WindowState {}
+
+
 impl Window {
     /// Returns a MutexGuard to the WindowState behind the mutex.
-    pub fn get_window_state_blocking(
+    pub fn read_window_state_blocking(
         &self,
-    ) -> MutexGuard<WindowState> {
-        return self.state.lock_blocking();
+    ) -> RwLockReadGuard<WindowState> {
+        return self.state.read_blocking();
+    }
+
+    pub fn write_window_state_blocking(
+        &self,
+    ) -> RwLockWriteGuard<WindowState> {
+        return self.state.write_blocking();
     }
 
     /// Returns a MutexGuard to the WindowState behind the mutex.
-    pub fn get_gpu_state_blocking(&self) -> MutexGuard<GPUState> {
-        return self.gpu_state.lock_blocking();
+    pub fn read_gpu_state_blocking(&self) -> RwLockReadGuard<GPUState> {
+        return self.gpu_state.read_blocking();
     }
 
-    /// Returns a MutexGuard to the WindowState behind the mutex asynchronously.
-    pub async fn get_window_state(&self) -> MutexGuard<WindowState> {
-        return self.state.lock().await;
+    pub fn write_gpu_state_blocking(&self) -> RwLockWriteGuard<GPUState> {
+        return self.gpu_state.write_blocking();
     }
 
-    /// Returns a MutexGuard to the WindowState behind the mutex asynchronously.
-    pub async fn get_gpu_state(&self) -> MutexGuard<GPUState> {
-        return self.gpu_state.lock().await;
-    }
+
+    // /// Returns a MutexGuard to the WindowState behind the mutex asynchronously.
+    // pub async fn get_window_state(&self) -> MutexGuard<WindowState> {
+    //     return self.state.lock().await;
+    // }
+
+    // /// Returns a MutexGuard to the WindowState behind the mutex asynchronously.
+    // pub async fn get_gpu_state(&self) -> MutexGuard<GPUState> {
+    //     return self.gpu_state.lock().await;
+    // }
 
     pub fn run_on_render_thread<R, Fut>(
         &self,
@@ -147,55 +165,7 @@ impl Window {
         return ret;
     }
 
-    // /// Listens for the specified keypresses and returns the key that was pressed and the time it took to press it.
-    // /// When a keypress is detected, the Future returns a PFutureReturns::KeyPress.
-    // pub async fn wait_for_keypress<T, I>(
-    //     &self,
-    //     keys: T,
-    // ) -> Result<PFutureReturns, anyhow::Error>
-    // where
-    //     T: IntoIterator<Item = I>,
-    //     I: Into<Key>,
-    // {
-    //     let start: web_time::Instant = web_time::Instant::now();
-
-    //     let mut keyboard_receiver =
-    //         self.keyboard_receiver.activate_cloned();
-
-    //     let key_vec: Vec<Key> =
-    //         keys.into_iter().map(|k| k.into()).collect();
-
-    //     let kc: winit::event::VirtualKeyCode;
-    //     loop {
-    //         // wait for buttons pres
-    //         let e = keyboard_receiver.recv().await.map_err(|_| {
-    //             anyhow::anyhow!(
-    //                 "Failed to receive keypress from channel"
-    //             )
-    //         })?;
-
-    //         // check if keypress matches any of the keys
-    //         if key_vec.contains(&e.virtual_keycode.unwrap().into())
-    //             || key_vec.is_empty()
-    //         {
-    //             kc = e.virtual_keycode.unwrap();
-    //             break;
-    //         }
-    //     }
-
-    //     return Ok(PFutureReturns::KeyPress((
-    //         kc.into(),
-    //         web_time::Instant::now().duration_since(start),
-    //     )));
-    // }
-
-    // /// Same as wait_for_keypress, but waits for any keypress.
-    // pub async fn wait_for_any_keypress(
-    //     &self,
-    // ) -> Result<PFutureReturns, anyhow::Error> {
-    //     let empty_vec: Vec<Key> = Vec::new();
-    //     return self.wait_for_keypress(empty_vec).await;
-    // }
+  
 
     /// Submits a frame to the render task. This will in turn call the prepare() and render() functions of all renderables in the frame.
     /// The future will return when the frame has been commited to the global render queue.
@@ -223,15 +193,18 @@ impl Window {
     /// Pixel coordinates are in a coordinate system with (0.0,0.0) in the center of the screen and
     /// (half of screen width in px, half of screen height in px) in the top right corner of the screen.
     #[rustfmt::skip]
-    pub fn transformation_matrix_to_ndc(width_px: u32, height_px: u32) -> nalgebra::Matrix4<f64> {
+    pub fn transformation_matrix_to_ndc(width_px: u32, height_px: u32) -> nalgebra::Matrix3<f64> {
         // TODO: this could be cached to avoid locking the mutex
 
-        nalgebra::Matrix4::new(
-            2.0 / width_px as f64,0.0, 0.0, 0.0,
-            0.0, 2.0 / height_px as f64, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0,0.0, 0.0, 1.0,
+   
+
+        nalgebra::Matrix3::new(
+            2.0 / width_px as f64,0.0, 0.0, 
+            0.0, 2.0 / height_px as f64, 0.0, 
+            0.0, 0.0, 1.0, 
         )
+
+        
     }
 
     // Create a new frame with a black background.
@@ -415,16 +388,10 @@ pub async fn render_task(window_handle: Window) {
                 window_handle.get_window_state_blocking();
             let gpu_state = window_handle.get_gpu_state_blocking();
 
-            println!("getting surface texture");
             let suface_texture = window_lock
                 .surface
                 .get_current_texture()
                 .expect("Failed to acquire next swap chain texture");
-
-            println!(
-                "got surface texture with size {:?}",
-                suface_texture.texture.size()
-            );
 
             let view = suface_texture.texture.create_view(
                 &wgpu::TextureViewDescriptor {
@@ -441,26 +408,26 @@ pub async fn render_task(window_handle: Window) {
             {
                 // clear the frame (once the lifetime annoyance is fixed, this can be removed only a single render pass is needed
                 // using the LoadOp::Clear option)
-                // let _rpass = &mut encoder.begin_render_pass(
-                //     &wgpu::RenderPassDescriptor {
-                //         label: None,
-                //         color_attachments: &[Some(
-                //             wgpu::RenderPassColorAttachment {
-                //                 view: &view,
-                //                 resolve_target: None,
-                //                 ops: wgpu::Operations {
-                //                     load: wgpu::LoadOp::Clear(
-                //                         frame.bg_color.into(),
-                //                     ),
-                //                     store: wgpu::StoreOp::Store,
-                //                 },
-                //             },
-                //         )],
-                //         depth_stencil_attachment: None,
-                //         timestamp_writes: None,
-                //         occlusion_query_set: None,
-                //     },
-                // );
+                let _rpass = &mut encoder.begin_render_pass(
+                    &wgpu::RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(
+                            wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(
+                                        frame.bg_color.into(),
+                                    ),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            },
+                        )],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    },
+                );
             }
             frame
                 .prepare(
@@ -471,15 +438,11 @@ pub async fn render_task(window_handle: Window) {
                     &window_handle,
                 )
                 .await;
-            println!(
-                "num renderables: {:?}",
-                frame.renderables.lock_blocking().len(),
-            );
+
             frame.render(&mut encoder, &view);
 
-            let sind = gpu_state.queue.submit(Some(encoder.finish()));
+            let _ = gpu_state.queue.submit(Some(encoder.finish()));
             suface_texture.present();
-            println!("sind: {:?}", sind);
 
             // notify sender that frame has been consumed
             let _ = block_on(tx.send(true));

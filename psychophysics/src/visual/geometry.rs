@@ -1,7 +1,7 @@
 //! This module contains structs and traits that are used to specify the geometry of a stimulus.
 //! This includes rectangles, circles, and transformations.
 
-use nalgebra::{Matrix3, Matrix4};
+use nalgebra::{Matrix2, Matrix3};
 
 /// This enum is used to specify the size and position of a stimulus. The unit can be specified in different ways,
 /// which will be evaluated just before the stimulus is rendered. This allows for the size of the stimulus to
@@ -269,6 +269,10 @@ pub trait ToVertices: Send + Sync {
     ) -> Vec<Vertex>;
 
     fn clone_box(&self) -> Box<dyn ToVertices>;
+
+    fn n_vertices(&self) -> usize {
+        self.to_vertices_px(1.0, 1.0, 1, 1).len()
+    }
 }
 
 /// A rectangle with a given position and size.
@@ -566,13 +570,13 @@ pub enum Transformation2D {
     /// Translation by x and y.
     Translation(Size, Size),
     /// Arbitrary 2D transformation matrix.
-    Matrix(Matrix3<f32>),
+    Matrix(Matrix2<f32>),
     /// Homogeneous 2D transformation matrix. This 4x4 matrix will be applied to the coordinates in NDC (Normalized
     /// Device Coordinates) space, but please note that the specific coordinate system this matrix will be applied to is
     /// considered an implementation detail and may change in the future. It is recommended to use the other variants
     /// instead or to combine a 2D transformation matrix with a `Translation` transformation, which will take care of
     /// the coordinate system for you.
-    Homogeneous(Matrix4<f32>),
+    Homogeneous(Matrix3<f32>),
     /// Product of two transformations. This variant is used to combine multiple transformations in a lazy way.
     Product(Box<Transformation2D>, Box<Transformation2D>),
 }
@@ -580,17 +584,11 @@ pub enum Transformation2D {
 impl Transformation2D {
     /// Convert to the corresponding (homogeneous) 2D transformation matrix.
     #[rustfmt::skip]
-    pub fn to_transformation_matrix(&self, width_mm: f64, viewing_distance_mm: f64, width_px: u32, height_px: u32) -> Matrix4<f32> {
+    pub fn to_transformation_matrix(&self, width_mm: f64, viewing_distance_mm: f64, width_px: u32, height_px: u32) -> Matrix3<f32> {
         match self {
-            Transformation2D::Identity => Matrix4::identity(),
+            Transformation2D::Identity => Matrix3::identity(),
             Transformation2D::RotationCenter(angle) => {
-                let angle = angle.to_radians();
-                Matrix4::new(
-                    angle.cos(), -angle.sin(), 0.0, 0.0,
-                    angle.sin(), angle.cos(), 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    0., 0., 0., 1.,
-                )
+                todo!()
             }
             Transformation2D::RotationPoint(angle, x, y) => {
                 let angle = angle.to_radians();
@@ -606,20 +604,15 @@ impl Transformation2D {
                     width_px,
                     height_px,
                 ) as f32;
-                Matrix4::new(
-                    angle.cos(), -angle.sin(), 0.0, 0.0,
-                    angle.sin(), angle.cos(), 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    x * (1.0 - angle.cos()) + y * angle.sin(), y * (1.0 - angle.cos()) - x * angle.sin(), 0.0, 1.0,
+                
+                Matrix3::new(
+                    angle.cos(), -angle.sin(), 0.0,
+                    angle.sin(), angle.cos(), 0.0,
+                    x * (1.0 - angle.cos()) + y * angle.sin(), y * (1.0 - angle.cos()) - x * angle.sin(), 1.0,
                 )
             }
             Transformation2D::ScaleCenter(x, y) => {
-                Matrix4::new(
-                    *x, 0.0, 0.0, 0.0,
-                    0.0, *y, 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    (1.0 - x) / 2.0, (1.0 - y) / 2.0, 0.0, 1.0,
-                )
+               todo!()
             }
             Transformation2D::ScalePoint(x, y, x0, y0) => {
                 let x0 = x0.to_pixels(
@@ -636,20 +629,14 @@ impl Transformation2D {
                     height_px,
                 ) as f32;
 
-                Matrix4::new(
-                    *x, 0.0, 0.0, 0.0,
-                    0.0, *y, 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    x0 * (1.0 - x), y0 * (1.0 - y), 0.0, 1.0,
+                Matrix3::new(
+                    *x, 0.0, 0.0,
+                    0.0, *y, 0.0,
+                    x0 * (1.0 - x), y0 * (1.0 - y), 1.0,
                 )
             }
             Transformation2D::ShearCenter(x, y) => {
-                Matrix4::new(
-                    1.0, *x, 0.0, 0.0,
-                    *y, 1.0, 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    (1.0 - x) / 2.0, (1.0 - y) / 2.0, 0.0, 1.0,
-                )
+                todo!()
             }
             Transformation2D::ShearPoint(x, y, x0, y0) => {
                 let x0 = x0.to_pixels(
@@ -666,30 +653,34 @@ impl Transformation2D {
                     height_px,
                 ) as f32;
 
-                Matrix4::new(
-                    1.0, *x, 0.0, 0.0,
-                    *y, 1.0, 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    x0 * (1.0 - x), y0 * (1.0 - y), 0.0, 1.0,
+                Matrix3::new(
+                    1.0, *x, 0.0,
+                    *y, 1.0, 0.0,
+                    -x0 * y, -y0 * x, 1.0,
                 )
             }
             Transformation2D::Translation(x, y) => {
-                let x = x.to_pixels(1.0, 1.0, 1, 1) as f32;
-                let y = y.to_pixels(1.0, 1.0, 1, 1) as f32;
-                Matrix4::new(
-                    1.0, 0.0, 0.0, 0.0,
-                    0.0, 1.0, 0., 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    x, y, 0.0, 1.0,
+                let x = x.to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                ) as f32;
+                let y = y.to_pixels(
+                    width_mm,
+                    viewing_distance_mm,
+                    width_px,
+                    height_px,
+                ) as f32;
+                
+                Matrix3::new(
+                    1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,
+                    x, y, 1.0,
                 )
             }
             Transformation2D::Matrix(matrix) => {
-                let mut matrix = matrix.clone();
-                matrix[(0, 3)] = 0.0;
-                matrix[(1, 3)] = 0.0;
-                matrix[(2, 3)] = 0.0;
-                matrix[(3, 3)] = 1.0;
-                matrix.to_homogeneous()
+                matrix.clone().to_homogeneous()
             }
             Transformation2D::Homogeneous(matrix) => matrix.clone(),
             Transformation2D::Product(a,b) =>

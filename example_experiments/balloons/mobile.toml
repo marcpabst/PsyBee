@@ -1,6 +1,6 @@
 [app]
-name = "hello-world"
-stylized-name = "Hello World"
+name = "balloons"
+stylized-name = "Balloons"
 domain = "childvisionlab.co.uk"
 template-pack = "wgpu"
 

@@ -90,6 +90,8 @@ pub trait BaseStimulusImplementation {
 /// setting up the rendering pipeline and uploading the data to the GPU.
 /// It will also apply any transformations and ensure that the geometry is
 /// converted to pixel coordinates before being uploaded to the GPU.
+///
+#[derive(Debug)]
 pub struct BaseStimulus<S: BaseStimulusImplementation> {
     /// The implementation of the stimulus.
     pub(crate) stimulus_implementation: Arc<Mutex<S>>,
@@ -211,6 +213,8 @@ impl<S: BaseStimulusImplementation> Renderable for BaseStimulus<S> {
             screen_height_px,
         )
         .map(|x| x as f32);
+
+        // then get the transformation matrix from the stimulus
         let stim_transform = (self.transforms.lock_blocking())
             .to_transformation_matrix(
                 screen_width_mm,
@@ -220,7 +224,11 @@ impl<S: BaseStimulusImplementation> Renderable for BaseStimulus<S> {
             );
 
         // cast to f32
-        let transform = win_transform * stim_transform;
+        let transform = win_transform * stim_transform.transpose();
+
+        let transform = transform.to_homogeneous();
+
+        let ident = nalgebra::Matrix3::<f32>::identity();
 
         queue.write_buffer(
             &(self.transform_buffer.lock_blocking()),

@@ -1,6 +1,7 @@
 [workspace]
 
-members = [
+members = [ "example_experiments/balloons",
     "psychophysics",
     "psychophysics-py",
+    "example_experiments/balloons"
 ]
