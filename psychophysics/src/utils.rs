@@ -38,6 +38,17 @@ impl AtomicExt<usize> for std::sync::atomic::AtomicUsize {
     }
 }
 
+impl AtomicExt<u32> for std::sync::atomic::AtomicU32 {
+    fn load_relaxed(&self) -> u32 {
+        self.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn store_relaxed(&self, value: u32) {
+        self.store(value, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+use nalgebra::U3;
 pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};

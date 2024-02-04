@@ -1,10 +1,8 @@
 use mobile_entry_point::mobile_entry_point;
 use nalgebra::Vector2;
-use psychophysics::{
-    prelude::*, ExperimentManager, WindowManager, WindowOptions,
-};
+use psychophysics::{prelude::*, ExperimentManager, WindowManager, WindowOptions};
 use rand_distr::Distribution;
-use rapier2d::{parry::transformation, prelude::*};
+use rapier2d::prelude::*;
 
 const N_BALLOONS: usize = 3;
 const N_BALLOON_RADIUS: f32 = 150.0;
@@ -12,19 +10,16 @@ const N_BALLOON_RADIUS: f32 = 150.0;
 const MONITOR_HZ: f64 = 120.0;
 
 // EXPERIMENT
-fn flicker_experiment(
-    wm: WindowManager,
-) -> Result<(), PsychophysicsError> {
+fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
     let monitors = wm.get_available_monitors();
     let monitor = monitors
         .get(1)
         .unwrap_or(monitors.first().expect("No monitor found!"));
 
-    let window_options: WindowOptions =
-        WindowOptions::FullscreenHighestResolution {
-            monitor: Some(monitor.clone()),
-            refresh_rate: Some(MONITOR_HZ),
-        };
+    let window_options: WindowOptions = WindowOptions::FullscreenHighestResolution {
+        monitor: Some(monitor.clone()),
+        refresh_rate: Some(MONITOR_HZ),
+    };
 
     let window = wm.create_window(&window_options);
 
@@ -42,8 +37,10 @@ fn flicker_experiment(
                 Size::ScreenHeight(0.5),
                 N_BALLOON_RADIUS as f64,
             ),
-            Size::Pixels(10.0),
-            0.0,
+            GratingType::Sine {
+                phase: 0.0,
+                cycle_length: Size::Pixels(10.0),
+            },
         );
 
         // crrate random initial direction
@@ -65,18 +62,12 @@ fn flicker_experiment(
     }
 
     // get window size in pixels using window.get_height_px() and window.get_width_px()
-    let window_size = Vector2::new(
-        window.get_width_px() as f32,
-        window.get_height_px() as f32,
-    );
+    let window_size =
+        Vector2::new(window.get_width_px() as f32, window.get_height_px() as f32);
 
     // create the simulator
-    let simulator = BalloonSimulator::new(
-        balloons,
-        Vector2::new(0.0, 0.0),
-        window_size,
-    )
-    .skip(10_000); // skip the first 10_000 steps to generate a pseudo-random state
+    let simulator =
+        BalloonSimulator::new(balloons, Vector2::new(0.0, 0.0), window_size).skip(10_000); // skip the first 10_000 steps to generate a pseudo-random state
 
     // run the simulation
     for balloons in simulator {
@@ -176,17 +167,12 @@ impl BalloonSimulator {
                 .build();
             let ball_body_handle = balloon_set.insert(rigid_body);
             balloon_handles.push(ball_body_handle);
-            collider_set.insert_with_parent(
-                collider,
-                ball_body_handle,
-                &mut balloon_set,
-            );
+            collider_set.insert_with_parent(collider, ball_body_handle, &mut balloon_set);
         }
 
         /* Create other structures necessary for the simulation. */
         let gravity = vector![0.0, 0.0];
-        let mut integration_parameters =
-            IntegrationParameters::default();
+        let mut integration_parameters = IntegrationParameters::default();
         integration_parameters.dt = 1.0 / 60.0;
         let physics_pipeline = PhysicsPipeline::new();
         let island_manager = IslandManager::new();

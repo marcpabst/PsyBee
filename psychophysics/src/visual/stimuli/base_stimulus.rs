@@ -1,19 +1,22 @@
 use crate::utils::AtomicExt;
 use crate::visual::geometry::Vertex;
+use crate::visual::window::WindowState;
 use crate::visual::{
     geometry::{ToVertices, Transformation2D},
     Window,
 };
+use crate::GPUState;
 use async_lock::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
 use wgpu::util::DeviceExt;
 use wgpu::TextureFormat;
+use winit::window;
 
 use super::Stimulus;
 
 /// Base stimulus that serves as a template for almost all stimuli.
 #[derive(Clone)]
-pub(crate) struct BaseStimulus {
+pub struct BaseStimulus {
     /// The window used to create the stimulus.
     window: Window,
     /// The rendering pipeline for the stimulus.
@@ -70,10 +73,9 @@ impl BaseStimulus {
         // get the GPU state
         let gpu_state = window.read_gpu_state_blocking();
         let window_state = window.read_window_state_blocking();
-        let device = gpu_state.device;
-        let queue = gpu_state.queue;
-        let surface = window_state.surface;
-        let adapter = gpu_state.adapter;
+        let device = &gpu_state.device;
+        let surface = &window_state.surface;
+        let adapter = &gpu_state.adapter;
         let surface_config = window_state.config.clone();
 
         // get the uniform buffer data
@@ -389,25 +391,31 @@ impl BaseStimulus {
         }
     }
 
+    pub fn set_uniform_buffer(&self, data: &[u8], gpu_state: &GPUState) {
+        let uniform_buffer = self.uniform_buffer.lock_blocking();
+        gpu_state.queue.write_buffer(&uniform_buffer, 0, data);
+    }
+
     pub fn set_geometry(&self, geometry: impl ToVertices + 'static) {
+        self.n_vertices.store_relaxed(geometry.n_vertices());
         *self.geometry.lock_blocking() =
             Box::new(geometry) as Box<dyn ToVertices + 'static>;
-        self.n_vertices.store_relaxed(geometry.n_vertices());
         // we dont upload the vertex buffer here, as this will need to be done every time the frame is rendered
     }
 }
 
 impl Stimulus for BaseStimulus {
-    fn prepare(&mut self, window: &Window) -> () {
+    fn prepare(
+        &mut self,
+        window: &Window,
+        window_state: &WindowState,
+        gpu_state: &GPUState,
+    ) {
         let screen_width_mm = window.physical_width.load_relaxed();
         let viewing_distance_mm = window.viewing_distance.load_relaxed();
 
-        let gpu_state = window.read_gpu_state_blocking();
-        let window_state = window.read_window_state_blocking();
-
-        let surface_config = window_state.config;
-        let screen_width_px = surface_config.width;
-        let screen_height_px = surface_config.height;
+        let screen_width_px = window_state.config.width;
+        let screen_height_px = window_state.config.height;
 
         let geometry = self.geometry.lock_blocking();
 
@@ -418,10 +426,8 @@ impl Stimulus for BaseStimulus {
             screen_height_px,
         );
 
-        let queue = gpu_state.queue;
-
         // update the vertex buffer
-        queue.write_buffer(
+        gpu_state.queue.write_buffer(
             &(self.vertex_buffer.lock_blocking()),
             0,
             bytemuck::cast_slice(&vertices),
@@ -446,7 +452,7 @@ impl Stimulus for BaseStimulus {
         // add the 4th row and column (for memory alignment)
         let transform = transform.to_homogeneous();
 
-        queue.write_buffer(
+        gpu_state.queue.write_buffer(
             &(self.transform_buffer.lock_blocking()),
             0,
             bytemuck::cast_slice(transform.as_slice()),

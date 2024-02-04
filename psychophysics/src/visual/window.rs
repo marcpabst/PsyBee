@@ -27,6 +27,7 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::closure::Closure;
 
+use super::stimuli::Stimulus;
 use super::Renderable;
 
 /// Internal window state. This is used to store the winit window, the wgpu device, the wgpu queue, etc.
@@ -254,14 +255,14 @@ impl Window {
 
 /// This is the window's main render task. On native, it will submit frames when they are ready (and block when an approriate presentation mode is used).
 /// On wasm, it will submit frames when the browser requests a new frame.
-pub async fn render_task(window_handle: Window) {
+pub async fn render_task(window: Window) {
     log::debug!(
         "Render task running on thread {:?}",
         std::thread::current().id()
     );
     // get rx and tx from handle
-    let tx = window_handle.frame_ok_sender.clone();
-    let rx = window_handle.frame_receiver.clone();
+    let tx = window.frame_ok_sender.clone();
+    let rx = window.frame_receiver.clone();
 
     // on wasm, we register our own requestAnimationFrame callback in a separate task
     #[cfg(target_arch = "wasm32")]
@@ -281,7 +282,7 @@ pub async fn render_task(window_handle: Window) {
 
             let tx = tx.clone();
             let rx = rx.clone();
-            let window_handle = window_handle.clone();
+            let window_handle = window.clone();
 
             let async_task = async move {
                 // check if there is a frame available
@@ -294,7 +295,7 @@ pub async fn render_task(window_handle: Window) {
 
                     // acquire lock on window
                     let window_lock =
-                        window_handle.get_window_state_blocking();
+                        window.get_window_state_blocking();
 
                     let suface_texture: wgpu::SurfaceTexture = window_lock
                         .surface
@@ -348,7 +349,7 @@ pub async fn render_task(window_handle: Window) {
                             &window_lock.queue,
                             &view,
                             &window_lock.config,
-                            &window_handle,
+                            &window,
                         )
                         .await;
 
@@ -384,11 +385,11 @@ pub async fn render_task(window_handle: Window) {
             let mut frame = (frame.lock_blocking());
 
             // acquire lock on window
-            let window_lock =
-                window_handle.get_window_state_blocking();
-            let gpu_state = window_handle.get_gpu_state_blocking();
+            let window_state =
+                window.read_window_state_blocking();
+            let gpu_state = window.read_gpu_state_blocking();
 
-            let suface_texture = window_lock
+            let suface_texture = window_state
                 .surface
                 .get_current_texture()
                 .expect("Failed to acquire next swap chain texture");
@@ -431,11 +432,10 @@ pub async fn render_task(window_handle: Window) {
             }
             frame
                 .prepare(
-                    &gpu_state.device,
-                    &gpu_state.queue,
-                    &view,
-                    &window_lock.config,
-                    &window_handle,
+                    &window,
+                    &window_state ,
+                    &gpu_state,
+      
                 )
                 .await;
 
@@ -454,7 +454,7 @@ pub async fn render_task(window_handle: Window) {
 /// will only be called once the frame is submitted to the render task.
 #[derive(Clone)]
 pub struct Frame {
-    renderables: Arc<Mutex<Vec<Box<dyn Renderable>>>>,
+    renderables: Arc<Mutex<Vec<Box<dyn Stimulus>>>>,
     color_format: ColorFormat,
     pub bg_color: super::color::RawRgba,
 }
@@ -472,23 +472,20 @@ impl Frame {
     }
 }
 
-#[async_trait(?Send)]
-impl Renderable for Frame {
+
+impl Frame {
     async fn prepare(
         &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        view: &wgpu::TextureView,
-        config: &wgpu::SurfaceConfiguration,
-        window_handle: &Window,
+        window: &Window,
+        window_state: &WindowState,
+        gpu_state: &GPUState,
     ) -> () {
         // call prepare() on all renderables
         for renderable in
             &mut self.renderables.lock().await.iter_mut()
         {
             renderable
-                .prepare(device, queue, view, config, window_handle)
-                .await;
+                .prepare(window, window_state, gpu_state)
         }
     }
 
@@ -510,13 +507,10 @@ impl Frame {
     /// Add a renderable to the frame.
     pub fn add(
         &mut self,
-        renderable: &(impl Renderable + Clone + 'static),
+        stimulus: &(impl Stimulus + Clone + 'static),
     ) -> () {
-        let renderable = Box::new(renderable.clone());
-        self.renderables.lock_blocking().push(renderable);
+        let stimulus = Box::new(stimulus.clone());
+        self.renderables.lock_blocking().push(stimulus);
     }
 }
 
-// mark Frame as Send and Sync
-unsafe impl Send for Frame {}
-unsafe impl Sync for Frame {}

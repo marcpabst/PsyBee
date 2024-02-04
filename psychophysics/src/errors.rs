@@ -49,17 +49,3 @@ macro_rules! error {
         return Err(PsychophysicsError::CustomError($msg.to_string()));
     };
 }
-
-pub fn show_error_screen(window: &Window, error: PsychophysicsError) {
-    let text_stim = TextStimulus::new(
-        window,
-        &format!("Fatal Error: {}", error),
-        Rectangle::FULLSCREEN,
-    );
-
-    loop_frames!(frame from window, {
-        // set frame color to red
-        frame.set_bg_color(crate::visual::color::RED);
-        frame.add(&text_stim);
-    });
-}

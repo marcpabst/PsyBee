@@ -1,6 +1,6 @@
 use async_broadcast::broadcast;
 use async_channel::{bounded, Receiver, Sender};
-use async_lock::Mutex;
+use async_lock::{Mutex, RwLock};
 
 use atomic_float::AtomicF64;
 use futures_lite::future::block_on;
@@ -55,9 +55,10 @@ pub mod prelude {
     pub use crate::visual::color;
     pub use crate::visual::geometry::{Rectangle, Size};
     pub use crate::visual::stimuli::GratingsStimulus;
-    pub use crate::visual::stimuli::ImageStimulus;
-    pub use crate::visual::stimuli::ShapeStimulus;
-    pub use crate::visual::{stimuli::TextStimulus, Window};
+    pub use crate::visual::stimuli::GratingType;
+    // pub use crate::visual::stimuli::ImageStimulus;
+    pub use crate::visual::stimuli::ColorStimulus;
+    // pub use crate::visual::{stimuli::TextStimulus, Window};
     pub use crate::visual::geometry::Transformation2D;
 }
 
@@ -269,7 +270,7 @@ pub struct ExperimentManager {
     pub windows: Vec<Window>,
 
     // wgpu stuff
-    pub gpu_state: Arc<Mutex<GPUState>>,
+    pub gpu_state: Arc<RwLock<GPUState>>,
 }
 
 /// The WindowManager is available as an argument to the experiment function. It can be used to create new windows.
@@ -363,7 +364,7 @@ impl ExperimentManager {
             render_task_sender,
             render_task_receiver,
             windows: vec![],
-            gpu_state: Arc::new(Mutex::new(GPUState {
+            gpu_state: Arc::new(RwLock::new(GPUState {
                 instance,
                 adapter,
                 device,
@@ -489,7 +490,7 @@ impl ExperimentManager {
         let winit_window = Arc::new(winit_window);
 
 
-        let gpu_state = self.gpu_state.lock_blocking();
+        let gpu_state = self.gpu_state.read_blocking();
         let instance = &gpu_state.instance;
         let adapter = &gpu_state.adapter;
         let device = &gpu_state.device;
@@ -551,7 +552,7 @@ impl ExperimentManager {
      
          // create handle
          let window = Window {
-             state: Arc::new(Mutex::new(window_state)),
+             state: Arc::new(RwLock::new(window_state)),
              gpu_state: self.gpu_state.clone(),
              physical_input_receiver,
              physical_input_sender,
@@ -804,8 +805,8 @@ impl ExperimentManager {
                         if let  Some(window) = self.get_window_by_id(id) {
                         //
                         let mut window_state =
-                            window.state.lock_blocking();
-                            let gpu_state = self.gpu_state.lock_blocking();
+                            window.write_window_state_blocking();
+                            let gpu_state = self.gpu_state.read_blocking();
                         window_state.config.width = new_size.width.max(1);
                         window_state.config.height =
                             new_size.height.max(1);
@@ -860,7 +861,7 @@ impl ExperimentManager {
 
     pub fn get_window_by_id(&self, id: winit::window::WindowId) -> Option<Window> {
         for window in &self.windows {
-            if window.state.lock_blocking().window.id() == id {
+            if window.read_window_state_blocking().window.id() == id {
                 return Some(window.clone());
             }
         }
