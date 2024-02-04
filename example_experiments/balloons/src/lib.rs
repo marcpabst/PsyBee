@@ -1,16 +1,23 @@
 use mobile_entry_point::mobile_entry_point;
 use nalgebra::Vector2;
-use psychophysics::{prelude::*, ExperimentManager, WindowManager, WindowOptions};
+use psychophysics::{
+    prelude::*,
+    visual::{
+        color::RawRgba,
+        stimuli::{patterns::SineGratings, PatternStimulus},
+    },
+    ExperimentManager, WindowManager, WindowOptions,
+};
 use rand_distr::Distribution;
 use rapier2d::prelude::*;
 
-const N_BALLOONS: usize = 3;
+const N_BALLOONS: usize = 10;
 const N_BALLOON_RADIUS: f32 = 150.0;
 
-const MONITOR_HZ: f64 = 120.0;
+const MONITOR_HZ: f64 = 60.0;
 
 // EXPERIMENT
-fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
+fn baloons(wm: WindowManager) -> Result<(), PsychophysicsError> {
     let monitors = wm.get_available_monitors();
     let monitor = monitors
         .get(1)
@@ -30,17 +37,14 @@ fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
     let mut balloons = Vec::new();
     for i in 0..N_BALLOONS {
         // create new circle grating stimulus
-        let stimulus = GratingsStimulus::new(
+        let stimulus = PatternStimulus::new(
             &window, // the window we want to display the stimulus inSetting color to
             psychophysics::visual::geometry::Circle::new(
                 -Size::ScreenWidth(0.5),
                 Size::ScreenHeight(0.5),
                 N_BALLOON_RADIUS as f64,
             ),
-            GratingType::Sine {
-                phase: 0.0,
-                cycle_length: Size::Pixels(10.0),
-            },
+            SineGratings::new(0.0, Size::Pixels(5.0), RawRgba::new(1.0, 1.0, 1.0, 0.01)),
         );
 
         // crrate random initial direction
@@ -53,7 +57,7 @@ fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
         let velocity = direction.normalize() * 100.0;
 
         balloons.push(Balloon {
-            position: Vector2::new(i as f32 * 400.0 + 400.0, 1000.0),
+            position: Vector2::new(i as f32 * (N_BALLOON_RADIUS * 2.0) + 400.0, 1000.0),
             radius: N_BALLOON_RADIUS as f32,
             velocity: velocity,
             hidden: false,
@@ -75,7 +79,7 @@ fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
         frame.set_bg_color(color::GRAY);
         for (i, balloon) in balloons.iter().enumerate() {
             if !balloon.hidden {
-                let mut stim = balloon.stimulus.clone();
+                let stim = balloon.stimulus.clone();
                 // update the stimulus position by setting the transformation
                 let transform = Transformation2D::Translation(
                     Size::Pixels(balloon.position.x as f64),
@@ -98,7 +102,7 @@ fn main() {
     // start experiment (this will block until the experiment is finished)
     let mut em = pollster::block_on(ExperimentManager::new());
 
-    em.run_experiment(flicker_experiment);
+    em.run_experiment(baloons);
 }
 
 pub struct BalloonSimulator {
@@ -125,7 +129,7 @@ pub struct Balloon {
     pub radius: Real,
     pub velocity: Vector2<Real>,
     pub hidden: bool,
-    pub stimulus: GratingsStimulus,
+    pub stimulus: PatternStimulus<SineGratings>,
 }
 
 impl BalloonSimulator {
@@ -139,11 +143,11 @@ impl BalloonSimulator {
 
         let walls = ColliderBuilder::polyline(
             vec![
-                Point::new(0.0, 0.0),                 // top left
-                Point::new(0.0, bbox_size.y),         // bottom left
-                Point::new(bbox_size.x, bbox_size.y), // bottom right
-                Point::new(bbox_size.x, 0.0),         // top right
-                Point::new(0.0, 0.0),                 // top left
+                Point::new(bbox_origin.x, bbox_origin.y), // bottom left
+                Point::new(bbox_origin.x, bbox_size.y),   // top left
+                Point::new(bbox_size.x, bbox_size.y),     // bottom right
+                Point::new(bbox_size.x, bbox_origin.y),   // top right
+                Point::new(bbox_origin.x, bbox_origin.y), // bottom left
             ],
             None,
         )
