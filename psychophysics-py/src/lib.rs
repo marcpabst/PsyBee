@@ -40,18 +40,16 @@ impl PyExperimentManager {
         window_options: &PyWindowOptions,
         experiment_fn: Py<PyFunction>,
     ) {
-        let rust_experiment_fn = move |window: Window| -> Result<
-            (),
-            errors::PsychophysicsError,
-        > {
-            Python::with_gil(|py| -> PyResult<()> {
-                let pywin = PyWindow(window);
-                experiment_fn.call1(py, (pywin,)).unwrap();
+        let rust_experiment_fn =
+            move |window: Window| -> Result<(), errors::PsychophysicsError> {
+                Python::with_gil(|py| -> PyResult<()> {
+                    let pywin = PyWindow(window);
+                    experiment_fn.call1(py, (pywin,)).unwrap();
+                    Ok(())
+                })
+                .unwrap();
                 Ok(())
-            })
-            .unwrap();
-            Ok(())
-        };
+            };
 
         // wrap self in a SendWrapper so that it can be sent through the magic barrier
         let mut self_wrapper = SendWrapper::new(self);
@@ -101,11 +99,10 @@ pub struct PyFrame(Frame);
 #[pymethods]
 impl PyFrame {
     fn set_bg_color(&mut self, color: (f32, f32, f32)) {
-        self.0.set_bg_color(
-            psychophysics::visual::color::SRGBA::new(
+        self.0
+            .set_bg_color(psychophysics::visual::color::SRGBA::new(
                 color.0, color.1, color.2, 1.0,
-            ),
-        );
+            ));
     }
 
     fn add(&mut self, stimulus: &PyShapeStimulus) {
@@ -129,28 +126,24 @@ impl PyWindowOptions {
         refresh_rate: Option<f64>,
     ) -> Self {
         match mode {
-            "windowed" => PyWindowOptions(WindowOptions::Windowed {
-                resolution: None,
+            "windowed" => PyWindowOptions(WindowOptions::Windowed { resolution: None }),
+            "fullscreen_exact" => PyWindowOptions(WindowOptions::FullscreenExact {
+                resolution: resolution,
+                monitor: monitor.map(|m| m.0.clone()),
+                refresh_rate: refresh_rate,
             }),
-            "fullscreen_exact" => {
-                PyWindowOptions(WindowOptions::FullscreenExact {
-                    resolution: resolution,
+            "fullscreen_highest_resolution" => {
+                PyWindowOptions(WindowOptions::FullscreenHighestResolution {
                     monitor: monitor.map(|m| m.0.clone()),
                     refresh_rate: refresh_rate,
                 })
             }
-            "fullscreen_highest_resolution" => PyWindowOptions(
-                WindowOptions::FullscreenHighestResolution {
-                    monitor: monitor.map(|m| m.0.clone()),
-                    refresh_rate: refresh_rate,
-                },
-            ),
-            "fullscreen_highest_refresh_rate" => PyWindowOptions(
-                WindowOptions::FullscreenHighestRefreshRate {
+            "fullscreen_highest_refresh_rate" => {
+                PyWindowOptions(WindowOptions::FullscreenHighestRefreshRate {
                     monitor: monitor.map(|m| m.0.clone()),
                     resolution: resolution,
-                },
-            ),
+                })
+            }
             _ => panic!("Unknown mode: {}", mode),
         }
     }
@@ -171,9 +164,7 @@ impl PyShapeStimulus {
         PyShapeStimulus(ShapeStimulus::new(
             &window.0,
             Rectangle::FULLSCREEN,
-            psychophysics::visual::color::SRGBA::new(
-                color.0, color.1, color.2, 1.0,
-            ),
+            psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0),
         ))
     }
 

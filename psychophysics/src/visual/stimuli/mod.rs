@@ -4,11 +4,12 @@ use super::{window::WindowState, Window};
 
 pub mod base_stimulus;
 pub mod color_stimulus;
-pub mod gratings_stimulus;
+pub mod pattern_stimulus;
+pub mod patterns;
 
 pub use color_stimulus::ColorStimulus;
-pub use gratings_stimulus::GratingType;
-pub use gratings_stimulus::GratingsStimulus;
+pub use pattern_stimulus::PatternStimulus;
+pub use patterns::SineGratings;
 
 /// The stimulus trait.
 pub trait Stimulus: Send + Sync {

@@ -7,7 +7,7 @@
 use psychophysics::{
     include_image, loop_frames, onnx, start_experiment,
     visual::geometry::{Rectangle, Size, Transformation2D},
-    visual::stimuli::{GratingsStimulus, ImageStimulus},
+    visual::stimuli::{ImageStimulus, Pattern},
     visual::{stimuli::TextStimulus, Window},
 };
 
@@ -16,8 +16,7 @@ fn show_image(window: Window) {
     let thatcher = include_image!("wicked_witch.png");
 
     // create image stimulus
-    let mut image_stim =
-        ImageStimulus::new(&window, thatcher, Rectangle::FULLSCREEN);
+    let mut image_stim = ImageStimulus::new(&window, thatcher, Rectangle::FULLSCREEN);
 
     // create text stimulus
     let text_stim = TextStimulus::new(

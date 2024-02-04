@@ -16,10 +16,10 @@ fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
 
     let window = wm.create_window(&window_options);
 
-    let stim = GratingsStimulus::new(
+    let stim = Pattern::new(
         &window,
         Rectangle::FULLSCREEN,
-        GratingType::Sine {
+        Gratings::Square {
             phase: 0.0,
             cycle_length: Size::Pixels(20.0),
         },

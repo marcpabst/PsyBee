@@ -12,7 +12,7 @@ use nokhwa::{
 use psychophysics::{
     include_image, loop_frames, start_experiment,
     visual::geometry::{Rectangle, Size, Transformation2D},
-    visual::stimuli::{GratingsStimulus, ImageStimulus},
+    visual::stimuli::{ImageStimulus, Pattern},
     visual::{stimuli::TextStimulus, Window},
 };
 

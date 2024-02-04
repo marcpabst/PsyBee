@@ -20,11 +20,11 @@ use wgpu::TextureFormat;
 use super::base_stimulus::BaseStimulus;
 use super::Stimulus;
 
-/// Base stimulus that serves as a template for almost all stimuli.
+/// A stimulus that displays a single color.
 #[derive(Clone, Debug)]
 pub struct ColorStimulus {
     base_stimulus: BaseStimulus,
-    color: RawRgba,
+    pub color: RawRgba,
 }
 
 const FRAGMENT_SHADER: &str = "
@@ -32,7 +32,7 @@ const FRAGMENT_SHADER: &str = "
                 color: vec4<f32>,
             };
 
-            @group(0) @binding(0)
+            @group(1) @binding(0)
             var<uniform> params: ShapeStimulusParams;
 
             @fragment
@@ -49,7 +49,7 @@ impl ColorStimulus {
         let color_format = window.color_format;
         let color = color_format.convert_to_raw_rgba(color);
 
-        let uniform_buffer_data = Some(bytemuck::bytes_of(&color));
+        let uniform_buffer_data = bytemuck::bytes_of(&color);
 
         Self {
             base_stimulus: BaseStimulus::new(
@@ -57,7 +57,7 @@ impl ColorStimulus {
                 shape,
                 FRAGMENT_SHADER,
                 None,
-                uniform_buffer_data,
+                &[uniform_buffer_data],
             ),
             color,
         }

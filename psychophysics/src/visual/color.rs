@@ -294,6 +294,34 @@ pub struct RawRgba {
     pub a: f32,
 }
 
+impl RawRgba {
+    /// Creates a new `RawRgba` color.
+    ///
+    /// # Arguments
+    /// * `r` - The red channel.
+    /// * `g` - The green channel.
+    /// * `b` - The blue channel.
+    /// * `a` - The alpha channel.
+    ///
+    /// # Returns
+    /// * `RawRgba` - The new color.
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self { r, g, b, a }
+    }
+
+    /// Converts the color to bytes in the native endianness.
+    pub fn to_ne_bytes(&self) -> [u8; 16] {
+        let r = self.r.to_ne_bytes();
+        let g = self.g.to_ne_bytes();
+        let b = self.b.to_ne_bytes();
+        let a = self.a.to_ne_bytes();
+        [
+            r[0], r[1], r[2], r[3], g[0], g[1], g[2], g[3], b[0], b[1], b[2], b[3], a[0],
+            a[1], a[2], a[3],
+        ]
+    }
+}
+
 /// The ColorFormat defines how color is handled internally in the rendering
 /// pipeline. It is used to convert colors to the appropriate color space
 /// before rendering.
@@ -332,8 +360,7 @@ impl ColorFormat {
     ) -> RawRgba {
         match self {
             ColorFormat::SRGBA8 => {
-                let col: Xyza<palette::white_point::D65, f32> =
-                    col.into_color();
+                let col: Xyza<palette::white_point::D65, f32> = col.into_color();
                 let col: Srgba<f32> = col.into_color();
                 RawRgba {
                     r: col.red as f32,
@@ -361,18 +388,14 @@ impl ColorFormat {
     /// # Returns
     /// * `TextureFormat` - The texture format for the swapchain.
     /// * `TextureFormat` - The texture format for the view.
-    pub fn to_wgpu_swapchain_texture_format(
-        &self,
-    ) -> (TextureFormat, TextureFormat) {
+    pub fn to_wgpu_swapchain_texture_format(&self) -> (TextureFormat, TextureFormat) {
         match self {
-            ColorFormat::SRGBA8 => (
-                TextureFormat::Bgra8Unorm,
-                TextureFormat::Bgra8UnormSrgb,
-            ),
-            ColorFormat::DisplayP3U8 => (
-                TextureFormat::Bgra8Unorm,
-                TextureFormat::Bgra8UnormSrgb,
-            ),
+            ColorFormat::SRGBA8 => {
+                (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
+            }
+            ColorFormat::DisplayP3U8 => {
+                (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
+            }
         }
     }
 
@@ -385,14 +408,10 @@ impl ColorFormat {
     ///
     /// # Panics
     /// Panics if the color format is not supported.
-    pub fn get_wgpu_predefined_color_space(
-        &self,
-    ) -> wgpu::PredefinedColorSpace {
+    pub fn get_wgpu_predefined_color_space(&self) -> wgpu::PredefinedColorSpace {
         match self {
             ColorFormat::SRGBA8 => wgpu::PredefinedColorSpace::Srgb,
-            ColorFormat::DisplayP3U8 => {
-                wgpu::PredefinedColorSpace::DisplayP3
-            }
+            ColorFormat::DisplayP3U8 => wgpu::PredefinedColorSpace::DisplayP3,
             _ => panic!("Unsupported color format"),
         }
     }

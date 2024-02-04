@@ -10,7 +10,6 @@ use async_lock::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
 use wgpu::util::DeviceExt;
 use wgpu::TextureFormat;
-use winit::window;
 
 use super::Stimulus;
 
@@ -29,18 +28,18 @@ pub struct BaseStimulus {
     vertex_buffer: Arc<Mutex<wgpu::Buffer>>,
     /// Number of vertices.
     n_vertices: Arc<AtomicUsize>,
-    /// Bind group 0.
-    bind_group: Arc<Mutex<wgpu::BindGroup>>,
+    /// Bind group 0 (contains the transformation matrix and, if a texture is specified, the texture and sampler).
+    tts_bind_group: Arc<Mutex<wgpu::BindGroup>>,
+    /// Bind group 1 (contains the uniform buffers).
+    uniform_bind_group: Arc<Mutex<wgpu::BindGroup>>,
     /// Uniform buffer for the pixel shader paramters.
-    uniform_buffer: Arc<Mutex<wgpu::Buffer>>,
+    uniform_buffers: Arc<Mutex<Vec<wgpu::Buffer>>>,
     /// Unifrom buffer for the transformation matrix.
     transform_buffer: Arc<Mutex<wgpu::Buffer>>,
     /// (Optional) texture size.
     texture_size: Option<wgpu::Extent3d>,
     /// (Optional) texture.
     texture: Option<Arc<Mutex<wgpu::Texture>>>,
-    /// (Optional) texture bind group.
-    texture_bind_group: Option<Arc<Mutex<wgpu::BindGroup>>>,
 }
 
 // manually implement Debug for BaseStimulus
@@ -52,12 +51,12 @@ impl std::fmt::Debug for BaseStimulus {
             .field("transforms", &self.transforms)
             .field("vertex_buffer", &self.vertex_buffer)
             .field("n_vertices", &self.n_vertices)
-            .field("bind_group", &self.bind_group)
-            .field("uniform_buffer", &self.uniform_buffer)
+            .field("bind_group", &self.uniform_bind_group)
+            .field("uniform_buffers", &self.uniform_buffers)
             .field("transform_buffer", &self.transform_buffer)
             .field("texture_size", &self.texture_size)
             .field("texture", &self.texture)
-            .field("texture_bind_group", &self.texture_bind_group)
+            .field("texture_bind_group", &self.tts_bind_group)
             .finish()
     }
 }
@@ -68,18 +67,246 @@ impl BaseStimulus {
         geometry: impl ToVertices + 'static,
         fragment_shader_code: &str,
         texture_size: Option<wgpu::Extent3d>,
-        uniform_buffer_data: Option<&[u8]>,
+        uniform_buffers_data: &[&[u8]],
     ) -> Self {
         // get the GPU state
         let gpu_state = window.read_gpu_state_blocking();
         let window_state = window.read_window_state_blocking();
         let device = &gpu_state.device;
-        let surface = &window_state.surface;
-        let adapter = &gpu_state.adapter;
+        // let surface = &window_state.surface;
+        // let adapter = &gpu_state.adapter;
         let surface_config = window_state.config.clone();
 
-        // get the uniform buffer data
-        let uniform_buffer_data = uniform_buffer_data.unwrap_or(&[0u8; 2]);
+        // iter over uniform buffer data and create a buffer each
+        // all buffers will be part ofnthe same bind group (bind group 1)
+        let mut uniform_buffer_bind_group_layout_entries = vec![];
+        let mut uniforms_buffers = vec![];
+
+        for &uniform_buffer_data in uniform_buffers_data.iter() {
+            // create bind group layout entry
+            let uniform_buffer_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            };
+
+            // add the entry to the list of entries
+            uniform_buffer_bind_group_layout_entries
+                .push(uniform_buffer_bind_group_layout_entry);
+
+            // create the buffer
+            let uniform_buffer =
+                device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: uniform_buffer_data,
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                });
+
+            // add the buffer to the list of buffers
+            uniforms_buffers.push(uniform_buffer);
+        }
+
+        // create uniform_buffers_bind_group_entries by iterating over the uniform_buffers
+        let uniform_buffers_bind_group_entries = uniforms_buffers
+            .iter()
+            .enumerate()
+            .map(|(i, uniform_buffer)| wgpu::BindGroupEntry {
+                binding: i as u32,
+                resource: uniform_buffer.as_entire_binding(),
+            })
+            .collect::<Vec<_>>();
+
+        //     // create the bind group entry
+        //     let uniform_buffer_bind_group_entry = wgpu::BindGroupEntry {
+        //         binding: 0,
+        //         resource: uniform_buffer.as_entire_binding(),
+        //     };
+
+        //     // add the entry to the list of entries
+        //     uniform_buffers_bind_group_entries.push(uniform_buffer_bind_group_entry);
+        // }
+
+        let uniform_buffer_bind_group_layout_entries =
+            uniform_buffer_bind_group_layout_entries.as_slice();
+
+        let uniform_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: uniform_buffer_bind_group_layout_entries,
+                label: Some("uniform_bind_group_layout"),
+            });
+
+        let uniform_bind_group_entries = uniform_buffers_bind_group_entries.as_slice();
+
+        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &uniform_bind_group_layout,
+            entries: uniform_bind_group_entries,
+            label: Some("uniform_bind_group"),
+        });
+
+        let transform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Transform Buffer"),
+                contents: bytemuck::cast_slice(
+                    &nalgebra::Matrix4::<f32>::identity().as_slice(),
+                ),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+        // if a texture size is specified, create a texture
+        let texture = if let Some(texture_size) = texture_size {
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                size: texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                // TODO: this should be configurable
+                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST,
+                label: Some("diffuse_texture"),
+                view_formats: &[wgpu::TextureFormat::Bgra8Unorm], // allow reading texture in linear space
+            });
+            Some(texture)
+        } else {
+            None
+        };
+
+        // create bind group layout for bind group 0
+        // this bind group will contain the transformation matrix
+        // and, if a texture is specified, the texture + sampler (hence: tts)
+        let mut tts_bind_bind_group_layout_entries = vec![];
+        let mut tts_bind_group_entries = vec![];
+
+        // push the transformation matrix entry
+        tts_bind_bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        });
+
+        tts_bind_group_entries.push(wgpu::BindGroupEntry {
+            binding: 0,
+            resource: transform_buffer.as_entire_binding(),
+        });
+
+        // if a texture is specified, create a texture buffer and a sampler and add them to the bind group
+        let (tts_bind_bind_group_layout, tts_bind_group) = if let Some(ref texture) =
+            texture
+        {
+            // create the texture view
+            let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
+                format: Some(wgpu::TextureFormat::Bgra8Unorm),
+                ..Default::default()
+            });
+
+            // create the sampler
+            let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            });
+
+            // add the texture view to the bind group
+            tts_bind_bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                },
+                count: None,
+            });
+
+            // add the sampler to the bind group
+            tts_bind_bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                // This should match the filterable field of the
+                // corresponding Texture entry above.
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            });
+
+            tts_bind_group_entries.push(wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&texture_view),
+            });
+
+            tts_bind_group_entries.push(wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(&texture_sampler),
+            });
+
+            // create the bind group layout for bind group 0
+            let tts_bind_bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: tts_bind_bind_group_layout_entries.as_slice(),
+                    label: Some("tts_bind_bind_group_layout"),
+                });
+
+            // create the bind group for bind group 0
+            let tts_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &tts_bind_bind_group_layout,
+                entries: tts_bind_group_entries.as_slice(),
+                label: Some("tts_bind_group"),
+            });
+
+            (tts_bind_bind_group_layout, tts_bind_group)
+        } else {
+            // create the bind group layout for bind group 0
+            let tts_bind_bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: tts_bind_bind_group_layout_entries.as_slice(),
+                    label: Some("tts_bind_bind_group_layout"),
+                });
+
+            // create the bind group for bind group 0
+            let tts_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &tts_bind_bind_group_layout,
+                entries: tts_bind_group_entries.as_slice(),
+                label: Some("tts_bind_group"),
+            });
+
+            (tts_bind_bind_group_layout, tts_bind_group)
+        };
+
+        let pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[
+                    &tts_bind_bind_group_layout,
+                    &uniform_bind_group_layout,
+                ],
+                push_constant_ranges: &[],
+            });
+
+        let swapchain_format = TextureFormat::Bgra8Unorm;
+
+        // // if a texture is specified, upload the texture data
+        // if let Some(texture) = &oot.texture {
+        //     let texture = texture.lock_blocking();
+        //     let texture_data = oot
+        //         .stimulus_implementation
+        //         .lock_blocking()
+        //         .get_texture_data()
+        //         .unwrap();
+        //     oot.set_texture(texture_data.as_slice(), &queue, &texture);
+        // }
 
         // compile the vertex shader
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -113,186 +340,6 @@ impl BaseStimulus {
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
-        // create the uniform buffer #1
-        let stimulus_buffer =
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Stimulus Buffer"),
-                contents: uniform_buffer_data,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
-
-        // create the uniform buffer #2 (note that to avoid memort alignment issues, we use a 4x4 matrix,
-        // even though we only need a 3x3 matrix for the 2D transformation)
-        // TODO: we should proably fix this in the future
-        let transform_buffer =
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Transform Buffer"),
-                contents: bytemuck::cast_slice(
-                    &nalgebra::Matrix4::<f32>::identity().as_slice(),
-                ),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
-
-        let uniform_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    // uniform buffer #1 (contains the stimulus parameters)
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // uniform buffer #2
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-                label: Some("uniform_bind_group_layout"),
-            });
-
-        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &uniform_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: stimulus_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: transform_buffer.as_entire_binding(),
-                },
-            ],
-            label: Some("uniform_bind_group"),
-        });
-
-        // if a texture size is specified, create a texture
-        let texture = if let Some(texture_size) = texture_size {
-            let texture = device.create_texture(&wgpu::TextureDescriptor {
-                size: texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                // TODO: this should be configurable
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING
-                    | wgpu::TextureUsages::COPY_DST,
-                label: Some("diffuse_texture"),
-                view_formats: &[wgpu::TextureFormat::Bgra8Unorm], // allow reading texture in linear space
-            });
-            Some(texture)
-        } else {
-            None
-        };
-
-        // if a texture is specified, create a sampler and bind group
-        let (texture_bind_group_layout, texture_bind_group) = if let Some(texture) =
-            &texture
-        {
-            let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-                format: Some(wgpu::TextureFormat::Bgra8Unorm),
-                ..Default::default()
-            });
-            let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                address_mode_w: wgpu::AddressMode::ClampToEdge,
-                mag_filter: wgpu::FilterMode::Nearest,
-                min_filter: wgpu::FilterMode::Nearest,
-                mipmap_filter: wgpu::FilterMode::Nearest,
-                ..Default::default()
-            });
-
-            let texture_bind_group_layout =
-                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    entries: &[
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Texture {
-                                multisampled: false,
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                                sample_type: wgpu::TextureSampleType::Float {
-                                    filterable: true,
-                                },
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            // This should match the filterable field of the
-                            // corresponding Texture entry above.
-                            ty: wgpu::BindingType::Sampler(
-                                wgpu::SamplerBindingType::Filtering,
-                            ),
-                            count: None,
-                        },
-                    ],
-                    label: Some("texture_bind_group_layout"),
-                });
-
-            let texture_bind_group =
-                device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &texture_bind_group_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&texture_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&texture_sampler),
-                        },
-                    ],
-                    label: Some("texture_bind_group"),
-                });
-
-            (Some(texture_bind_group_layout), Some(texture_bind_group))
-        } else {
-            (None, None)
-        };
-
-        // create the bind group layout (depending on whether a texture is specified)
-        let bind_group_layouts =
-            if let Some(texture_bind_group_layout) = &texture_bind_group_layout {
-                vec![&uniform_bind_group_layout, &texture_bind_group_layout]
-            } else {
-                vec![&uniform_bind_group_layout]
-            };
-
-        let pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: bind_group_layouts.as_slice(),
-                push_constant_ranges: &[],
-            });
-
-        let swapchain_capabilities = surface.get_capabilities(&adapter);
-        let swapchain_format = TextureFormat::Bgra8Unorm;
-
-        // // if a texture is specified, upload the texture data
-        // if let Some(texture) = &oot.texture {
-        //     let texture = texture.lock_blocking();
-        //     let texture_data = oot
-        //         .stimulus_implementation
-        //         .lock_blocking()
-        //         .get_texture_data()
-        //         .unwrap();
-        //     oot.set_texture(texture_data.as_slice(), &queue, &texture);
-        // }
-
         let render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: None,
@@ -305,7 +352,11 @@ impl BaseStimulus {
                 fragment: Some(wgpu::FragmentState {
                     module: &fragment_shader,
                     entry_point: "fs_main",
-                    targets: &[Some(swapchain_format.into())],
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: swapchain_format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
                 }),
                 primitive: wgpu::PrimitiveState::default(),
                 depth_stencil: None,
@@ -316,28 +367,20 @@ impl BaseStimulus {
         Self {
             window: window.clone(),
             geometry: Arc::new(Mutex::new(Box::new(geometry))),
-            uniform_buffer: Arc::new(Mutex::new(stimulus_buffer)),
-            bind_group: Arc::new(Mutex::new(uniform_bind_group)),
+            uniform_buffers: Arc::new(Mutex::new(uniforms_buffers)),
+            uniform_bind_group: Arc::new(Mutex::new(uniform_bind_group)),
             pipeline: Arc::new(Mutex::new(render_pipeline)),
             transforms: Arc::new(Mutex::new(Transformation2D::Identity)),
             vertex_buffer: Arc::new(Mutex::new(vertex_buffer)),
             transform_buffer: Arc::new(Mutex::new(transform_buffer)),
             n_vertices: Arc::new(AtomicUsize::new(n_vertices)),
-            texture_size: if let Some(texture_size) = texture_size {
-                Some(texture_size)
-            } else {
-                None
-            },
+            texture_size: texture_size,
             texture: if let Some(texture) = texture {
                 Some(Arc::new(Mutex::new(texture)))
             } else {
                 None
             },
-            texture_bind_group: if let Some(texture_bind_group) = texture_bind_group {
-                Some(Arc::new(Mutex::new(texture_bind_group)))
-            } else {
-                None
-            },
+            tts_bind_group: Arc::new(Mutex::new(tts_bind_group)),
         }
     }
 
@@ -391,9 +434,9 @@ impl BaseStimulus {
         }
     }
 
-    pub fn set_uniform_buffer(&self, data: &[u8], gpu_state: &GPUState) {
-        let uniform_buffer = self.uniform_buffer.lock_blocking();
-        gpu_state.queue.write_buffer(&uniform_buffer, 0, data);
+    pub fn set_uniform_buffers(&self, data: &[&[u8]], gpu_state: &GPUState) {
+        // let uniform_buffer = self.uniform_buffer.lock_blocking();
+        // gpu_state.queue.write_buffer(&uniform_buffer, 0, data);
     }
 
     pub fn set_geometry(&self, geometry: impl ToVertices + 'static) {
@@ -463,14 +506,9 @@ impl Stimulus for BaseStimulus {
         let pipeline = self.pipeline.lock_blocking();
         let n_vertices = self.n_vertices.load_relaxed();
 
-        let texture_bind_group =
-            if let Some(texture_bind_group) = &self.texture_bind_group {
-                Some(texture_bind_group.lock_blocking())
-            } else {
-                None
-            };
+        let tts_bind_group = self.tts_bind_group.lock_blocking();
+        let bind_group = self.uniform_bind_group.lock_blocking();
 
-        let bind_group = self.bind_group.lock_blocking();
         let vertex_buffer = self.vertex_buffer.lock_blocking();
         {
             let mut rpass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -490,12 +528,8 @@ impl Stimulus for BaseStimulus {
 
             rpass.set_pipeline(&pipeline);
             rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            rpass.set_bind_group(0, &bind_group, &[]);
-
-            // if a texture is specified, set the texture bind group
-            if let Some(texture_bind_group) = &texture_bind_group {
-                rpass.set_bind_group(1, &texture_bind_group, &[]);
-            }
+            rpass.set_bind_group(0, &tts_bind_group, &[]);
+            rpass.set_bind_group(1, &bind_group, &[]);
 
             rpass.draw(0..n_vertices as u32, 0..1);
         }

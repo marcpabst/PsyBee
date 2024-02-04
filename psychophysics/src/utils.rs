@@ -374,3 +374,20 @@ impl BIDSEventLogger {
 pub fn sleep_secs(secs: f64) {
     std::thread::sleep(std::time::Duration::from_secs_f64(secs));
 }
+
+pub fn create_random_lowercase_string(len: usize) -> String {
+    use rand::Rng;
+
+    let mut rng = rand::thread_rng();
+
+    let random_string: String = (0..len)
+        .map(|_| {
+            // Generate a random number in the ASCII range of lowercase letters
+            let ascii = rng.gen_range(97..=122) as u8;
+            // Convert the number to a char
+            ascii as char
+        })
+        .collect();
+
+    random_string
+}

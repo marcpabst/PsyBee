@@ -11,11 +11,11 @@ struct VertexOutput {
 };
 
 
-@group(0) @binding(1)
+@group(0) @binding(0)
 var<uniform> transform: mat4x4<f32>;
-@group(1) @binding(0)
+@group(0) @binding(1)
 var texture: texture_2d<f32>;
-@group(1) @binding(1)
+@group(0) @binding(2)
 var texture_sampler: sampler;
 
 @vertex
