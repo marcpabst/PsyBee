@@ -55,6 +55,8 @@ pub mod prelude {
     pub use crate::visual::color;
     pub use crate::visual::geometry::{Rectangle, Size};
     pub use crate::visual::stimuli::SineGratings;
+    pub use crate::visual::stimuli::patterns::GaussianAlphamask;
+    pub use crate::visual::stimuli::PatternStimulus;
     // pub use crate::visual::stimuli::ImageStimulus;
     pub use crate::visual::stimuli::ColorStimulus;
     // pub use crate::visual::{stimuli::TextStimulus, Window};

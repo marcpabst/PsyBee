@@ -707,8 +707,10 @@ dependencies = [
  "android_logger",
  "log",
  "mobile-entry-point",
+ "naga 0.19.0",
  "nalgebra 0.32.3",
  "ndk-glue",
+ "paste",
  "pollster",
  "psychophysics",
  "rand 0.8.5",
@@ -1174,22 +1176,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cocoa"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6140449f97a6e97f9511815c5632d84c8aacf8ac271ad77c559218161a1373c"
-dependencies = [
- "bitflags 1.3.2",
- "block",
- "cocoa-foundation",
- "core-foundation",
- "core-graphics 0.23.1",
- "foreign-types 0.5.0",
- "libc",
- "objc",
-]
-
-[[package]]
 name = "cocoa-foundation"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1336,6 +1322,12 @@ checksum = "78ff10625fd0ac447827aa30ea8b861fead473bb60aeb73af6c1c58caf0d1299"
 dependencies = [
  "custom_derive",
 ]
+
+[[package]]
+name = "convert_case"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
 name = "convert_case"
@@ -1778,6 +1770,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "0.99.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fb810d30a7c1953f91334de7244731fc3f3c10d7fe163338a35b9f640960321"
+dependencies = [
+ "convert_case 0.4.0",
+ "proc-macro2",
+ "quote",
+ "rustc_version",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1849,7 +1854,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf4596583a2c680c55b6feaa748f74890c4f9cb9c7cb69d6117110444cb65b2f"
 dependencies = [
  "bytemuck",
- "cocoa 0.24.1",
+ "cocoa",
  "egui 0.22.0",
  "egui-winit",
  "egui_glow",
@@ -4028,11 +4033,40 @@ dependencies = [
  "indexmap 2.2.2",
  "log",
  "num-traits",
+ "pp-rs",
  "rustc-hash",
  "spirv 0.3.0+sdk-1.3.268.0",
  "termcolor",
  "thiserror",
  "unicode-xid",
+]
+
+[[package]]
+name = "naga-exp"
+version = "0.1.0"
+dependencies = [
+ "naga 0.19.0",
+ "naga_oil",
+]
+
+[[package]]
+name = "naga_oil"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0ea62ae0f2787456afca7209ca180522b41f00cbe159ee369eba1e07d365cd1"
+dependencies = [
+ "bit-set",
+ "codespan-reporting",
+ "data-encoding",
+ "indexmap 2.2.2",
+ "naga 0.19.0",
+ "once_cell",
+ "regex",
+ "regex-syntax 0.8.2",
+ "rustc-hash",
+ "thiserror",
+ "tracing",
+ "unicode-ident",
 ]
 
 [[package]]
@@ -5083,6 +5117,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
+name = "pp-rs"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb458bb7f6e250e6eb79d5026badc10a3ebb8f9a15d1fff0f13d17c71f4d6dee"
+dependencies = [
+ "unicode-xid",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5199,12 +5242,12 @@ dependencies = [
  "atomic_float",
  "byte-slice-cast",
  "bytemuck",
- "cocoa 0.25.0",
  "console_error_panic_hook",
  "console_log",
  "cpal",
  "csv",
  "derive_builder",
+ "derive_more",
  "env_logger 0.10.2",
  "facetracking",
  "fastrand 2.0.1",
@@ -5904,7 +5947,7 @@ dependencies = [
  "arrow2",
  "camino",
  "clang-format",
- "convert_case",
+ "convert_case 0.6.0",
  "flatbuffers",
  "indent",
  "itertools 0.11.0",

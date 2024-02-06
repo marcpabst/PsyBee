@@ -3,26 +3,19 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
-use crate::utils::AtomicExt;
-use crate::visual::color::RawRgba;
-use crate::visual::geometry::Vertex;
-use crate::visual::window::WindowState;
-use crate::visual::{
-    geometry::{ToVertices, Transformation2D},
-    Window,
+use crate::{
+    visual::{
+        color::RawRgba, geometry::ToVertices, stimuli::base_stimulus::BaseStimulus,
+        window::WindowState, Window,
+    },
+    GPUState,
 };
-use crate::GPUState;
-use async_lock::Mutex;
-use std::sync::{atomic::AtomicUsize, Arc};
-use wgpu::util::DeviceExt;
-use wgpu::TextureFormat;
-
-use super::base_stimulus::BaseStimulus;
-use super::Stimulus;
+use derive_more::Deref;
 
 /// A stimulus that displays a single color.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deref)]
 pub struct ColorStimulus {
+    #[deref]
     base_stimulus: BaseStimulus,
     pub color: RawRgba,
 }
@@ -30,7 +23,7 @@ pub struct ColorStimulus {
 const FRAGMENT_SHADER: &str = "
             struct ShapeStimulusParams {
                 color: vec4<f32>,
-            };
+            }
 
             @group(1) @binding(0)
             var<uniform> params: ShapeStimulusParams;
@@ -41,6 +34,7 @@ const FRAGMENT_SHADER: &str = "
             }";
 
 impl ColorStimulus {
+    /// Create a new color stimulus.
     pub fn new(
         window: &Window,
         shape: impl ToVertices + 'static,
@@ -63,6 +57,7 @@ impl ColorStimulus {
         }
     }
 
+    /// Set the color of the stimulus.
     pub fn set_color(
         &mut self,
         color: impl palette::IntoColor<palette::Xyza<palette::white_point::D65, f32>>,
@@ -71,20 +66,8 @@ impl ColorStimulus {
     }
 }
 
-impl std::ops::Deref for ColorStimulus {
-    type Target = BaseStimulus;
-    fn deref(&self) -> &Self::Target {
-        &self.base_stimulus
-    }
-}
-
-impl Stimulus for ColorStimulus {
-    fn prepare(
-        &mut self,
-        window: &Window,
-        window_state: &WindowState,
-        gpu_state: &GPUState,
-    ) -> () {
+impl super::Stimulus for ColorStimulus {
+    fn prepare(&mut self, window: &Window, window_state: &WindowState, gpu_state: &GPUState) -> () {
         self.base_stimulus.prepare(window, window_state, gpu_state);
     }
 

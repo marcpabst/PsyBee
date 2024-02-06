@@ -57,12 +57,48 @@ pub enum Size {
     Difference(Box<Size>, Box<Size>),
 }
 
+#[derive(Clone, Debug)]
+pub struct SizeVector2D {
+    pub x: Size,
+    pub y: Size,
+}
+
+
+
+impl From<(f64, f64)> for SizeVector2D {
+    fn from((x, y): (f64, f64)) -> Self {
+        SizeVector2D {
+            x: Size::Default(x),
+            y: Size::Default(y),
+        }
+    }
+}
+
+impl From<(f32, f32)> for SizeVector2D {
+    fn from((x, y): (f32, f32)) -> Self {
+        SizeVector2D {
+            x: Size::Default(x as f64),
+            y: Size::Default(y as f64),
+        }
+    }
+}
+
+
+impl From<f32> for Size {
+    /// Convert from a float to a unit. The float is interpreted as a number of `Default` units.
+    fn from(f: f32) -> Self {
+        Size::Default(f as f64)
+    }
+}
+
 impl From<i64> for Size {
     /// Convert from an integer to a unit. The integer is interpreted as a number of `Default` units.
     fn from(i: i64) -> Self {
         Size::Default(i as f64)
     }
 }
+
+
 
 impl From<f64> for Size {
     /// Convert from a float to a unit. The float is interpreted as a number of `Default` units.
@@ -112,6 +148,18 @@ impl std::ops::Neg for Size {
     }
 }
 
+pub trait ToPixels {
+    type Output;
+
+     fn to_pixels(
+        &self,
+        screenwidth_mm: f64,
+        viewing_distance_mm: f64,
+        width_px: u32,
+        height_px: u32,
+    ) -> Self::Output;
+}
+
 impl Size {
     /// Convert the given angle of visual angle to millimeters, taking the viewing distance into account.
     ///
@@ -132,12 +180,15 @@ impl Size {
                 * (angle.to_radians() / 2.0).tan(),
         )
     }
+}
 
+impl ToPixels for Size {
+    type Output = f64;
     /// Convert the given unit to pixels, taking the physical size of the screen and the viewing distance into account.
     ///
     /// # Arguments
     ///
-    /// * `width_mm` - The width of the screen in millimeters.
+    /// * `screenwidth_mm` - The width of the screen in millimeters.
     /// * `width_px` - The width of the screen in pixels.
     /// * `viewing_distance_mm` - The viewing distance in millimeters.
     /// * `height_px` - The height of the screen in pixels.
@@ -145,14 +196,14 @@ impl Size {
     /// # Returns
     ///
     /// The unit converted to pixels (as a float).
-    pub fn to_pixels(
+    fn to_pixels(
         &self,
-        width_mm: f64,
+        screenwidth_mm: f64,
         viewing_distance_mm: f64,
         width_px: u32,
         height_px: u32,
     ) -> f64 {
-        let window_width_mm = width_mm;
+        let window_width_mm = screenwidth_mm;
         let window_width_pixels = width_px as f64;
         let window_height_pixels = height_px as f64;
 
@@ -169,7 +220,7 @@ impl Size {
                 viewing_distance_mm,
             )
             .to_pixels(
-                width_mm,
+                screenwidth_mm,
                 viewing_distance_mm,
                 width_px,
                 height_px,
@@ -179,7 +230,7 @@ impl Size {
             }
             Size::Centimeters(centimeters) => {
                 Size::Millimeters(*centimeters * 10.0).to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -187,14 +238,14 @@ impl Size {
             }
             Size::Inches(inches) => Size::Millimeters(*inches * 25.4)
                 .to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 ),
             Size::Points(points) => Size::Inches(*points / 72.0)
                 .to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -203,7 +254,7 @@ impl Size {
             Size::Quotient(a, b) => {
                 // first, we resolve `a` to pixels, the we divide by b
                 let a = a.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -213,7 +264,7 @@ impl Size {
             Size::Product(a, b) => {
                 // first, we resolve `a` to pixels, the we multiply with b
                 let a = a.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -222,13 +273,13 @@ impl Size {
             }
             Size::Sum(a, b) => {
                 let a = a.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 );
                 let b = b.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -237,13 +288,13 @@ impl Size {
             }
             Size::Difference(a, b) => {
                 let a = a.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 );
                 let b = b.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -251,6 +302,44 @@ impl Size {
                 a - b
             }
         }
+    }
+}
+
+impl ToPixels for SizeVector2D {
+    type Output = (f64, f64);
+    /// Convert the point to pixels, taking the physical size of the screen and the viewing distance into account.
+    ///
+    /// # Arguments
+    ///
+    /// * `screenwidth_mm` - The width of the screen in millimeters.
+    /// * `width_px` - The width of the screen in pixels.
+    /// * `viewing_distance_mm` - The viewing distance in millimeters.
+    /// * `height_px` - The height of the screen in pixels.
+    ///
+    /// # Returns
+    ///
+    /// The point converted to pixels.
+     fn to_pixels(
+        &self,
+        screenwidth_mm: f64,
+        viewing_distance_mm: f64,
+        width_px: u32,
+        height_px: u32,
+    ) -> (f64, f64) {
+        (
+            self.x.to_pixels(
+                screenwidth_mm,
+                viewing_distance_mm,
+                width_px,
+                height_px,
+            ),
+            self.y.to_pixels(
+                screenwidth_mm,
+                viewing_distance_mm,
+                width_px,
+                height_px,
+            ),
+        )
     }
 }
 
@@ -262,7 +351,7 @@ pub trait ToVertices: Send + Sync {
     /// and 1 with the origin in the center of the screen and the point (-1, -1) in the top left corner.
     fn to_vertices_px(
         &self,
-        width_mm: f64,
+        screenwidth_mm: f64,
         viewing_distance_mm: f64,
         width_px: u32,
         height_px: u32,
@@ -333,31 +422,31 @@ impl Rectangle {
     /// always 0.0. X and y coordinates are given in pixels.
     pub fn to_pixels(
         &self,
-        width_mm: f64,
+        screenwidth_mm: f64,
         viewing_distance_mm: f64,
         width_px: u32,
         height_px: u32,
     ) -> [f64; 4] {
         let left = self.left.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
         );
         let top = self.top.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
         );
         let width = self.width.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
         );
         let height = self.height.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
@@ -402,31 +491,31 @@ impl Circle {
 impl ToVertices for Rectangle {
     fn to_vertices_px(
         &self,
-        width_mm: f64,
+        screenwidth_mm: f64,
         viewing_distance_mm: f64,
         width_px: u32,
         height_px: u32,
     ) -> Vec<Vertex> {
         let left = self.left.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
         ) as f32;
         let top = self.top.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
         ) as f32;
         let width = self.width.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
         ) as f32;
         let height = self.height.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
@@ -476,25 +565,25 @@ impl ToVertices for Rectangle {
 impl ToVertices for Circle {
     fn to_vertices_px(
         &self,
-        width_mm: f64,
+        screenwidth_mm: f64,
         viewing_distance_mm: f64,
         width_px: u32,
         height_px: u32,
     ) -> Vec<Vertex> {
         let center_x = self.center_x.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
         );
         let center_y = self.center_y.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
         );
         let radius = self.radius.to_pixels(
-            width_mm,
+            screenwidth_mm,
             viewing_distance_mm,
             width_px,
             height_px,
@@ -584,7 +673,7 @@ pub enum Transformation2D {
 impl Transformation2D {
     /// Convert to the corresponding (homogeneous) 2D transformation matrix.
     #[rustfmt::skip]
-    pub fn to_transformation_matrix(&self, width_mm: f64, viewing_distance_mm: f64, width_px: u32, height_px: u32) -> Matrix3<f32> {
+    pub fn to_transformation_matrix(&self, screenwidth_mm: f64, viewing_distance_mm: f64, width_px: u32, height_px: u32) -> Matrix3<f32> {
         match self {
             Transformation2D::Identity => Matrix3::identity(),
             Transformation2D::RotationCenter(angle) => {
@@ -593,13 +682,13 @@ impl Transformation2D {
             Transformation2D::RotationPoint(angle, x, y) => {
                 let angle = angle.to_radians();
                 let x = x.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 ) as f32;
                 let y = y.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -616,14 +705,14 @@ impl Transformation2D {
             }
             Transformation2D::ScalePoint(x, y, x0, y0) => {
                 let x0 = x0.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 ) as f32;
 
                 let y0 = y0.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -640,14 +729,14 @@ impl Transformation2D {
             }
             Transformation2D::ShearPoint(x, y, x0, y0) => {
                 let x0 = x0.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 ) as f32;
 
                 let y0 = y0.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -661,13 +750,13 @@ impl Transformation2D {
             }
             Transformation2D::Translation(x, y) => {
                 let x = x.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 ) as f32;
                 let y = y.to_pixels(
-                    width_mm,
+                    screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
@@ -685,8 +774,8 @@ impl Transformation2D {
             Transformation2D::Homogeneous(matrix) => matrix.clone(),
             Transformation2D::Product(a,b) =>
             {
-                let a = a.to_transformation_matrix(width_mm, viewing_distance_mm, width_px, height_px);
-                let b = b.to_transformation_matrix(width_mm, viewing_distance_mm, width_px, height_px);
+                let a = a.to_transformation_matrix(screenwidth_mm, viewing_distance_mm, width_px, height_px);
+                let b = b.to_transformation_matrix(screenwidth_mm, viewing_distance_mm, width_px, height_px);
                 a * b
             }
         }
@@ -748,3 +837,4 @@ pub trait GetCenter {
 
 //         (left + width / 2.0, top + height / 2.0)
 //     }
+

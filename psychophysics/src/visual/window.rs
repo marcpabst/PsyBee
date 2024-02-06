@@ -243,12 +243,12 @@ impl Window {
     }
 
     /// Returns the width of the window in pixels.
-    pub fn get_width_px(&self) -> u32 {
+    pub fn width_px(&self) -> u32 {
         self.width_px.load(Ordering::Relaxed)
     }
 
     /// Returns the height of the window in pixels.
-    pub fn get_height_px(&self) -> u32 {
+    pub fn height_px(&self) -> u32 {
         self.height_px.load(Ordering::Relaxed)
     }
 }

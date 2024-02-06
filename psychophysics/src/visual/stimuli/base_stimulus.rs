@@ -7,6 +7,7 @@ use crate::visual::{
 };
 use crate::GPUState;
 use async_lock::Mutex;
+use std::sync::atomic::AtomicBool;
 use std::sync::{atomic::AtomicUsize, Arc};
 use wgpu::util::DeviceExt;
 use wgpu::TextureFormat;
@@ -40,6 +41,8 @@ pub struct BaseStimulus {
     texture_size: Option<wgpu::Extent3d>,
     /// (Optional) texture.
     texture: Option<Arc<Mutex<wgpu::Texture>>>,
+    /// Flag that indicates if the stimulus is visible or not.
+    visible: Arc<AtomicBool>,
 }
 
 // manually implement Debug for BaseStimulus
@@ -82,10 +85,10 @@ impl BaseStimulus {
         let mut uniform_buffer_bind_group_layout_entries = vec![];
         let mut uniforms_buffers = vec![];
 
-        for &uniform_buffer_data in uniform_buffers_data.iter() {
+        for (i, &uniform_buffer_data) in uniform_buffers_data.iter().enumerate() {
             // create bind group layout entry
             let uniform_buffer_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
-                binding: 0,
+                binding: i as u32,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
@@ -96,16 +99,14 @@ impl BaseStimulus {
             };
 
             // add the entry to the list of entries
-            uniform_buffer_bind_group_layout_entries
-                .push(uniform_buffer_bind_group_layout_entry);
+            uniform_buffer_bind_group_layout_entries.push(uniform_buffer_bind_group_layout_entry);
 
             // create the buffer
-            let uniform_buffer =
-                device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    contents: uniform_buffer_data,
-                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                });
+            let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: uniform_buffer_data,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
 
             // add the buffer to the list of buffers
             uniforms_buffers.push(uniform_buffer);
@@ -148,14 +149,11 @@ impl BaseStimulus {
             label: Some("uniform_bind_group"),
         });
 
-        let transform_buffer =
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Transform Buffer"),
-                contents: bytemuck::cast_slice(
-                    &nalgebra::Matrix4::<f32>::identity().as_slice(),
-                ),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
+        let transform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Transform Buffer"),
+            contents: bytemuck::cast_slice(&nalgebra::Matrix4::<f32>::identity().as_slice()),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
         // if a texture size is specified, create a texture
         let texture = if let Some(texture_size) = texture_size {
@@ -166,8 +164,7 @@ impl BaseStimulus {
                 dimension: wgpu::TextureDimension::D2,
                 // TODO: this should be configurable
                 format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING
-                    | wgpu::TextureUsages::COPY_DST,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                 label: Some("diffuse_texture"),
                 view_formats: &[wgpu::TextureFormat::Bgra8Unorm], // allow reading texture in linear space
             });
@@ -200,9 +197,7 @@ impl BaseStimulus {
         });
 
         // if a texture is specified, create a texture buffer and a sampler and add them to the bind group
-        let (tts_bind_bind_group_layout, tts_bind_group) = if let Some(ref texture) =
-            texture
-        {
+        let (tts_bind_bind_group_layout, tts_bind_group) = if let Some(ref texture) = texture {
             // create the texture view
             let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
                 format: Some(wgpu::TextureFormat::Bgra8Unorm),
@@ -285,15 +280,11 @@ impl BaseStimulus {
             (tts_bind_bind_group_layout, tts_bind_group)
         };
 
-        let pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[
-                    &tts_bind_bind_group_layout,
-                    &uniform_bind_group_layout,
-                ],
-                push_constant_ranges: &[],
-            });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&tts_bind_bind_group_layout, &uniform_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
         let swapchain_format = TextureFormat::Bgra8Unorm;
 
@@ -318,8 +309,7 @@ impl BaseStimulus {
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(
-                (include_str!("shaders/base.wgsl").to_string() + &fragment_shader_code)
-                    .into(),
+                (include_str!("shaders/base.wgsl").to_string() + &fragment_shader_code).into(),
             ),
         });
 
@@ -329,40 +319,37 @@ impl BaseStimulus {
         let height_px = surface_config.height;
 
         // create the vertex buffer
-        let vertices =
-            geometry.to_vertices_px(width_mm, viewing_distance_mm, width_px, height_px);
+        let vertices = geometry.to_vertices_px(width_mm, viewing_distance_mm, width_px, height_px);
         let n_vertices = vertices.len();
 
-        let vertex_buffer =
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(vertices.as_slice()),
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            });
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(vertices.as_slice()),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        });
 
-        let render_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: None,
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &vertex_shader,
-                    entry_point: "vs_main",
-                    buffers: &[Vertex::desc()],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &fragment_shader,
-                    entry_point: "fs_main",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: swapchain_format,
-                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState::default(),
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview: None,
-            });
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &vertex_shader,
+                entry_point: "vs_main",
+                buffers: &[Vertex::desc()],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &fragment_shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: swapchain_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
 
         Self {
             window: window.clone(),
@@ -381,11 +368,18 @@ impl BaseStimulus {
                 None
             },
             tts_bind_group: Arc::new(Mutex::new(tts_bind_group)),
+            visible: Arc::new(AtomicBool::new(true)),
         }
     }
 
+    /// Set the transformation for the stimulus.
     pub fn set_transformation(&self, transform: Transformation2D) {
         *self.transforms.lock_blocking() = transform;
+    }
+
+    /// Set the visibility of the stimulus.
+    pub fn set_visible(&self, visible: bool) {
+        self.visible.store_relaxed(visible);
     }
 
     /// Set the data for the texture of the stimulus.
@@ -441,19 +435,18 @@ impl BaseStimulus {
 
     pub fn set_geometry(&self, geometry: impl ToVertices + 'static) {
         self.n_vertices.store_relaxed(geometry.n_vertices());
-        *self.geometry.lock_blocking() =
-            Box::new(geometry) as Box<dyn ToVertices + 'static>;
+        *self.geometry.lock_blocking() = Box::new(geometry) as Box<dyn ToVertices + 'static>;
         // we dont upload the vertex buffer here, as this will need to be done every time the frame is rendered
     }
 }
 
 impl Stimulus for BaseStimulus {
-    fn prepare(
-        &mut self,
-        window: &Window,
-        window_state: &WindowState,
-        gpu_state: &GPUState,
-    ) {
+    fn prepare(&mut self, window: &Window, window_state: &WindowState, gpu_state: &GPUState) {
+        // if the stimulus is not visible we don't need to do anything
+        if !self.visible.load_relaxed() {
+            return;
+        }
+
         let screen_width_mm = window.physical_width.load_relaxed();
         let viewing_distance_mm = window.viewing_distance.load_relaxed();
 
@@ -477,9 +470,8 @@ impl Stimulus for BaseStimulus {
         );
 
         // update the transform buffer
-        let win_transform =
-            Window::transformation_matrix_to_ndc(screen_width_px, screen_height_px)
-                .map(|x| x as f32);
+        let win_transform = Window::transformation_matrix_to_ndc(screen_width_px, screen_height_px)
+            .map(|x| x as f32);
 
         // then get the transformation matrix from the stimulus
         let stim_transform = self.transforms.lock_blocking().to_transformation_matrix(
@@ -503,6 +495,11 @@ impl Stimulus for BaseStimulus {
     }
 
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
+        // if the stimulus is not visible, return
+        if !self.visible.load_relaxed() {
+            return;
+        }
+
         let pipeline = self.pipeline.lock_blocking();
         let n_vertices = self.n_vertices.load_relaxed();
 

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use async_lock::{Mutex, MutexGuard, RwLock};
+use bytemuck;
 use futures_lite::future::block_on;
 
 pub(crate) trait AtomicExt<T> {
@@ -44,6 +45,16 @@ impl AtomicExt<u32> for std::sync::atomic::AtomicU32 {
     }
 
     fn store_relaxed(&self, value: u32) {
+        self.store(value, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+impl AtomicExt<bool> for std::sync::atomic::AtomicBool {
+    fn load_relaxed(&self) -> bool {
+        self.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn store_relaxed(&self, value: bool) {
         self.store(value, std::sync::atomic::Ordering::Relaxed);
     }
 }
@@ -125,7 +136,8 @@ where
     I: IntoIterator<Item = S>,
     S: Into<String> + 'static,
 {
-    let column_names: Vec<String> = column_names.into_iter().map(Into::into).collect();
+    let column_names: Vec<String> =
+        column_names.into_iter().map(Into::into).collect();
 
     // check that all column names are unique
     let mut unique_column_names = column_names.clone();
@@ -159,7 +171,8 @@ impl CSVEventLogger {
     {
         let filepath = path.into();
 
-        let columns: Vec<String> = columns.into_iter().map(Into::into).collect();
+        let columns: Vec<String> =
+            columns.into_iter().map(Into::into).collect();
 
         if !check_unique_column_names(columns.clone()) {
             return Err(errors::PsychophysicsError::ColumnNamesNotUniqueError);
@@ -173,9 +186,11 @@ impl CSVEventLogger {
                 if overwrite {
                     std::fs::remove_file(&filepath)?;
                 } else {
-                    return Err(errors::PsychophysicsError::FileExistsAndNotEmptyError(
-                        filepath.to_string_lossy().to_string(),
-                    ));
+                    return Err(
+                        errors::PsychophysicsError::FileExistsAndNotEmptyError(
+                            filepath.to_string_lossy().to_string(),
+                        ),
+                    );
                 }
             }
         }
@@ -238,9 +253,11 @@ impl CSVEventLogger {
         // assert that all column names are in self.columns
         for column_name in column_names.iter() {
             if !self.columns.contains(column_name) {
-                return Err(errors::PsychophysicsError::ColumnNameDoesNotExistError(
-                    column_name.clone(),
-                ));
+                return Err(
+                    errors::PsychophysicsError::ColumnNameDoesNotExistError(
+                        column_name.clone(),
+                    ),
+                );
             }
         }
 
@@ -252,7 +269,8 @@ impl CSVEventLogger {
         }
 
         // we need to cal self.log() with the correct order of columns, replacing missing columns with an empty string
-        let mut new_column_values: Vec<String> = Vec::with_capacity(self.columns.len());
+        let mut new_column_values: Vec<String> =
+            Vec::with_capacity(self.columns.len());
 
         for column in self.columns.iter() {
             if column_names.contains(column) {
@@ -300,9 +318,12 @@ impl BIDSEventLogger {
         }
 
         // add mandatory columns "onset" and "duration"
-        let columns: Vec<String> = columns.into_iter().map(Into::into).collect();
-        let mandatory_columns = vec!["onset".to_string(), "duration".to_string()];
-        let columns: Vec<String> = mandatory_columns.into_iter().chain(columns).collect();
+        let columns: Vec<String> =
+            columns.into_iter().map(Into::into).collect();
+        let mandatory_columns =
+            vec!["onset".to_string(), "duration".to_string()];
+        let columns: Vec<String> =
+            mandatory_columns.into_iter().chain(columns).collect();
 
         let logger = CSVEventLogger::new(path, columns, '\t' as u8, overwrite)?;
 
@@ -328,10 +349,11 @@ impl BIDSEventLogger {
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let columns_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
-            .into_iter()
-            .chain(columns_values.into_iter())
-            .collect();
+        let columns_values: Vec<String> =
+            vec![onset.to_string(), duration.to_string()]
+                .into_iter()
+                .chain(columns_values.into_iter())
+                .collect();
 
         // log event
         self.logger.log(columns_values)
@@ -356,15 +378,17 @@ impl BIDSEventLogger {
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let column_names: Vec<String> = vec!["onset".to_string(), "duration".to_string()]
-            .into_iter()
-            .chain(column_names.into_iter())
-            .collect();
+        let column_names: Vec<String> =
+            vec!["onset".to_string(), "duration".to_string()]
+                .into_iter()
+                .chain(column_names.into_iter())
+                .collect();
 
-        let column_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
-            .into_iter()
-            .chain(column_values.into_iter())
-            .collect();
+        let column_values: Vec<String> =
+            vec![onset.to_string(), duration.to_string()]
+                .into_iter()
+                .chain(column_values.into_iter())
+                .collect();
 
         // log event
         self.logger.log_cols(column_names, column_values)
@@ -391,3 +415,58 @@ pub fn create_random_lowercase_string(len: usize) -> String {
 
     random_string
 }
+
+/// Converts a value to a byte array that can be used in WebGPU Shading Language (WGSL).
+/// For sake of simplicity, t
+// pub trait ToWgslBytes<S> {
+//     /// Returns the WebGPU Shading Language (WGSL) representation of the object as a byte array.
+//     fn to_wgsl_bytes(&self) -> Vec<u8>;
+// }
+
+const fn next_power_of_two(mut n: usize) -> usize {
+    if n == 0 {
+        return 1;
+    }
+    n -= 1;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n += 1;
+    n
+}
+
+pub trait ToWgslBytes {
+    type Bytes;
+
+    fn to_wgsl_bytes(&self) -> Self::Bytes;
+}
+
+macro_rules! impl_to_wgsl_bytes {
+    ( $( $t:ty ),* ) => {
+        $(
+            impl ToWgslBytes for $t {
+                // use a power of two for the size of the byte array
+                type Bytes = [u8; next_power_of_two(std::mem::size_of::<$t>())];
+
+                fn to_wgsl_bytes(&self) -> [u8; next_power_of_two(std::mem::size_of::<$t>())] {
+                    let bytes: [u8; std::mem::size_of::<$t>()] = bytemuck::cast(*self);
+
+                     // avoid a copy if the size of the byte array is already a power of two
+                    if std::mem::size_of::<$t>() == next_power_of_two(std::mem::size_of::<$t>()) {
+                        return bytes;
+                    }
+
+                    let mut aligned_bytes = [0; next_power_of_two(std::mem::size_of::<$t>())];
+
+                    aligned_bytes[..bytes.len()].copy_from_slice(&bytes);
+                    aligned_bytes
+                }
+            }
+        )*
+    };
+}
+
+// implement ToWgslBytes for common types
+impl_to_wgsl_bytes!(f32, f64, u32, u64, i32, i64, bool);
