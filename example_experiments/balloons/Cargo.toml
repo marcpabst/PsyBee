@@ -21,6 +21,8 @@ psychophysics = { path = "../../psychophysics"}
 rand = "0.8.5"
 rapier2d = "0.18.0"
 rand_distr = "0.4.3"
+naga = "0.19.0"
+paste = "1.0.14"
 
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -35,4 +37,4 @@ wgpu-subscriber = "0.1.0"
 opt-level = 3
 
 [build]
-target-dir = "target"
+target-dir = "example_experiments/balloons/target"

@@ -4,99 +4,131 @@ use psychophysics::{
     prelude::*,
     visual::{
         color::RawRgba,
-        stimuli::{patterns::SineGratings, PatternStimulus},
+        stimuli::{patterns::SineGratings, Stimulus},
     },
     ExperimentManager, WindowManager, WindowOptions,
 };
 use rand_distr::Distribution;
 use rapier2d::prelude::*;
 
-const N_BALLOONS: usize = 10;
+const N_BALLOONS: usize = 5;
 const N_BALLOON_RADIUS: f32 = 150.0;
+const SPEED: f32 = 100.0;
 
 const MONITOR_HZ: f64 = 60.0;
 
 // EXPERIMENT
 fn baloons(wm: WindowManager) -> Result<(), PsychophysicsError> {
+    // find all monitors available
     let monitors = wm.get_available_monitors();
-    let monitor = monitors
-        .get(1)
-        .unwrap_or(monitors.first().expect("No monitor found!"));
+    // get the second monitor if available, otherwise use the first one
+    let monitor = monitors.get(1).unwrap_or(
+        monitors
+            .first()
+            .expect("No monitor found - this should not happen"),
+    );
 
-    let window_options: WindowOptions = WindowOptions::FullscreenHighestResolution {
-        monitor: Some(monitor.clone()),
-        refresh_rate: Some(MONITOR_HZ),
-    };
+    // choose the highest possible resolution for the given refresh rate
+    let window_options: WindowOptions =
+        WindowOptions::FullscreenHighestResolution {
+            monitor: Some(monitor.clone()),
+            refresh_rate: Some(MONITOR_HZ),
+        };
 
+    // finally, create the window
     let window = wm.create_window(&window_options);
 
-    // wait 1s to make sure the window is created
-    std::thread::sleep(std::time::Duration::from_secs(1));
-    log::info!("Window created");
-    // create balloons
+    // wait 1s to make sure the window is created (this should not be necessary but is a workaround for a bug in winit)
+    std::thread::sleep(std::time::Duration::from_secs_f32(1.0));
+
+    // create all the balloons
     let mut balloons = Vec::new();
     for i in 0..N_BALLOONS {
-        // create new circle grating stimulus
+        // create a random float between 1 and 5
+        let random_float = rand::random::<f64>() * 4.0 + 1.0;
+        // create the pattern for the PatternStimulus
+        let grating = SineGratings::new(
+            0.0,
+            Size::Pixels(random_float),
+            RawRgba::new(1.0, 1.0, 1.0, 0.5),
+        );
+
+        // add a 2D Gaussian alpha mask to the pattern
+        // this is just a normalised 2D Gaussian function pixel-wise multiplied with the alpha value
+        let masked_grating =
+            GaussianAlphamask::new(grating, (0.0, 0.0), (40.0, 40.0));
+
+        // create the actual stimulus
         let stimulus = PatternStimulus::new(
             &window, // the window we want to display the stimulus inSetting color to
             psychophysics::visual::geometry::Circle::new(
-                -Size::ScreenWidth(0.5),
-                Size::ScreenHeight(0.5),
+                0.0,
+                0.0,
                 N_BALLOON_RADIUS as f64,
             ),
-            SineGratings::new(0.0, Size::Pixels(5.0), RawRgba::new(1.0, 1.0, 1.0, 0.01)),
+            masked_grating,
         );
 
-        // crrate random initial direction
+        // create a random velocity
         let normal = rand_distr::Normal::new(0.0, 1.0).unwrap();
         let direction = Vector2::new(
             normal.sample(&mut rand::thread_rng()) as f32,
             normal.sample(&mut rand::thread_rng()) as f32,
         );
-        // normalize the direction vector and scale it by the velocity
-        let velocity = direction.normalize() * 100.0;
 
-        balloons.push(Balloon {
-            position: Vector2::new(i as f32 * (N_BALLOON_RADIUS * 2.0) + 400.0, 1000.0),
-            radius: N_BALLOON_RADIUS as f32,
-            velocity: velocity,
-            hidden: false,
-            stimulus,
-        });
+        // normalize the direction vector and scale it by the velocity
+        let velocity = direction.normalize() * SPEED;
+
+        // create the ballon
+        let balloon = Balloon {
+            position: Vector2::new(i as f32 * 310.0 + 305.0, 0.0), // this is the position of the balloon
+            radius: N_BALLOON_RADIUS as f32, // this is the radius used for the collision detection
+            velocity: velocity, // this is the velocity of the balloon
+            hidden: false,      // this is used to hide the balloon
+            stimulus,           // this is the stimulus
+        };
+
+        // add the balloon to the vector of balloons
+        balloons.push(balloon);
     }
 
-    // get window size in pixels using window.get_height_px() and window.get_width_px()
+    // get window size in pixels
     let window_size =
-        Vector2::new(window.get_width_px() as f32, window.get_height_px() as f32);
+        Vector2::new(window.width_px() as f32, window.height_px() as f32);
+    let origin = Vector2::new(-window_size.x / 2.0, -window_size.y / 2.0);
 
     // create the simulator
     let simulator =
-        BalloonSimulator::new(balloons, Vector2::new(0.0, 0.0), window_size).skip(10_000); // skip the first 10_000 steps to generate a pseudo-random state
+        BalloonSimulator::new(balloons, origin, window_size).skip(10_000); // skip the first 10_000 steps to generate a pseudo-random state
 
-    // run the simulation
+    // run the simulation by stepping through the simulator
     for balloons in simulator {
+        // obtain the frame and set the background color
         let mut frame = window.get_frame();
         frame.set_bg_color(color::GRAY);
-        for (i, balloon) in balloons.iter().enumerate() {
+
+        // iterate through the balloons and add the stimulus to the frame
+        for balloon in balloons.iter() {
             if !balloon.hidden {
-                let stim = balloon.stimulus.clone();
-                // update the stimulus position by setting the transformation
+                // create a transformation to move the stimulus to the correct position
                 let transform = Transformation2D::Translation(
                     Size::Pixels(balloon.position.x as f64),
-                    -Size::Pixels(balloon.position.y as f64),
+                    Size::Pixels(balloon.position.y as f64),
                 );
-                stim.set_transformation(transform);
-                frame.add(&stim);
+                // set the transformation
+                balloon.stimulus.set_transformation(transform);
+                // finally, add the stimulus to the frame
+                frame.add(&balloon.stimulus);
             }
         }
-
+        // submit the frame to the window for rendering
         window.submit_frame(frame);
     }
 
     Ok(())
 }
 
-// ENTRY POINT
+// this is the entry point for the mobile app
 #[mobile_entry_point]
 fn main() {
     // start experiment (this will block until the experiment is finished)
@@ -105,8 +137,9 @@ fn main() {
     em.run_experiment(baloons);
 }
 
-pub struct BalloonSimulator {
-    pub balloons: Vec<Balloon>,
+/// A balloon simulator
+pub struct BalloonSimulator<T: Stimulus> {
+    pub balloons: Vec<Balloon<T>>,
     pub collider_set: ColliderSet,
     pub balloon_set: RigidBodySet,
     pub balloon_handles: Vec<RigidBodyHandle>,
@@ -123,61 +156,74 @@ pub struct BalloonSimulator {
     pub n_steps: usize,
 }
 
+/// A balloon
 #[derive(Debug, Clone)]
-pub struct Balloon {
+pub struct Balloon<T: Stimulus> {
     pub position: Vector2<Real>,
     pub radius: Real,
     pub velocity: Vector2<Real>,
     pub hidden: bool,
-    pub stimulus: PatternStimulus<SineGratings>,
+    pub stimulus: T,
 }
 
-impl BalloonSimulator {
+impl<T: Stimulus> BalloonSimulator<T> {
+    /// Create a new balloon simulator
     pub fn new(
-        balloons: Vec<Balloon>,
-        bbox_origin: Vector2<Real>,
-        bbox_size: Vector2<Real>,
+        balloons: Vec<Balloon<T>>,
+        origin: Vector2<Real>,
+        extend: Vector2<Real>,
     ) -> Self {
-        // set of balloons
+        // all the things that can collide with each other will live in the collider set
         let mut collider_set = ColliderSet::new();
 
+        // create the walls (they usually align with the window size)
         let walls = ColliderBuilder::polyline(
             vec![
-                Point::new(bbox_origin.x, bbox_origin.y), // bottom left
-                Point::new(bbox_origin.x, bbox_size.y),   // top left
-                Point::new(bbox_size.x, bbox_size.y),     // bottom right
-                Point::new(bbox_size.x, bbox_origin.y),   // top right
-                Point::new(bbox_origin.x, bbox_origin.y), // bottom left
+                Point::new(origin.x, origin.y), // bottom left
+                Point::new(origin.x, origin.y + extend.y), // top left
+                Point::new(origin.x + extend.x, origin.y + extend.y), // top right
+                Point::new(origin.x + extend.x, origin.y), // bottom right
+                Point::new(origin.x, origin.y),            // bottom left
             ],
             None,
         )
-        .restitution(1.0)
-        .friction(0.0)
+        .restitution(1.0) // no energy loss
+        .friction(0.0) // no friction
         .build();
+
         collider_set.insert(walls);
 
-        /* Create the bouncing balls */
+        // create the balloons as rigid bodies and add them to the collider set
         let mut balloon_set = RigidBodySet::new();
         let mut balloon_handles = Vec::new();
 
+        // for each balloon, create a rigid body and a collider with the same size
         for balloon in balloons.iter() {
             let rigid_body = RigidBodyBuilder::dynamic()
                 .translation(balloon.position)
                 .linvel(balloon.velocity)
                 .build();
+
             let collider = ColliderBuilder::ball(balloon.radius)
                 .restitution(1.0)
                 .friction(0.0)
                 .build();
+
             let ball_body_handle = balloon_set.insert(rigid_body);
             balloon_handles.push(ball_body_handle);
-            collider_set.insert_with_parent(collider, ball_body_handle, &mut balloon_set);
+
+            // insert the collider with the rigid body as parent
+            collider_set.insert_with_parent(
+                collider,
+                ball_body_handle,
+                &mut balloon_set,
+            );
         }
 
-        /* Create other structures necessary for the simulation. */
+        // create the physics pipeline
         let gravity = vector![0.0, 0.0];
         let mut integration_parameters = IntegrationParameters::default();
-        integration_parameters.dt = 1.0 / 60.0;
+        integration_parameters.dt = 1.0 / MONITOR_HZ as f32;
         let physics_pipeline = PhysicsPipeline::new();
         let island_manager = IslandManager::new();
         let broad_phase = BroadPhase::new();
@@ -209,8 +255,8 @@ impl BalloonSimulator {
 
 // implement the Iterator trait for the BalloonSimulator
 // each iteration steps through n_steps of the simulation
-impl Iterator for BalloonSimulator {
-    type Item = Vec<Balloon>;
+impl<T: Stimulus + Clone> Iterator for BalloonSimulator<T> {
+    type Item = Vec<Balloon<T>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         for _ in 0..self.n_steps {
