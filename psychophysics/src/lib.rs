@@ -639,7 +639,7 @@ impl ExperimentManager {
         #[cfg(not(target_arch = "wasm32"))]
         {
             simple_logger::SimpleLogger::new().env().init().unwrap();
-            log::set_max_level(log::LevelFilter::Info);
+            log::set_max_level(log::LevelFilter::Warn);
 
             smol::block_on(
                 self.run_event_loop(event_loop, experiment_fn),
