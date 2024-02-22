@@ -304,7 +304,7 @@ pub async fn render_task(window: Window) {
                     let view = suface_texture.texture.create_view(
                         &wgpu::TextureViewDescriptor {
                             format: Some(
-                                wgpu::TextureFormat::Bgra8Unorm,
+                                wgpu::TextureFormat::RGBA16Float,
                             ),
                             ..wgpu::TextureViewDescriptor::default()
                         },
@@ -396,7 +396,7 @@ pub async fn render_task(window: Window) {
 
             let view = suface_texture.texture.create_view(
                 &wgpu::TextureViewDescriptor {
-                    format: Some(wgpu::TextureFormat::Bgra8Unorm),
+                    format: Some(wgpu::TextureFormat::Rgba16Float),
                     ..wgpu::TextureViewDescriptor::default()
                 },
             );

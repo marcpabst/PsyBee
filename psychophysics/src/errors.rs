@@ -40,6 +40,30 @@ pub enum PsychophysicsError {
     #[cfg(feature = "serial")]
     #[error("{0}")]
     SerialPortError(#[from] serialport::Error),
+
+    // image errors
+    #[error("{0}")]
+    ImageError(#[from] image::ImageError),
+
+    // wrong dimensions
+    #[error("The dimensions of the image are not correct. Expected: ({0}, {1}), got: ({2}, {3})")]
+    WrongDimensionsError(u32, u32, u32, u32),
+
+    // dimensionsa are not identical
+    #[error("The dimensions of the images are not identical. The first image has dimensions: ({0}, {1}). All other images need to have the same dimensions.")]
+    NonIdenticalDimensionsError(u32, u32),
+
+    // empty vector provided
+    #[error("The provided vector is empty.")]
+    EmptyVectorError,
+
+    // index out of bounds
+    #[error("The index {0} is out of bounds for an array or vector of length {1}.")]
+    IndexOutOfBoundsError(usize, usize),
+
+    // single image error
+    #[error("Only one image was provided. This is currently not supported.")]
+    SingleImageError,
 }
 
 // macro that error with the given message

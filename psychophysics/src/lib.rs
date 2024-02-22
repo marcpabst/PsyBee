@@ -55,12 +55,12 @@ pub mod prelude {
     pub use crate::visual::color;
     pub use crate::visual::geometry::{Rectangle, Size};
     pub use crate::visual::stimuli::SineGratings;
-    pub use crate::visual::stimuli::patterns::GaussianAlphamask;
     pub use crate::visual::stimuli::PatternStimulus;
     // pub use crate::visual::stimuli::ImageStimulus;
     pub use crate::visual::stimuli::ColorStimulus;
     // pub use crate::visual::{stimuli::TextStimulus, Window};
     pub use crate::visual::geometry::Transformation2D;
+    pub use crate::visual::geometry::Circle;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -310,6 +310,22 @@ impl WindowManager {
                 return window;
     }
 
+    /// Create a default window. This is a convenience function that creates a window with the default options.
+    pub fn create_default_window(&self) -> Window {
+        // select monitor 1 if available
+            // find all monitors available
+       let monitors = self.get_available_monitors();
+        // get the second monitor if available, otherwise use the first one
+        let monitor = monitors.get(1).unwrap_or(
+            monitors
+                .first()
+                .expect("No monitor found - this should not happen"),
+        );
+
+        println!("Creating default window on monitor {:?}", monitor);
+        self.create_window(&WindowOptions::FullscreenHighestResolution {  monitor: Some(monitor.clone()), refresh_rate: Some(120.0) })
+    }
+
     /// Retrive available monitors. This reflects the state of the monitors at the time of the creation of the WindowManager.
     /// If a monitor is connected or disconnected after the WindowManager has been created, this will not be reflected here!
     pub fn get_available_monitors(&self) -> Vec<Monitor> {
@@ -508,10 +524,10 @@ impl ExperimentManager {
  
  
          let swapchain_capabilities = surface.get_capabilities(&adapter);
-         let swapchain_format = TextureFormat::Bgra8Unorm;
+         let swapchain_format = TextureFormat::Rgba16Float;
          let swapchain_view_format = vec![
-             TextureFormat::Bgra8Unorm,
-             TextureFormat::Bgra8UnormSrgb,
+             TextureFormat::Rgba16Float,
+             TextureFormat::Rgba16Float,
          ];
      
          let config = wgpu::SurfaceConfiguration {
@@ -638,8 +654,10 @@ impl ExperimentManager {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            simple_logger::SimpleLogger::new().env().init().unwrap();
-            log::set_max_level(log::LevelFilter::Warn);
+            simple_logger::SimpleLogger::new()
+                .with_level(log::LevelFilter::Error)
+                .init()
+                .unwrap();
 
             smol::block_on(
                 self.run_event_loop(event_loop, experiment_fn),
@@ -741,6 +759,14 @@ impl ExperimentManager {
         // start experiment
         thread::spawn(move || {
             let res = experiment_fn(wm);
+            // panic if the experiment function returns an error
+            if let Err(e) = res {
+                // throw error
+                log::error!("Experiment failed with {:?}: {:}", e, e);
+                // quit program
+                std::process::exit(1);
+                
+            }
         });
 
         // set event loop to poll

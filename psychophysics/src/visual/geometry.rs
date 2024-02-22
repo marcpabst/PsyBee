@@ -4,13 +4,13 @@
 use nalgebra::{Matrix2, Matrix3};
 
 /// This enum is used to specify the size and position of a stimulus. The unit can be specified in different ways,
-/// which will be evaluated just before the stimulus is rendered. This allows for the size of the stimulus to
+/// which will be evaluated just before the object is rendered. This allows for the size of the object to
 /// be specified in a flexible way, e.g. as a fraction of the screen size or in degrees of visual angle.
 ///
-/// Important: The unit is specified in the constructor of the stimulus, but its actual size in pixels
-/// is only calculated when the stimulus is rendered. This is because the size of the stimulus depends on the
+/// Important: The unit is specified in the constructor of the object, but its actual size in pixels
+/// is only calculated when the object is rendered. This is because the size of the object depends on the
 /// size of the window, the distance of the observer to the screen, and the physical size of the screen. As
-/// some of these parameters may change during the experiment, the size and position of the stimulus in pixels
+/// some of these parameters may change during the experiment, the size and position of the object in pixels
 /// can only be known at the time of rendering.
 ///
 /// # Examples
@@ -57,12 +57,15 @@ pub enum Size {
     Difference(Box<Size>, Box<Size>),
 }
 
+
+
+
+
 #[derive(Clone, Debug)]
 pub struct SizeVector2D {
     pub x: Size,
     pub y: Size,
 }
-
 
 
 impl From<(f64, f64)> for SizeVector2D {
@@ -82,6 +85,13 @@ impl From<(f32, f32)> for SizeVector2D {
         }
     }
 }
+
+impl From<(Size, Size)> for SizeVector2D {
+    fn from((x, y): (Size, Size)) -> Self {
+        SizeVector2D { x, y }
+    }
+}
+
 
 
 impl From<f32> for Size {
@@ -343,6 +353,8 @@ impl ToPixels for SizeVector2D {
     }
 }
 
+
+
 /// Types that can be triangulated, i.e. converted to a list of vertices.
 pub trait ToVertices: Send + Sync {
     /// Convert the shape to a list of vertices in pixels. The vertices are given as a list of floats,
@@ -593,6 +605,8 @@ impl ToVertices for Circle {
 
         let n_segments = 500;
 
+        // note that texture coordinates are based on the rectangle that contains the circle
+
         for i in 0..n_segments {
             let theta = 2.0
                 * std::f64::consts::PI
@@ -610,17 +624,17 @@ impl ToVertices for Circle {
             vertices.push(Vertex {
                 position: [center_x as f32, center_y as f32, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [0.0, 0.0],
+                tex_coords: [0.5, 0.5],
             });
             vertices.push(Vertex {
                 position: [x as f32, y as f32, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [1.0, 0.0],
+                tex_coords: [0.5 + 0.5 * theta.cos() as f32, 0.5 - 0.5 * theta.sin() as f32],
             });
             vertices.push(Vertex {
                 position: [next_x as f32, next_y as f32, 0.0],
                 color: [1.0, 1.0, 1.0],
-                tex_coords: [1.0, 1.0],
+                tex_coords: [0.5 + 0.5 * next_theta.cos() as f32, 0.5 - 0.5 * next_theta.sin() as f32],
             });
         }
 
@@ -633,26 +647,26 @@ impl ToVertices for Circle {
 }
 
 /// 2D transformations that can be applied to a stimulus.
-/// This enum is used to specify the transformation of a stimulus. The transformation is applied to the stimulus
+/// This enum is used to specify the transformation of a stimulus. The transformation is applied to the object
 /// just before it is rendered.
 ///
-/// Important: The transformation is specified in the constructor of the stimulus, but its actual transformation
-/// matrix is only calculated when the stimulus is rendered. This is because the transformation of the stimulus depends on the
+/// Important: The transformation is specified in the constructor of the object, but its actual transformation
+/// matrix is only calculated when the object is rendered. This is because the transformation of the object depends on the
 /// size of the window, the distance of the observer to the screen, and the physical size of the screen. As
-/// some of these parameters may change during the experiment, the transformation matrix of the stimulus can only be known at the time of rendering.
-#[derive(Debug)]
+/// some of these parameters may change during the experiment, the transformation matrix of the object can only be known at the time of rendering.
+#[derive(Debug, Clone)]
 pub enum Transformation2D {
     /// Identity transformation (no transformation).
     Identity,
-    /// Rotation around the center of the stimulus.
+    /// Rotation around the center of the object.
     RotationCenter(f32),
     /// Rotation around an arbitrary point.
     RotationPoint(f32, Size, Size),
-    /// Scale around the center of the stimulus.
+    /// Scale around the center of the object.
     ScaleCenter(f32, f32),
     /// Scale around an arbitrary point.
     ScalePoint(f32, f32, Size, Size),
-    /// Shear around the center of the stimulus.
+    /// Shear around the center of the object.
     ShearCenter(f32, f32),
     /// Shear around an arbitrary point.
     ShearPoint(f32, f32, Size, Size),
@@ -668,6 +682,13 @@ pub enum Transformation2D {
     Homogeneous(Matrix3<f32>),
     /// Product of two transformations. This variant is used to combine multiple transformations in a lazy way.
     Product(Box<Transformation2D>, Box<Transformation2D>),
+}
+
+impl Transformation2D {
+    #[allow(non_snake_case)]
+    pub fn translation(x: impl Into<Size>, y: impl Into<Size>) -> Transformation2D {
+        Transformation2D::Translation(x.into(), y.into())
+    }
 }
 
 impl Transformation2D {
@@ -819,12 +840,22 @@ impl Vertex {
         }
     }
 }
+
+// implement the multiplication operator for two transformations
+impl std::ops::Mul for Transformation2D {
+    type Output = Transformation2D;
+    /// Multiply two transformations. The results is a `Transformation2D::Product`.
+    fn mul(self, rhs: Self) -> Self::Output {
+        Transformation2D::Product(Box::new(self), Box::new(rhs))
+    }
+}
+
 pub trait GetCenter {
-    /// Get the x and y coordinates of the center of the stimulus. This is used to calculate the
-    /// transformations of the stimulus, such `RotationCenter`.
+    /// Get the x and y coordinates of the center of the object. This is used to calculate the
+    /// transformations of the object, such `RotationCenter`.
     ///
     /// # Returns
-    /// A tuple containing the x and y coordinates of the center of the stimulus.
+    /// A tuple containing the x and y coordinates of the center of the object.
     fn get_center(&self) -> (Size, Size);
 }
 
@@ -838,3 +869,56 @@ pub trait GetCenter {
 //         (left + width / 2.0, top + height / 2.0)
 //     }
 
+
+pub trait Transformable {
+    /// Set the transformation.
+    fn set_transformation(&self, transformation: Transformation2D);
+    /// Add a transformation to the current transformation.
+    fn add_transformation(&self, transformation: Transformation2D);
+
+    /// Translate the object by the given x and y coordinates.
+    fn translate(&self, x: impl Into<Size>, y: impl Into<Size>)
+    {
+        let (x, y) = (x.into(), y.into());
+        self.set_transformation(Transformation2D::Translation(x, y));
+    }
+
+    /// Rotate the object around the center of the object by the given angle.
+    fn rotate_center(&self, angle: f32)
+    {
+        self.set_transformation(Transformation2D::RotationCenter(angle));
+    }  
+
+    /// Rotate the object around the given point by the given angle.
+    fn rotate_point(&self, angle: f32, x: impl Into<Size>, y: impl Into<Size>)
+    {
+        let (x, y) = (x.into(), y.into());
+        self.set_transformation(Transformation2D::RotationPoint(angle, x, y));
+    }
+
+    /// Scale the object around the center of the object by the given x and y factors.
+    fn scale_center(&self, x: f32, y: f32)
+    {
+        self.set_transformation(Transformation2D::ScaleCenter(x, y));
+    }
+
+    /// Scale the object around the given point by the given x and y factors.
+    fn scale_point(&self, x: f32, y: f32, x0: impl Into<Size>, y0: impl Into<Size>)
+    {
+        let (x0, y0) = (x0.into(), y0.into());
+        self.set_transformation(Transformation2D::ScalePoint(x, y, x0, y0));
+    }
+
+    /// Shear the object around the center of the object by the given x and y factors.
+    fn shear_center(&self, x: f32, y: f32)
+    {
+        self.set_transformation(Transformation2D::ShearCenter(x, y));
+    }
+
+    /// Shear the object around the given point by the given x and y factors.
+    fn shear_point(&self, x: f32, y: f32, x0: impl Into<Size>, y0: impl Into<Size>)
+    {
+        let (x0, y0) = (x0.into(), y0.into());
+        self.set_transformation(Transformation2D::ShearPoint(x, y, x0, y0));
+    }
+}

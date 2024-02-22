@@ -1,131 +1,125 @@
-// Copyright (c) 2024 marc
+// This module defines the color types used in the psychophysics crate. It also
+// defines some predefined colors that can be used in experiments.
 //
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-//! This module defines the color types used in the psychophysics crate. It also
-//! defines some predefined colors that can be used in experiments.
-//!
-//! Accurate handling of colour in psychophysics experiments is a complex
-//! topic. This module provides a number of tools to help you with this.
-//!
-//! # Background
-//!
-//! You might be surprised to learn that there is no such thing as a simple
-//! RGB color in `psychophysics`. The reason for this is that many different
-//! colour spaces exist that can be represented as RGB. And since there is
-//! simply no way to know what RGB values mean without knowing the colour space,
-//! `psychophysics` requires you to specify the colour space when creating a
-//! color. This removes ambiguity and ensures that you always know what you
-//! are doing.
-//!
-//! ## Color spaces
-//!
-//! A color space is a mathematical model that describes how colors can be
-//! represented as tuples of numbers. Since human vision is trichromatic (i.e.
-//! we have three types of color receptors in our eyes), most color spaces
-//! are tristimulus color spaces. This means that all colors can be represented
-//! as a combination of three numbers.
-//!
-//! ### CIE XYZ colour space
-//!
-//! ...
-//!
-//! ### RGB colour spaces
-//!
-//! Many of the color spaces commonly used today in computer graphics
-//! are RGB color spaces. This means that the three numbers represent the amount
-//! of red, green, and blue light that is required to create a color. RGB colour
-//! spaces are defined by the three primary colors (red, green, and blue) and
-//! the white point. The white point is the color of a perfectly white surface
-//! under a given illumination, i.e. when all three primary colors are present
-//! in equal amounts. The most commonly used white point is the CIE standard
-//! illuminant D65, which is characterized by a color temperature of approximately
-//! 6500 K (wich apparently is the colour of daylight in western/central Europe).
-//!
-//! ### The electro-optical transfer function (EOTF)
-//!
-//! The electro-optical transfer function (EOTF) is a function that describes
-//! how the RGB values are converted to light intensity. In other words, it
-//! describes how the RGB values are converted to actual number of photons
-//! emitted by the display. In the simplest case, the EOTF is a linear function
-//! that simply scales the RGB values by a constant factor. However, most
-//! displays use a non-linear EOTF. This is mostly for historical reasons as
-//! CRT displays used a non-linear EOTF to compensate for the non-linear
-//! response of the phosphors used in the monitors. But as it turns out, the
-//! most commonly used EOTF today also happens to match the non-linear response
-//! of the human visual system reasonably well, allowing for more efficient
-//! encoding of the color values (more values are assigned to darker colors,
-//! which is where the human visual system is most sensitive). The most commonly
-//! used EOTF today is the sRGB transfer function, which is defined as follows:
-//!
-//! ```text
-//! if c <= 0.0031308
-//!    c * 12.92
-//! else
-//!   1.055 * c^(1.0 / 2.4) - 0.055
-//! ```
-//! where `c` is the RGB in the range [0.0, 1.0].
-//!
-//!
-//! # Colours in `psychophysics`
-//!
-//! ## Color types
-//!
-//! All colour handling in `psychophysics` is based on the `palette` crate
-//! (and this is also where new color spaces should be added). The `palette`
-//! crate is a very powerful crate for handling colors and color spaces. It
-//! provides a number of color spaces and conversion functions between them.
-//!
-//! `psychophysics` defines a number of color types that are based on the
-//! `palette` crate. These types are:
-//!  * `SRGBA`: An RGBA color in the sRGB color space with 32 bits of floating
-//!   point precision per channel.
-//! * `LinearSRGBA`: An RGBA color in the linear sRGB color space with 32 bits
-//!  of floating point precision per channel.
-//! * `XYZA`: An XYZA color with 32 bits of floating point precision per channel.
-//! * `YxyA`: A YxyA color with 32 bits of floating point precision per channel.
-//! * `DisplayP3RGB`: An RGBA color in the Display P3 color space with 32 bits
-//! of floating point precision per channel.
-//!
-//! ## Specifying colours
-//!
-//! As discussed above, `psychophysics` requires you to specify the color space
-//! when creating a color. This is done by using the appropriate color type.
-//! For example, if you would like to create a 50% gray color in sRGB, you can
-//! do so as follows:
-//! ```
-//! let grey = SRGBA::new(0.5, 0.5, 0.5, 1.0);
-//! ```
-//!
-//! Note that this is not (!) the same as the following:
-//!
-//! ```
-//! let grey = LinearSRGBA::new(0.5, 0.5, 0.5, 1.0);
-//! ```
-//!
-//! The first example creates a 50% gray color in sRGB color space. The
-//! second example creates a 50% gray color in linear sRGB color space.
-//! The difference between these two color spaces is that the sRGB color space
-//! uses a non-linear transfer function to encode the color values. In fact,
-//! 50% gray in the (non-linear) sRGB color space is the same as approximately
-//! 21% gray in the linear sRGB color space.
-//!
-//! ## Converting between color spaces
-//!
-//! The `palette` crate provides the `IntoColor` trait that allows you to
-//! convert between color spaces. For example, if you would like to convert
-//! the 50% gray color in sRGB to the linear sRGB color space, you can do so
-//! as follows:
-//! ```
-//! let grey = SRGBA::new(0.5, 0.5, 0.5, 1.0);
-//! let grey_linear = grey.into_color::<LinearSRGBA>();
-//! ```
-//!
-//! **Note:** Converting between color spaces is not lossless. This means that
-//! converting a color from one color space to another and back will not
-//! necessarily give you the same color.
+// Accurate handling of colour in psychophysics experiments is a complex
+// topic. This module provides a number of tools to help you with this.
+//
+// # Background
+//
+// You might be surprised to learn that there is no such thing as a simple
+// RGB color in `psychophysics`. The reason for this is that many different
+// colour spaces exist that can be represented as RGB. And since there is
+// simply no way to know what RGB values mean without knowing the colour space,
+// `psychophysics` requires you to specify the colour space when creating a
+// color. This removes ambiguity and ensures that you always know what you
+// are doing.
+//
+// ## Color spaces
+//
+// A color space is a mathematical model that describes how colors can be
+// represented as tuples of numbers. Since human vision is trichromatic (i.e.
+// we have three types of color receptors in our eyes), most color spaces
+// are tristimulus color spaces. This means that all colors can be represented
+// as a combination of three numbers.
+//
+// ### CIE XYZ colour space
+//
+// ...
+//
+// ### RGB colour spaces
+//
+// Many of the color spaces commonly used today in computer graphics
+// are RGB color spaces. This means that the three numbers represent the amount
+// of red, green, and blue light that is required to create a color. RGB colour
+// spaces are defined by the three primary colors (red, green, and blue) and
+// the white point. The white point is the color of a perfectly white surface
+// under a given illumination, i.e. when all three primary colors are present
+// in equal amounts. The most commonly used white point is the CIE standard
+// illuminant D65, which is characterized by a color temperature of approximately
+// 6500 K (wich apparently is the colour of daylight in western/central Europe).
+//
+// ### The electro-optical transfer function (EOTF)
+//
+// The electro-optical transfer function (EOTF) is a function that describes
+// how the RGB values are converted to light intensity. In other words, it
+// describes how the RGB values are converted to actual number of photons
+// emitted by the display. In the simplest case, the EOTF is a linear function
+// that simply scales the RGB values by a constant factor. However, most
+// displays use a non-linear EOTF. This is mostly for historical reasons as
+// CRT displays used a non-linear EOTF to compensate for the non-linear
+// response of the phosphors used in the monitors. But as it turns out, the
+// most commonly used EOTF today also happens to match the non-linear response
+// of the human visual system reasonably well, allowing for more efficient
+// encoding of the color values (more values are assigned to darker colors,
+// which is where the human visual system is most sensitive). The most commonly
+// used EOTF today is the sRGB transfer function, which is defined as follows:
+//
+// ```text
+// if c <= 0.0031308
+//    c * 12.92
+// else
+//   1.055 * c^(1.0 / 2.4) - 0.055
+// ```
+// where `c` is the RGB in the range [0.0, 1.0].
+//
+//
+// # Colours in `psychophysics`
+//
+// ## Color types
+//
+// All colour handling in `psychophysics` is based on the `palette` crate
+// (and this is also where new color spaces should be added). The `palette`
+// crate is a very powerful crate for handling colors and color spaces. It
+// provides a number of color spaces and conversion functions between them.
+//
+// `psychophysics` defines a number of color types that are based on the
+// `palette` crate. These types are:
+//  * `SRGBA`: An RGBA color in the sRGB color space with 32 bits of floating
+//   point precision per channel.
+// * `LinearSRGBA`: An RGBA color in the linear sRGB color space with 32 bits
+//  of floating point precision per channel.
+// * `XYZA`: An XYZA color with 32 bits of floating point precision per channel.
+// * `YxyA`: A YxyA color with 32 bits of floating point precision per channel.
+// * `DisplayP3RGB`: An RGBA color in the Display P3 color space with 32 bits
+// of floating point precision per channel.
+//
+// ## Specifying colours
+//
+// As discussed above, `psychophysics` requires you to specify the color space
+// when creating a color. This is done by using the appropriate color type.
+// For example, if you would like to create a 50% gray color in sRGB, you can
+// do so as follows:
+// ```
+// let grey = SRGBA::new(0.5, 0.5, 0.5, 1.0);
+// ```
+//
+// Note that this is not (!) the same as the following:
+//
+// ```
+// let grey = LinearSRGBA::new(0.5, 0.5, 0.5, 1.0);
+// ```
+//
+// The first example creates a 50% gray color in sRGB color space. The
+// second example creates a 50% gray color in linear sRGB color space.
+// The difference between these two color spaces is that the sRGB color space
+// uses a non-linear transfer function to encode the color values. In fact,
+// 50% gray in the (non-linear) sRGB color space is the same as approximately
+// 21% gray in the linear sRGB color space.
+//
+// ## Converting between color spaces
+//
+// The `palette` crate provides the `IntoColor` trait that allows you to
+// convert between color spaces. For example, if you would like to convert
+// the 50% gray color in sRGB to the linear sRGB color space, you can do so
+// as follows:
+// ```
+// let grey = SRGBA::new(0.5, 0.5, 0.5, 1.0);
+// let grey_linear = grey.into_color::<LinearSRGBA>();
+// ```
+//
+// **Note:** Converting between color spaces is not lossless. This means that
+// converting a color from one color space to another and back will not
+// necessarily give you the same color.
 
 use bytemuck::Pod;
 use bytemuck::Zeroable;
@@ -322,6 +316,12 @@ impl RawRgba {
     }
 }
 
+impl IntoRawRgba for RawRgba {
+    fn convert_to_raw_rgba(&self, _color_format: ColorFormat) -> RawRgba {
+        *self
+    }
+}
+
 /// The ColorFormat defines how color is handled internally in the rendering
 /// pipeline. It is used to convert colors to the appropriate color space
 /// before rendering.
@@ -342,6 +342,11 @@ pub enum ColorFormat {
     /// (about 25% more). However, as this format still uses the same bit depth
     /// as the `SRGBA8` format, color banding may be more apparent.
     DisplayP3U8,
+    RGB16f,
+}
+
+pub trait IntoRawRgba {
+    fn convert_to_raw_rgba(&self, color_format: ColorFormat) -> RawRgba;
 }
 
 impl ColorFormat {
@@ -372,6 +377,16 @@ impl ColorFormat {
             ColorFormat::DisplayP3U8 => {
                 todo!()
             }
+            ColorFormat::RGB16f => {
+                let col: Xyza<palette::white_point::D65, f32> = col.into_color();
+                let col: Srgba<f32> = col.into_color();
+                RawRgba {
+                    r: col.red as f32,
+                    g: col.green as f32,
+                    b: col.blue as f32,
+                    a: col.alpha as f32,
+                }
+            }
         }
     }
 
@@ -380,6 +395,7 @@ impl ColorFormat {
         match self {
             ColorFormat::SRGBA8 => TextureFormat::Bgra8UnormSrgb,
             ColorFormat::DisplayP3U8 => TextureFormat::Bgra8UnormSrgb,
+            ColorFormat::RGB16f => TextureFormat::Rgba16Float,
         }
     }
 
@@ -395,6 +411,9 @@ impl ColorFormat {
             }
             ColorFormat::DisplayP3U8 => {
                 (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
+            }
+            ColorFormat::RGB16f => {
+                (TextureFormat::Rgba16Float, TextureFormat::Rgba16Float)
             }
         }
     }
@@ -446,38 +465,35 @@ impl From<RawRgba> for glyphon::Color {
     }
 }
 
-// /// Defines the DisplayP3 color space.
-// pub type DisplayP3Standard = (
-//     palette::encoding::Srgb,
-//     palette::white_point::D65,
-//     palette::encoding::Srgb,
-// );
-
-// #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-// pub struct DisplayP3;
-
-// impl<T: palette::num::Real> palette::rgb::Primaries<T> for DisplayP3 {
-//     fn red() -> palette::Yxy<palette::white_point::Any, T> {
-//         palette::Yxy::new(
-//             T::from_f64(0.68000),
-//             T::from_f64(0.32000),
-//             T::from_f64(0.212656),
-//         )
-//     }
-//     fn green() -> palette::Yxy<palette::white_point::Any, T> {
-//         Yxy::new(
-//             T::from_f64(0.3000),
-//             T::from_f64(0.6000),
-//             T::from_f64(0.715158),
-//         )
-//     }
-//     fn blue() -> palette::Yxy<palette::white_point::Any, T> {
-//         Yxy::new(
-//             T::from_f64(0.1500),
-//             T::from_f64(0.0600),
-//             T::from_f64(0.072186),
-//         )
-//     }
-// }
-
-// pub type DisplayP3Rgb = palette::rgb::Rgb<DisplayP3Standard, f32>;
+// implement ToRawRgba for SRGBA
+impl IntoRawRgba for SRGBA {
+    fn convert_to_raw_rgba(&self, color_format: ColorFormat) -> RawRgba {
+        match color_format {
+            ColorFormat::SRGBA8 => {
+                let col = self.clone();
+                let col: Xyza<palette::white_point::D65, f32> = col.into_color();
+                let col: Srgba<f32> = col.into_color();
+                RawRgba {
+                    r: col.red as f32,
+                    g: col.green as f32,
+                    b: col.blue as f32,
+                    a: col.alpha as f32,
+                }
+            }
+            ColorFormat::DisplayP3U8 => {
+                todo!()
+            }
+            ColorFormat::RGB16f => {
+                let col = self.clone();
+                let col: Xyza<palette::white_point::D65, f32> = col.into_color();
+                let col: Srgba<f32> = col.into_color();
+                RawRgba {
+                    r: col.red as f32,
+                    g: col.green as f32,
+                    b: col.blue as f32,
+                    a: col.alpha as f32,
+                }
+            }
+        }
+    }
+}

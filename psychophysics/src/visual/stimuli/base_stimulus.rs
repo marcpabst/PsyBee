@@ -7,12 +7,94 @@ use crate::visual::{
 };
 use crate::GPUState;
 use async_lock::Mutex;
+use num_traits::ToPrimitive;
+use rapier2d::data;
 use std::sync::atomic::AtomicBool;
 use std::sync::{atomic::AtomicUsize, Arc};
 use wgpu::util::DeviceExt;
 use wgpu::TextureFormat;
 
 use super::Stimulus;
+
+// helper trait to set the texture data
+pub trait TextureDataTrait {
+    fn to_f32(self) -> Vec<f32>;
+    fn to_f16(self) -> Vec<half::f16>;
+    fn to_bytes(self) -> Vec<u8>;
+}
+// implement the trait for Vec<f32>
+impl TextureDataTrait for Vec<f32> {
+    fn to_f32(self) -> Vec<f32> {
+        self
+    }
+    fn to_f16(self) -> Vec<half::f16> {
+        self.iter().map(|x| half::f16::from_f32(*x)).collect()
+    }
+    fn to_bytes(self) -> Vec<u8> {
+        self.iter().map(|x| x.to_le_bytes()).flatten().collect()
+    }
+}
+// implement the trait for Vec<half::f16>
+impl TextureDataTrait for Vec<half::f16> {
+    fn to_f32(self) -> Vec<f32> {
+        self.iter().map(|x| x.to_f32()).collect()
+    }
+    fn to_f16(self) -> Vec<half::f16> {
+        self
+    }
+    fn to_bytes(self) -> Vec<u8> {
+        self.iter().map(|x| x.to_le_bytes()).flatten().collect()
+    }
+}
+// implement the trait for Vec<u8>
+impl TextureDataTrait for Vec<u8> {
+    fn to_f32(self) -> Vec<f32> {
+        self.iter().map(|x| (*x as f32) / 255.0).collect()
+    }
+    fn to_f16(self) -> Vec<half::f16> {
+        self.to_f32().to_f16() // convert to f32 first to allow for higher precision division
+    }
+    fn to_bytes(self) -> Vec<u8> {
+        self
+    }
+}
+
+const VERTEX_SHADER: &str = "
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec3<f32>,
+    @location(2) tex_coords: vec2<f32>,
+};
+
+struct VertexOutput {
+    @builtin(position) position_px: vec4<f32>,
+    @location(0) position_org: vec2<f32>,
+    @location(1) tex_coords: vec2<f32>,
+};
+
+
+@group(0) @binding(0)
+var<uniform> transform: mat4x4<f32>;
+@group(0) @binding(1)
+var texture: texture_2d<f32>;
+@group(0) @binding(2)
+var texture_sampler: sampler;
+
+@vertex
+fn vs_main(
+    model: VertexInput,
+) -> VertexOutput {
+
+    // transform the vertex position
+    let transform3x3 = mat3x3<f32>(transform[0].xyz, transform[1].xyz, transform[2].xyz);
+    let new_position = transform3x3 * vec3(model.position.xy, 1.0);
+
+    return VertexOutput(
+        vec4(new_position, 1.0),
+        vec2<f32>(model.position.xy),
+        model.tex_coords
+    );
+}";
 
 /// Base stimulus that serves as a template for almost all stimuli.
 #[derive(Clone)]
@@ -65,19 +147,21 @@ impl std::fmt::Debug for BaseStimulus {
 }
 
 impl BaseStimulus {
-    pub fn new(
+    pub fn new<T>(
         window: &Window,
         geometry: impl ToVertices + 'static,
         fragment_shader_code: &str,
         texture_size: Option<wgpu::Extent3d>,
-        uniform_buffers_data: &[&[u8]],
-    ) -> Self {
+        texture_data: Option<T>,
+        uniform_buffers_data: &[Vec<u8>],
+    ) -> Self
+    where
+        T: TextureDataTrait,
+    {
         // get the GPU state
         let gpu_state = window.read_gpu_state_blocking();
         let window_state = window.read_window_state_blocking();
         let device = &gpu_state.device;
-        // let surface = &window_state.surface;
-        // let adapter = &gpu_state.adapter;
         let surface_config = window_state.config.clone();
 
         // iter over uniform buffer data and create a buffer each
@@ -85,7 +169,7 @@ impl BaseStimulus {
         let mut uniform_buffer_bind_group_layout_entries = vec![];
         let mut uniforms_buffers = vec![];
 
-        for (i, &uniform_buffer_data) in uniform_buffers_data.iter().enumerate() {
+        for (i, uniform_buffer_data) in uniform_buffers_data.iter().cloned().enumerate() {
             // create bind group layout entry
             let uniform_buffer_bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
                 binding: i as u32,
@@ -99,14 +183,16 @@ impl BaseStimulus {
             };
 
             // add the entry to the list of entries
-            uniform_buffer_bind_group_layout_entries.push(uniform_buffer_bind_group_layout_entry);
+            uniform_buffer_bind_group_layout_entries
+                .push(uniform_buffer_bind_group_layout_entry);
 
             // create the buffer
-            let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: uniform_buffer_data,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
+            let uniform_buffer =
+                device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: uniform_buffer_data.as_slice(),
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                });
 
             // add the buffer to the list of buffers
             uniforms_buffers.push(uniform_buffer);
@@ -149,11 +235,14 @@ impl BaseStimulus {
             label: Some("uniform_bind_group"),
         });
 
-        let transform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Transform Buffer"),
-            contents: bytemuck::cast_slice(&nalgebra::Matrix4::<f32>::identity().as_slice()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let transform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Transform Buffer"),
+                contents: bytemuck::cast_slice(
+                    &nalgebra::Matrix4::<f32>::identity().as_slice(),
+                ),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
 
         // if a texture size is specified, create a texture
         let texture = if let Some(texture_size) = texture_size {
@@ -162,11 +251,11 @@ impl BaseStimulus {
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                // TODO: this should be configurable
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                label: Some("diffuse_texture"),
-                view_formats: &[wgpu::TextureFormat::Bgra8Unorm], // allow reading texture in linear space
+                format: wgpu::TextureFormat::Rgba16Float,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST,
+                label: Some("some texture"),
+                view_formats: &[wgpu::TextureFormat::Rgba16Float], // allow reading texture in linear space
             });
             Some(texture)
         } else {
@@ -197,10 +286,12 @@ impl BaseStimulus {
         });
 
         // if a texture is specified, create a texture buffer and a sampler and add them to the bind group
-        let (tts_bind_bind_group_layout, tts_bind_group) = if let Some(ref texture) = texture {
+        let (tts_bind_bind_group_layout, tts_bind_group) = if let Some(ref texture) =
+            texture
+        {
             // create the texture view
             let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-                format: Some(wgpu::TextureFormat::Bgra8Unorm),
+                format: Some(wgpu::TextureFormat::Rgba16Float),
                 ..Default::default()
             });
 
@@ -221,7 +312,7 @@ impl BaseStimulus {
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::D2,
+                    view_dimension: wgpu::TextureViewDimension::D2Array,
                     sample_type: wgpu::TextureSampleType::Float { filterable: true },
                 },
                 count: None,
@@ -280,37 +371,30 @@ impl BaseStimulus {
             (tts_bind_bind_group_layout, tts_bind_group)
         };
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&tts_bind_bind_group_layout, &uniform_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[
+                    &tts_bind_bind_group_layout,
+                    &uniform_bind_group_layout,
+                ],
+                push_constant_ranges: &[],
+            });
 
-        let swapchain_format = TextureFormat::Bgra8Unorm;
+        let swapchain_format = TextureFormat::Rgba16Float;
 
-        // // if a texture is specified, upload the texture data
-        // if let Some(texture) = &oot.texture {
-        //     let texture = texture.lock_blocking();
-        //     let texture_data = oot
-        //         .stimulus_implementation
-        //         .lock_blocking()
-        //         .get_texture_data()
-        //         .unwrap();
-        //     oot.set_texture(texture_data.as_slice(), &queue, &texture);
-        // }
+        // if a texture is specified, upload the texture data
 
         // compile the vertex shader
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/base.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(VERTEX_SHADER.into()),
         });
 
         // compile the fragment shader
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
-            source: wgpu::ShaderSource::Wgsl(
-                (include_str!("shaders/base.wgsl").to_string() + &fragment_shader_code).into(),
-            ),
+            source: wgpu::ShaderSource::Wgsl(fragment_shader_code.into()),
         });
 
         let width_mm = window.physical_width.load_relaxed();
@@ -319,39 +403,44 @@ impl BaseStimulus {
         let height_px = surface_config.height;
 
         // create the vertex buffer
-        let vertices = geometry.to_vertices_px(width_mm, viewing_distance_mm, width_px, height_px);
+        let vertices =
+            geometry.to_vertices_px(width_mm, viewing_distance_mm, width_px, height_px);
         let n_vertices = vertices.len();
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(vertices.as_slice()),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
+        let vertex_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(vertices.as_slice()),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &vertex_shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &fragment_shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: swapchain_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
+        let render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: None,
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &vertex_shader,
+                    entry_point: "vs_main",
+                    buffers: &[Vertex::desc()],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &fragment_shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: swapchain_format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+            });
 
-        Self {
+        // upload the texture data if a texture is specified
+
+        let out = Self {
             window: window.clone(),
             geometry: Arc::new(Mutex::new(Box::new(geometry))),
             uniform_buffers: Arc::new(Mutex::new(uniforms_buffers)),
@@ -369,12 +458,14 @@ impl BaseStimulus {
             },
             tts_bind_group: Arc::new(Mutex::new(tts_bind_group)),
             visible: Arc::new(AtomicBool::new(true)),
-        }
-    }
+        };
 
-    /// Set the transformation for the stimulus.
-    pub fn set_transformation(&self, transform: Transformation2D) {
-        *self.transforms.lock_blocking() = transform;
+        // if a texture is specified, upload the texture data
+        if let Some(texture_data) = texture_data {
+            out.set_texture(texture_data, &gpu_state);
+        }
+
+        out
     }
 
     /// Set the visibility of the stimulus.
@@ -390,20 +481,22 @@ impl BaseStimulus {
     ///
     /// # Arguments
     ///
-    /// * `data` - The data for the texture. The data must be a slice of `f16` values. The length of the slice must match the size of the texture.
+    /// * `data` - The data for the texture. The data must be a slice of `f32` values. The length of the slice must match the size of the texture.
     ///
     /// If no texture is specified, this method is a no-op.
-    pub fn set_texture(&self, data: &[u8]) {
+    pub fn set_texture<T>(&self, data: T, gpu_state: &GPUState)
+    where
+        T: TextureDataTrait,
+    {
+        // convert the data to f16
+        let data = data.to_f16();
+        let data = data.to_bytes();
+
         // get the GPU state
-        let gpu_state = self.window.read_gpu_state_blocking();
         let queue = &gpu_state.queue;
 
         if let Some(texture) = &self.texture {
             let texture = texture.lock_blocking();
-
-            // get the texture size
-            let width = texture.size().width;
-            let height = texture.size().height;
 
             // upload the texture data
             queue.write_texture(
@@ -413,35 +506,53 @@ impl BaseStimulus {
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
-                data,
+                data.as_slice(),
                 wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(4 * width),
-                    rows_per_image: Some(height),
+                    bytes_per_row: Some(4 * 2 * texture.size().width),
+                    rows_per_image: Some(texture.size().height),
                 },
-                wgpu::Extent3d {
-                    width,
-                    height,
-                    depth_or_array_layers: 1,
-                },
+                texture.size(),
             );
         }
     }
 
     pub fn set_uniform_buffers(&self, data: &[&[u8]], gpu_state: &GPUState) {
-        // let uniform_buffer = self.uniform_buffer.lock_blocking();
-        // gpu_state.queue.write_buffer(&uniform_buffer, 0, data);
+        let queue = &gpu_state.queue;
+        let uniform_buffers = self.uniform_buffers.lock_blocking();
+
+        for (i, buffer) in uniform_buffers.iter().enumerate() {
+            queue.write_buffer(buffer, 0, data[i]);
+        }
     }
 
     pub fn set_geometry(&self, geometry: impl ToVertices + 'static) {
         self.n_vertices.store_relaxed(geometry.n_vertices());
-        *self.geometry.lock_blocking() = Box::new(geometry) as Box<dyn ToVertices + 'static>;
+        *self.geometry.lock_blocking() =
+            Box::new(geometry) as Box<dyn ToVertices + 'static>;
         // we dont upload the vertex buffer here, as this will need to be done every time the frame is rendered
     }
 }
 
+impl crate::visual::geometry::Transformable for BaseStimulus {
+    fn set_transformation(&self, transformation: Transformation2D) {
+        *self.transforms.lock_blocking() = transformation;
+    }
+
+    fn add_transformation(&self, transformation: Transformation2D) {
+        let mut old_transformation = self.transforms.lock_blocking();
+        let new_transformation = transformation * old_transformation.clone();
+        *old_transformation = new_transformation;
+    }
+}
+
 impl Stimulus for BaseStimulus {
-    fn prepare(&mut self, window: &Window, window_state: &WindowState, gpu_state: &GPUState) {
+    fn prepare(
+        &mut self,
+        window: &Window,
+        window_state: &WindowState,
+        gpu_state: &GPUState,
+    ) {
         // if the stimulus is not visible we don't need to do anything
         if !self.visible.load_relaxed() {
             return;
@@ -470,8 +581,9 @@ impl Stimulus for BaseStimulus {
         );
 
         // update the transform buffer
-        let win_transform = Window::transformation_matrix_to_ndc(screen_width_px, screen_height_px)
-            .map(|x| x as f32);
+        let win_transform =
+            Window::transformation_matrix_to_ndc(screen_width_px, screen_height_px)
+                .map(|x| x as f32);
 
         // then get the transformation matrix from the stimulus
         let stim_transform = self.transforms.lock_blocking().to_transformation_matrix(

@@ -4,14 +4,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use palette::white_point::A;
-use rand::Rng;
-
-// Copyright (c) 2024 Marc Pabst
-//
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 use crate::visual::window::WindowState;
 use crate::visual::{geometry::ToVertices, Window};
 use crate::GPUState;
@@ -22,124 +14,112 @@ use super::Stimulus;
 #[derive(Clone, Debug)]
 pub struct PatternStimulus<P> {
     base_stimulus: BaseStimulus,
-    pattern: P,
+    pub pattern: P,
 }
 
 pub trait FillPattern: Send + Sync {
-    /// Get the uniform buffer(s) data for the pattern. Every item in the vector should be the data for a single uniform buffer.
-    ///
-    /// The length of the returned vector must be equal to number of structs returned by `get_uniform_structs_code`.
-    ///
-    /// Be careful, WGSL expect very specific alignment for the data in the uniform buffer!
-    fn get_uniform_buffers_data(&self, window: &Window) -> Vec<Vec<u8>>;
+    /// The shader language that the pattern uses. WGSL by default.
+    const SHADER_LANGUAGE: &'static str = "wgsl";
 
-    /// Get the uniform struct(s) code for the pattern. This needs to be a vector of (String, String, String), matching the number of uniform buffers.
-    /// The first string in the tuple should be the code for the struct, the second string should be the name of the struct and the third string should be the name of the variable.
+    /// Get the fragment shader code for the pattern.
     ///
-    /// Length of the returned vector must be equal to the number of the vector returned by `get_uniform_buffers_data`.
+    /// You can bind one uniform buffer to the pattern and one texture. They will be automatically rebound to suitable bind groups.
     ///
-    /// You are free to choose the name of the struct and variable, but both must contain the unique identifier provided by the `uuid` parameter.
+    /// # Example
     ///
-    /// For example, this could be the return value for a pattern that has a single uniform buffer with a struct containing a single field `alpha`:
     /// ```
-    /// return vec![(format!("struct {uuid}_s1] {{ alpha: f32, }}".to_string(), "[uuid]_s1".to_string(), "[uuid]_0".to_string())];
+    /// fn fragment_shader_code(&self, window: &Window) -> String {
+    ///    "struct Uniforms {{
+    ///       color: vec4<f32>;
+    ///   }};
+    ///
+    ///  @group(1) @binding(0)
+    /// var<uniform> uniforms: Uniforms;
+    ///
+    /// @fragment
+    /// fn main() -> @location(0) vec4f {
+    ///   return uniforms.color;
+    /// }}
     /// ```
-    fn get_uniform_structs_code(
-        &self,
-        uuid: &str,
-    ) -> Vec<(String, String, String)>;
+    ///
+    fn fragment_shader_code(&self, window: &Window) -> String;
 
-    /// An arbitrary number of functions that will be available to the fragment shader.
-    /// You are free to choose the name of the function, but it must contain the unique identifier provided by the `uuid` parameter.
+    /// Get the uniform buffer size (in bytes) for the pattern. This is the size of the buffer that will be passed to the fragment shader.
     ///
-    /// For example, could be returned by a pattern that has a single uniform buffer with a struct containing a single field `alpha`,
-    /// where the function sets the alpha value of the color to the alpha value of the uniform buffer:
-    /// ```
-    /// return format!("fn {uuid}_set_alpha(x: f32, y: f32, color: vec4<f32>) -> vec4<f32> {{ return vec4<f32>(color.r, color.g, color.b, {uuid}_0.alpha); }}");
-    /// ```
-    fn get_pattern_functions_code(&self, uuid: &str) -> String;
+    /// If the pattern does not use a uniform buffer, this function should return `None`.
+    fn uniform_buffer_size(&self, window: &Window) -> Option<usize> {
+        // by default, return the size of self.uniform_buffer_data()
+        // this is slightly inefficient, but it's the best we can do without knowing the actual data
+        if let Some(data) = self.uniform_buffer_data(window) {
+            Some(data.len())
+        } else {
+            None
+        }
+    }
 
-    /// The expression that will be evaluated in the fragment shader. Must evaluate to a vec4<f32>.
-    /// You may call any functions defined in `get_pattern_functions_code`. Following variables are in scope:
-    /// - `x: f32` and `y: f32`: the position of the pixel
-    /// - `color: vec4<f32>`: the current color of the pixel
+    /// Get the uniform buffer data for the pattern. This is the data that will be passed to the fragment shader.
+    /// If the buffer did not change since the last time this function was called, it can return `None`.
     ///
-    /// For example, this could be returned by a pattern that has a single uniform buffer with a struct containing a single field `alpha`:
-    /// ```
-    /// return format!("{uuid}_set_alpha(x, y, color)");
-    fn get_pattern_expression(&self, uuid: &str) -> String;
+    /// If the pattern does not use a uniform buffer, this function should return `None`.
+    ///
+    /// Must match the size returned by `uniform_buffer_size`. Also, make sure that you honor WGPU's alignment requirements.
+    fn uniform_buffer_data(&self, _window: &Window) -> Option<Vec<u8>> {
+        None
+    }
+
+    /// Returns the current uniform buffer data for the pattern. As opposed to `uniform_buffer_data`,
+    /// this function should return `None` if the buffer did not change since the last time this function was called.
+    fn updated_uniform_buffers_data(&self, window: &Window) -> Option<Vec<u8>> {
+        self.uniform_buffer_data(window)
+    }
+
+    /// Returns the extent of the texture that will be used by the pattern.
+    /// This is optional and can be used to provide a texture to the pattern.
+    ///
+    /// If the pattern does not use a texture, this function should return `None`.
+    fn texture_extent(&self, _window: &Window) -> Option<wgpu::Extent3d> {
+        None
+    }
+
+    /// Get the texture data for the pattern. This is optional and can be used to provide a texture to the pattern.
+    ///
+    /// If the pattern does not use a texture, this function should return `None`.
+    fn texture_data(&self, _window: &Window) -> Option<Vec<u8>> {
+        None
+    }
+
+    /// Returns the current texture data for the pattern. As opposed to `texture_data`,
+    /// this function should return `None` if the texture did not change since the last time this function was called.
+    fn updated_texture_data(&self, window: &Window) -> Option<Vec<u8>> {
+        self.texture_data(window)
+    }
 }
 
 impl<P: FillPattern> PatternStimulus<P> {
-    pub fn new(
-        window: &Window,
-        shape: impl ToVertices + 'static,
-        pattern: P,
-    ) -> Self {
-        let uniform_buffers_data = pattern.get_uniform_buffers_data(window);
-        let uniform_buffers_data = uniform_buffers_data
-            .iter()
-            .map(|data| data.as_slice())
-            .collect::<Vec<_>>();
-        let uniform_buffers_data = uniform_buffers_data.as_slice();
+    pub fn new(window: &Window, geometry: impl ToVertices + 'static, pattern: P) -> Self {
+        // get the uniform buffer data
+        let _uniform_buffer_size = pattern.uniform_buffer_size(window);
 
-        // build up the fragment shader code
-        // first, randomly create a unique name for the param struct using only uppercase and lowercase letters
-        let uuid = crate::utils::create_random_lowercase_string(10);
+        let uniform_buffer_data =
+            if let Some(uniform_buffer_data) = pattern.uniform_buffer_data(window) {
+                uniform_buffer_data
+            } else {
+                // return an empty buffer
+                vec![]
+            };
 
-        // then, get the uniform struct code
-        let uniform_struct_code = pattern.get_uniform_structs_code(&uuid);
-
-        // then, get the pattern function code
-        let pattern_function_code = pattern.get_pattern_functions_code(&uuid);
-
-        // get the pattern expression
-        let pattern_expression = pattern.get_pattern_expression(&uuid);
-
-        // then, build the fragment shader code
-        let mut fragment_shader_code = "".to_string();
-
-        // add the code for the uniform structs
-        for (i, (struct_code, struct_name, variable_name)) in
-            uniform_struct_code.iter().enumerate()
-        {
-            fragment_shader_code.push_str(&format!(
-                "
-                {struct_code}
-
-                @group(1) @binding({i})
-                var<uniform> {variable_name}: {struct_name};
-
-                "
-            ));
-        }
-
-        // add the code for the pattern functions
-        fragment_shader_code = format!(
-            "
-            {fragment_shader_code}
-
-            {pattern_function_code}
-
-            @fragment
-                fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {{
-                    let x = in.position_org.x;
-                    let y = in.position_org.y;
-                    let color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
-                    return {pattern_expression};
-                }}
-        "
-        );
-
-        println!("{}", fragment_shader_code);
+        let texture_size = pattern.texture_extent(window);
+        let texture_data = pattern.texture_data(window);
+        let fragment_shader_code = pattern.fragment_shader_code(window);
 
         Self {
             base_stimulus: BaseStimulus::new(
                 window,
-                shape,
+                geometry,
                 &fragment_shader_code,
-                None,
-                uniform_buffers_data,
+                texture_size,
+                texture_data,
+                &[uniform_buffer_data],
             ),
             pattern: pattern,
         }
@@ -164,24 +144,23 @@ impl<P: FillPattern> Stimulus for PatternStimulus<P> {
         window_state: &WindowState,
         gpu_state: &GPUState,
     ) -> () {
-        let uniform_buffers_data =
-            self.pattern.get_uniform_buffers_data(window);
-        let uniform_buffers_data = uniform_buffers_data
-            .iter()
-            .map(|data| data.as_slice())
-            .collect::<Vec<_>>();
-        let uniform_buffers_data = uniform_buffers_data.as_slice();
+        // update the uniform buffer
+        if let Some(uniform_buffer_data) =
+            self.pattern.updated_uniform_buffers_data(window)
+        {
+            self.base_stimulus
+                .set_uniform_buffers(&[uniform_buffer_data.as_slice()], gpu_state);
+        }
 
-        self.base_stimulus
-            .set_uniform_buffers(uniform_buffers_data, gpu_state);
+        // update the texture
+        if let Some(texture_data) = self.pattern.updated_texture_data(window) {
+            self.base_stimulus.set_texture(texture_data, gpu_state);
+        }
+
         self.base_stimulus.prepare(window, window_state, gpu_state);
     }
 
-    fn render(
-        &mut self,
-        enc: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
-    ) -> () {
+    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
         self.base_stimulus.render(enc, view);
     }
 }

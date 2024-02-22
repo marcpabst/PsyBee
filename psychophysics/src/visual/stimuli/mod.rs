@@ -23,3 +23,31 @@ pub trait Stimulus: Send + Sync {
     /// Render the object to the screen.
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();
 }
+
+// macro that implements the Stimulus trait for a newtype with an _inner field that implements the trait
+#[macro_export]
+macro_rules! impl_stimulus {
+    ($newtype:ident, $inner:ty) => {
+        use crate::visual::stimuli::Stimulus;
+        use crate::GPUState;
+
+        impl Stimulus for $newtype {
+            fn prepare(
+                &mut self,
+                window: &Window,
+                window_state: &WindowState,
+                gpu_state: &GPUState,
+            ) -> () {
+                self._inner.prepare(window, window_state, gpu_state);
+            }
+
+            fn render(
+                &mut self,
+                enc: &mut wgpu::CommandEncoder,
+                view: &wgpu::TextureView,
+            ) -> () {
+                self._inner.render(enc, view);
+            }
+        }
+    };
+}
