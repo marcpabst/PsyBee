@@ -543,10 +543,9 @@ impl ExperimentManager {
  
  
          let swapchain_capabilities = surface.get_capabilities(&adapter);
-         let swapchain_format = TextureFormat::Rgba8Unorm;
+         let swapchain_format = TextureFormat::Rgba16Float;
          let swapchain_view_format = vec![
-                TextureFormat::Rgba8Unorm,
-        
+             TextureFormat::Rgba16Float,
          ];
      
          let config = wgpu::SurfaceConfiguration {
@@ -557,7 +556,7 @@ impl ExperimentManager {
              present_mode: wgpu::PresentMode::Fifo,
              alpha_mode: swapchain_capabilities.alpha_modes[0],
              view_formats: swapchain_view_format,
-             desired_maximum_frame_latency: 1,
+             desired_maximum_frame_latency: 2,
          };
 
          println!("Surface config: {:?}", config);
