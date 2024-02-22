@@ -10,7 +10,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     size.width = size.width.max(1);
     size.height = size.height.max(1);
 
-    let instance = wgpu::Instance::default();
+    let instance_desc = wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::DX12,
+        ..Default::default()
+    };
+
+    let instance = wgpu::Instance::new(instance_desc);
 
     let surface = instance.create_surface(&window).unwrap();
     let adapter = instance
@@ -30,9 +35,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 label: None,
                 required_features: wgpu::Features::empty(),
                 // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                required_limits:
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                        .using_resolution(adapter.limits()),
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                    .using_resolution(adapter.limits()),
             },
             None,
         )
@@ -55,27 +59,23 @@ fn fs_main() -> @location(0) vec4<f32> {
 "#;
 
     // Load the shaders from disk
-    let shader =
-        device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(
-                shader_str,
-            )),
-        });
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(shader_str)),
+    });
 
-    let pipeline_layout = device.create_pipeline_layout(
-        &wgpu::PipelineLayoutDescriptor {
+    let pipeline_layout =
+        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[],
             push_constant_ranges: &[],
-        },
-    );
+        });
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[0];
 
-    let render_pipeline = device.create_render_pipeline(
-        &wgpu::RenderPipelineDescriptor {
+    let render_pipeline =
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
@@ -92,8 +92,7 @@ fn fs_main() -> @location(0) vec4<f32> {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
-        },
-    );
+        });
 
     let mut config = surface
         .get_default_config(&adapter, size.width, size.height)
@@ -129,22 +128,25 @@ fn fs_main() -> @location(0) vec4<f32> {
                         let view = frame
                             .texture
                             .create_view(&wgpu::TextureViewDescriptor::default());
-                        let mut encoder =
-                            device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                                label: None,
-                            });
+                        let mut encoder = device.create_command_encoder(
+                            &wgpu::CommandEncoderDescriptor { label: None },
+                        );
                         {
                             let mut rpass =
                                 encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                                     label: None,
-                                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                        view: &view,
-                                        resolve_target: None,
-                                        ops: wgpu::Operations {
-                                            load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
-                                            store: wgpu::StoreOp::Store,
+                                    color_attachments: &[Some(
+                                        wgpu::RenderPassColorAttachment {
+                                            view: &view,
+                                            resolve_target: None,
+                                            ops: wgpu::Operations {
+                                                load: wgpu::LoadOp::Clear(
+                                                    wgpu::Color::GREEN,
+                                                ),
+                                                store: wgpu::StoreOp::Store,
+                                            },
                                         },
-                                    })],
+                                    )],
                                     depth_stencil_attachment: None,
                                     timestamp_writes: None,
                                     occlusion_query_set: None,
@@ -189,9 +191,7 @@ pub fn main() {
     let video_mode = video_modes.nth(2).unwrap();
 
     let window = builder
-        .with_fullscreen(Some(winit::window::Fullscreen::Exclusive(
-            video_mode,
-        )))
+        .with_fullscreen(Some(winit::window::Fullscreen::Exclusive(video_mode)))
         .build(&event_loop)
         .unwrap();
 
@@ -202,9 +202,7 @@ pub fn main() {
     }
     #[cfg(target_arch = "wasm32")]
     {
-        std::panic::set_hook(Box::new(
-            console_error_panic_hook::hook,
-        ));
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init().expect("could not initialize logger");
         wasm_bindgen_futures::spawn_local(run(event_loop, window));
     }

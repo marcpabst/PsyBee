@@ -7,6 +7,13 @@ use psychophysics::ExperimentManager;
 use psychophysics::WindowManager;
 
 fn calibrate(wn: WindowManager) -> Result<(), PsychophysicsError> {
+    let mut color_cal = ColorCalII::new("/dev/tty.usbmodem00001").unwrap();
+
+    loop {
+        let measurement = color_cal.measure().unwrap();
+        println!("{:?}", measurement);
+    }
+
     // create a window
     let window = wn.create_default_window();
 

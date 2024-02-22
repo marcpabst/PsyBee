@@ -30,6 +30,7 @@ impl ColorCalII {
         let (serial_num, firmware, firm_build) = Self::get_device_info(&mut *serial)?;
 
         let calib_matrix = Self::get_color_matrix(&mut *serial, 0)?;
+        println!("{:?}", calib_matrix);
 
         Ok(Self {
             serial,
