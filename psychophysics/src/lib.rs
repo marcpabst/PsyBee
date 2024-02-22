@@ -543,9 +543,10 @@ impl ExperimentManager {
  
  
          let swapchain_capabilities = surface.get_capabilities(&adapter);
-         let swapchain_format = TextureFormat::Rgba16Float;
+         let swapchain_format = TextureFormat::Rgba8Unorm;
          let swapchain_view_format = vec![
-             TextureFormat::Rgba16Float,
+                TextureFormat::Rgba8Unorm,
+        
          ];
      
          let config = wgpu::SurfaceConfiguration {
