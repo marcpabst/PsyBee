@@ -531,9 +531,9 @@ impl ExperimentManager {
         let surface =  
             instance.create_surface(winit_window.clone()).expect("Failed to create surface. This is likely a bug, please report it.");
      
-
-  
-         let size = winit_window.inner_size();
+        // print supported swapchain formats
+        let swapchain_formats = surface.get_capabilities().formats;
+        println!("Supported swapchain formats: {:?}", swapchain_formats);
 
          // print supported swapchain formats
             let swapchain_formats = adapter.get_texture_format_features(TextureFormat::Rgba16Float);
