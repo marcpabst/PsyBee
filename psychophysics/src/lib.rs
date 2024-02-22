@@ -341,8 +341,20 @@ impl ExperimentManager {
         let event_loop = EventLoopBuilder::<PsychophysicsEventLoopEvent>::with_user_event().build().expect("Failed to create event loop. This is likely a bug, please report it.");
         let event_loop_proxy = event_loop.create_proxy();
 
+        // let instance_desc = wgpu::InstanceDescriptor {
+        //     backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN | wgpu::Backends::METAL,
+        //     // use defaults for the rest
+        //     ..Default::default()
+        // };
+
+        // chose any backend except on windows, where we prefer DX12
+        #[cfg(target_os = "windows")]
+        let backend = wgpu::Backends::DX12;
+        #[cfg(not(target_os = "windows"))]
+        let backend = wgpu::Backends::all();
+
         let instance_desc = wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN | wgpu::Backends::METAL,
+            backends: backend,
             // use defaults for the rest
             ..Default::default()
         };
