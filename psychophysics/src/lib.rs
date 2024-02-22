@@ -532,7 +532,7 @@ impl ExperimentManager {
             instance.create_surface(winit_window.clone()).expect("Failed to create surface. This is likely a bug, please report it.");
      
         // print supported swapchain formats
-        let swapchain_formats = surface.get_capabilities().formats;
+        let swapchain_formats = surface.get_capabilities(&adapter).swap_chain_formats;
         println!("Supported swapchain formats: {:?}", swapchain_formats);
 
          // print supported swapchain formats
