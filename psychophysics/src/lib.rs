@@ -529,6 +529,7 @@ impl ExperimentManager {
         println!("Creating surface");
         let surface =  
             instance.create_surface(winit_window.clone()).expect("Failed to create surface. This is likely a bug, please report it.");
+        println!("Surface created");
 
         log::info!("Surface created");
 
@@ -539,7 +540,6 @@ impl ExperimentManager {
          let swapchain_capabilities = surface.get_capabilities(&adapter);
          let swapchain_format = TextureFormat::Rgba16Float;
          let swapchain_view_format = vec![
-             TextureFormat::Rgba16Float,
              TextureFormat::Rgba16Float,
          ];
      
