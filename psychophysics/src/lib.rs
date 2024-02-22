@@ -558,6 +558,8 @@ impl ExperimentManager {
              view_formats: swapchain_view_format,
              desired_maximum_frame_latency: 1,
          };
+
+         println!("Surface config: {:?}", config);
      
          surface.configure(&device, &config);
      
