@@ -1,5 +1,3 @@
-#![feature(repr_simd, simd_ffi)]
-
 use lazy_static::lazy_static;
 use mobile_entry_point::mobile_entry_point;
 use nalgebra::Matrix4;
