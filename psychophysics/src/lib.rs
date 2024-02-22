@@ -535,6 +535,7 @@ impl ExperimentManager {
         let swapchain_formats = surface.get_capabilities(&adapter).formats;
         println!("Supported swapchain formats: {:?}", swapchain_formats);
 
+        let size = winit_window.inner_size();
          // print supported swapchain formats
             let swapchain_formats = adapter.get_texture_format_features(TextureFormat::Rgba16Float);
             println!("Supported swapchain formats: {:?}", swapchain_formats);
