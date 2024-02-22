@@ -6,9 +6,13 @@ use nalgebra::Matrix4;
 use nalgebra::Vector2;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
+#[cfg(target_os = "ios")]
 use objc::class;
+#[cfg(target_os = "ios")]
 use objc::rc::StrongPtr;
+#[cfg(target_os = "ios")]
 use objc::runtime::{Class, Object, Sel};
+#[cfg(target_os = "ios")]
 use objc::{declare::ClassDecl, msg_send, sel, sel_impl};
 use psychophysics::visual::stimuli::patterns::Checkerboard;
 use psychophysics::visual::stimuli::patterns::GaborPatch;
@@ -28,6 +32,7 @@ use rapier2d::prelude::*;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
+#[cfg(target_os = "ios")]
 pub type id = *mut Object;
 
 const N_BALLOONS: usize = 10;
@@ -42,6 +47,7 @@ lazy_static! {
         Arc::new(Mutex::new(None));
 }
 
+#[cfg(target_os = "ios")]
 #[repr(C)]
 #[derive(Debug)]
 struct MyMatrix {
@@ -50,7 +56,7 @@ struct MyMatrix {
     c3: [f32; 4],
     c4: [f32; 4],
 }
-
+#[cfg(target_os = "ios")]
 // impl into nalgebra::Matrix4<f32> for SimdFloat4x4
 impl Into<Matrix4<f32>> for MyMatrix {
     fn into(self) -> Matrix4<f32> {
@@ -62,7 +68,7 @@ impl Into<Matrix4<f32>> for MyMatrix {
         .transpose()
     }
 }
-
+#[cfg(target_os = "ios")]
 /// Compute the intersection of a line with the Z=0 plane
 fn intersection_with_z_plane(
     point: Vector3<f32>,
@@ -82,6 +88,7 @@ fn intersection_with_z_plane(
     }
 }
 
+#[cfg(target_os = "ios")]
 fn get_current_gaze_position(frame: id) -> Option<nalgebra::Vector2<f32>> {
     // get the array of anchors using msg_send!
     let anchors: id = unsafe { msg_send![frame, anchors] };
