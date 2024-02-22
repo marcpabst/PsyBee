@@ -526,6 +526,7 @@ impl ExperimentManager {
 
         log::info!("Creating surface");
 
+        println!("Creating surface");
         let surface =  
             instance.create_surface(winit_window.clone()).expect("Failed to create surface. This is likely a bug, please report it.");
 
