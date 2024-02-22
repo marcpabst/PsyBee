@@ -161,10 +161,8 @@ fn baloons(wm: WindowManager) -> Result<(), PsychophysicsError> {
     );
 
     // choose the highest possible resolution for the given refresh rate
-    let window_options: WindowOptions = WindowOptions::FullscreenHighestResolution {
-        monitor: Some(monitor.clone()),
-        refresh_rate: Some(MONITOR_HZ),
-    };
+    let window_options: WindowOptions = WindowOptions::Windowed { resolution: None };
+
     // finally, create the window
     let window = wm.create_window(&window_options);
 

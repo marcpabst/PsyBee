@@ -532,8 +532,6 @@ impl ExperimentManager {
             instance.create_surface(winit_window.clone()).expect("Failed to create surface. This is likely a bug, please report it.");
      
 
-        log::info!("Surface created");
-
   
          let size = winit_window.inner_size();
 
@@ -551,8 +549,8 @@ impl ExperimentManager {
          let config = wgpu::SurfaceConfiguration {
              usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
              format: swapchain_format,
-             width: 200,
-             height: 200,
+             width: size.width,
+             height: size.height,
              present_mode: wgpu::PresentMode::Fifo,
              alpha_mode: swapchain_capabilities.alpha_modes[0],
              view_formats: swapchain_view_format,
