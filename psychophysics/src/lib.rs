@@ -551,12 +551,12 @@ impl ExperimentManager {
          let config = wgpu::SurfaceConfiguration {
              usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
              format: swapchain_format,
-             width: size.width,
-             height: size.height,
+             width: 200,
+             height: 200,
              present_mode: wgpu::PresentMode::Fifo,
              alpha_mode: swapchain_capabilities.alpha_modes[0],
              view_formats: swapchain_view_format,
-             desired_maximum_frame_latency: 2,
+             desired_maximum_frame_latency: 1,
          };
 
          println!("Surface config: {:?}", config);
