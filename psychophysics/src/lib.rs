@@ -348,9 +348,9 @@ impl ExperimentManager {
         // };
 
         // chose any backend except on windows, where we prefer DX12
-        #[cfg(target_os = "windows")]
-        let backend = wgpu::Backends::DX12;
-        #[cfg(not(target_os = "windows"))]
+        // #[cfg(target_os = "windows")]
+        // let backend = wgpu::Backends::DX12;
+        // #[cfg(not(target_os = "windows"))]
         let backend = wgpu::Backends::all();
 
         let instance_desc = wgpu::InstanceDescriptor {
