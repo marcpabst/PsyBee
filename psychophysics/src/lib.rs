@@ -372,6 +372,8 @@ impl ExperimentManager {
             .await
             .expect("Failed to find an appropiate graphics adapter. This is likely a bug, please report it.");
 
+    println!("Adapter: {:?}", adapter.get_info());
+
         // Create the logical device and command queue
         let (device, queue) = adapter
             .request_device(
