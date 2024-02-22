@@ -526,15 +526,18 @@ impl ExperimentManager {
 
         log::info!("Creating surface");
 
-        println!("Creating surface");
         let surface =  
             instance.create_surface(winit_window.clone()).expect("Failed to create surface. This is likely a bug, please report it.");
-        println!("Surface created");
+     
 
         log::info!("Surface created");
 
   
          let size = winit_window.inner_size();
+
+         // print supported swapchain formats
+            let swapchain_formats = adapter.get_texture_format_features(TextureFormat::Rgba16Float);
+            println!("Supported swapchain formats: {:?}", swapchain_formats);
  
  
          let swapchain_capabilities = surface.get_capabilities(&adapter);
