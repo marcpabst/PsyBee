@@ -5,6 +5,7 @@ use async_lock::{Mutex, RwLock};
 use atomic_float::AtomicF64;
 use futures_lite::future::block_on;
 use futures_lite::Future;
+use wgpu::hal::metal;
 use winit::monitor::VideoMode;
 
 use crate::visual::color::ColorFormat;
@@ -528,9 +529,19 @@ impl ExperimentManager {
 
         log::info!("Creating surface");
 
-        let surface =  
+        let mut surface =  
             instance.create_surface(winit_window.clone()).expect("Failed to create surface. This is likely a bug, please report it.");
      
+        // get HAL using callback (but only on macos)
+        let hal_surface =  unsafe { surface.as_hal::<wgpu::hal::api::Dx12, _, _>(
+            |surface| {
+                let surface = surface.unwrap();
+                println!("Surface: {:?}", surface.present_with_transaction);
+            }
+        )
+        };
+        
+
         // print supported swapchain formats
         let swapchain_formats = surface.get_capabilities(&adapter).formats;
         println!("Supported swapchain formats: {:?}", swapchain_formats);
