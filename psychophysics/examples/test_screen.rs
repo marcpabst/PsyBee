@@ -15,7 +15,7 @@ fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
 
     // setup serial port
 
-    let port_name = "/dev/cu.usbmodem11301";
+    let port_name = "/dev/cu.usbmodem1234561";
     let mut port = serialport::new(port_name, 256000)
         .timeout(std::time::Duration::from_millis(1000))
         .open()
@@ -48,9 +48,9 @@ fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
         window.submit_frame(frame);
 
         // change color every 10 frames
-        if i % 10 == 0 {
+        if i % 100 == 0 {
             // send a zero byte to the serial port
-            port.write(&[0]).expect("Write failed");
+            port.write(&[9, 0]).expect("Write failed");
             stim.pattern.set_color(color::WHITE);
         } else {
             stim.pattern.set_color(color::BLACK);
