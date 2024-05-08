@@ -113,7 +113,7 @@ pub struct BaseStimulus {
     n_vertices: Arc<AtomicUsize>,
     /// Bind group 0 (contains the transformation matrix and, if a texture is specified, the texture and sampler).
     tts_bind_group: Arc<Mutex<wgpu::BindGroup>>,
-    /// Bind group 1 (contains the uniform buffers).
+    /// Bind group 1 (contains the uniform tts_bind_groupbuffers).
     uniform_bind_group: Arc<Mutex<wgpu::BindGroup>>,
     /// Uniform buffer for the pixel shader paramters.
     uniform_buffers: Arc<Mutex<Vec<wgpu::Buffer>>>,
@@ -251,11 +251,11 @@ impl BaseStimulus {
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba16Float,
+                format: wgpu::TextureFormat::Bgra8Unorm,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING
                     | wgpu::TextureUsages::COPY_DST,
                 label: Some("some texture"),
-                view_formats: &[wgpu::TextureFormat::Rgba16Float], // allow reading texture in linear space
+                view_formats: &[wgpu::TextureFormat::Bgra8Unorm], // allow reading texture in linear space
             });
             Some(texture)
         } else {
@@ -291,7 +291,7 @@ impl BaseStimulus {
         {
             // create the texture view
             let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-                format: Some(wgpu::TextureFormat::Rgba16Float),
+                format: Some(wgpu::TextureFormat::Bgra8Unorm),
                 ..Default::default()
             });
 
@@ -312,7 +312,7 @@ impl BaseStimulus {
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::D2Array,
+                    view_dimension: wgpu::TextureViewDimension::D2,
                     sample_type: wgpu::TextureSampleType::Float { filterable: true },
                 },
                 count: None,
@@ -381,7 +381,7 @@ impl BaseStimulus {
                 push_constant_ranges: &[],
             });
 
-        let swapchain_format = TextureFormat::Rgba16Float;
+        let swapchain_format = TextureFormat::Bgra8Unorm;
 
         // if a texture is specified, upload the texture data
 
@@ -488,8 +488,7 @@ impl BaseStimulus {
     where
         T: TextureDataTrait,
     {
-        // convert the data to f16
-        let data = data.to_f16();
+        // convert to bytes
         let data = data.to_bytes();
 
         // get the GPU state
@@ -509,7 +508,7 @@ impl BaseStimulus {
                 data.as_slice(),
                 wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(4 * 2 * texture.size().width),
+                    bytes_per_row: Some(4 * 1 * texture.size().width),
                     rows_per_image: Some(texture.size().height),
                 },
                 texture.size(),

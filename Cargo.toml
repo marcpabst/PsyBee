@@ -2,6 +2,5 @@
 resolver = "2"
 members = [ "example_experiments/balloons",
     "psychophysics",
-    "example_experiments/balloons",
-    "photometry"
+    "psychophysics-py",
 ]

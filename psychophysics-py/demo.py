@@ -4,45 +4,54 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import threading
-import psychophysics_py as psy
+from psychophysics_py import *
+import numpy as np
 
 # Create an experiment manager
-em = psy.ExperimentManager()
+em = ExperimentManager()
+
 # Get a monitor (0 is usually the internal screen, 1 the first external monitor, etc.)
 monitor = em.get_available_monitors()[-1]
 
-# Use the full screen of the second monitor at 60 Hz, select the highest resolution available
-win_opts = psy.WindowOptions(mode = "fullscreen_highest_resolution", 
-                             monitor = monitor, 
-                             refresh_rate = 60)
-
-# write an iterator that yields the frames of the experiment on each iteration
-class LoopFrameIterator:
-    def __init__(self, window):
-        self.window = window
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        return self.window.get_frame()
-        
-        
-
 # Define the experiment
-def my_experiment(window):
-     # print the thread id
-    colors = [(1, 0, 0), (0, 0, 1)]
-    color_index = 0
-    stim = psy.ShapeStimulus(window, (0, 0, 0))
+def my_experiment(wm):
 
-    for i, frame in enumerate(LoopFrameIterator(window)):
+    # create a window
+    window = wm.create_default_window()
+
+    # receive keyboard input from the window
+    kb = window.create_physical_input_receiver()
+
+    # create a stimulus
+    #stim = VideoStimulus(window, Rectangle.fullscreen(), "/Users/marc/Downloads/Movies/BigBuckBunny.mp4", 3840, 2160)
+
+
+    # create a Gabor patch stimulus
+    stim = GaborStimulus(window, Rectangle.fullscreen(), 0, Pixels(20), (0.,0.,0.))
+
+
+    # loop until the window is closed
+    i = 0
+    while True:
+        i += 1
+
+        # check for keyboard input
+        keys = kb.get_inputs()
+
+       
+        if i % 10 == 0:
+            stim.set_phase(stim.get_phase() + np.pi)
+            stim.set_cycle_length(Pixels(i))
+
+        if keys.key_pressed("s"):
+            stim.pause()
+        
+        if keys.key_pressed("p"):
+            stim.play()
+
+        frame = window.get_frame()
         frame.add(stim)
         window.submit_frame(frame)
 
-        color_index = (color_index + 1) % len(colors)
-        stim.set_color(colors[color_index])
-
 # Run the experiment 
-em.run_experiment(win_opts, my_experiment)
+em.run_experiment(my_experiment)

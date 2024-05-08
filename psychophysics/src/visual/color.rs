@@ -395,7 +395,7 @@ impl ColorFormat {
         match self {
             ColorFormat::SRGBA8 => TextureFormat::Bgra8UnormSrgb,
             ColorFormat::DisplayP3U8 => TextureFormat::Bgra8UnormSrgb,
-            ColorFormat::RGB16f => TextureFormat::Rgba16Float,
+            ColorFormat::RGB16f => TextureFormat::Bgra8Unorm,
         }
     }
 
@@ -412,9 +412,7 @@ impl ColorFormat {
             ColorFormat::DisplayP3U8 => {
                 (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
             }
-            ColorFormat::RGB16f => {
-                (TextureFormat::Rgba16Float, TextureFormat::Rgba16Float)
-            }
+            ColorFormat::RGB16f => (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8Unorm),
         }
     }
 

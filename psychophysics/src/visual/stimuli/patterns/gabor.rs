@@ -18,13 +18,13 @@ use crate::{
 
 /// A Sinosoidal grating pattern
 #[derive(Clone, Debug)]
-pub struct SineGratings {
-    phase: f32,
-    cycle_length: Size,
-    color: RawRgba,
+pub struct Gabor {
+    pub phase: f32,
+    pub cycle_length: Size,
+    pub color: RawRgba,
 }
 
-impl SineGratings {
+impl Gabor {
     pub fn new<L, C>(phase: f32, cycle_length: L, color: C) -> Self
     where
         L: Into<Size>,
@@ -36,9 +36,24 @@ impl SineGratings {
             color: color.convert_to_raw_rgba(ColorFormat::SRGBA8),
         }
     }
+
+    pub fn set_phase(&mut self, phase: f32) -> () {
+        self.phase = phase;
+    }
+
+    pub fn set_color(&mut self, color: impl IntoRawRgba) -> () {
+        self.color = color.convert_to_raw_rgba(ColorFormat::SRGBA8);
+    }
+
+    pub fn set_cycle_length<L>(&mut self, cycle_length: L) -> ()
+    where
+        L: Into<Size>,
+    {
+        self.cycle_length = cycle_length.into();
+    }
 }
 
-impl FillPattern for SineGratings {
+impl FillPattern for Gabor {
     fn uniform_buffer_data(&self, window: &Window) -> Option<Vec<u8>> {
         let screen_width_mm = window.physical_width.load_relaxed();
         let viewing_distance_mm = window.viewing_distance.load_relaxed();

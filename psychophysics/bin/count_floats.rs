@@ -111,6 +111,4 @@ fn main() {
 }
 
 /// Function that plots the sRGB color space in x,y coordinates
-fn plot_srgb() {
-    
-}
+fn plot_srgb() {}

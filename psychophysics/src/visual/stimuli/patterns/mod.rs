@@ -7,17 +7,26 @@
 //! Pattern stimuli for visual stimuli.
 
 pub mod checkerboard;
+pub mod gabor;
 pub mod gabor_patch;
 pub mod image;
 pub mod polka_dots;
-pub mod sine_gratings;
 pub mod sprite;
 pub mod uniform;
 
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+pub mod video;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+pub mod camera;
+
 pub use checkerboard::Checkerboard;
+pub use gabor::Gabor;
 pub use gabor_patch::GaborPatch;
 pub use image::Image;
 pub use polka_dots::PolkaDots;
-pub use sine_gratings::SineGratings;
 pub use sprite::Sprite;
 pub use uniform::Uniform;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+pub use video::Video;

@@ -4,6 +4,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::sync::{Arc, Mutex};
+
 use crate::visual::window::WindowState;
 use crate::visual::{geometry::ToVertices, Window};
 use crate::GPUState;
@@ -14,7 +16,7 @@ use super::Stimulus;
 #[derive(Clone, Debug)]
 pub struct PatternStimulus<P> {
     base_stimulus: BaseStimulus,
-    pub pattern: P,
+    pub pattern: Arc<Mutex<P>>,
 }
 
 pub trait FillPattern: Send + Sync {
@@ -96,7 +98,11 @@ pub trait FillPattern: Send + Sync {
 }
 
 impl<P: FillPattern> PatternStimulus<P> {
-    pub fn new(window: &Window, geometry: impl ToVertices + 'static, pattern: P) -> Self {
+    pub fn new_from_pattern(
+        window: &Window,
+        geometry: impl ToVertices + 'static,
+        pattern: P,
+    ) -> Self {
         // get the uniform buffer data
         let _uniform_buffer_size = pattern.uniform_buffer_size(window);
 
@@ -121,12 +127,12 @@ impl<P: FillPattern> PatternStimulus<P> {
                 texture_data,
                 &[uniform_buffer_data],
             ),
-            pattern: pattern,
+            pattern: Arc::new(Mutex::new(pattern)),
         }
     }
 
     pub fn set_pattern(&mut self, pattern: P) -> () {
-        self.pattern = pattern;
+        self.pattern = Arc::new(Mutex::new(pattern));
     }
 }
 
@@ -145,15 +151,15 @@ impl<P: FillPattern> Stimulus for PatternStimulus<P> {
         gpu_state: &GPUState,
     ) -> () {
         // update the uniform buffer
-        if let Some(uniform_buffer_data) =
-            self.pattern.updated_uniform_buffers_data(window)
-        {
+        let pattern = self.pattern.lock().unwrap();
+        if let Some(uniform_buffer_data) = pattern.updated_uniform_buffers_data(window) {
             self.base_stimulus
                 .set_uniform_buffers(&[uniform_buffer_data.as_slice()], gpu_state);
         }
 
         // update the texture
-        if let Some(texture_data) = self.pattern.updated_texture_data(window) {
+
+        if let Some(texture_data) = pattern.updated_texture_data(window) {
             self.base_stimulus.set_texture(texture_data, gpu_state);
         }
 

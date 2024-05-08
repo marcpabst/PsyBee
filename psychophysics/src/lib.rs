@@ -42,6 +42,9 @@ pub mod utils;
 pub mod visual;
 use winit::event_loop::EventLoop;
 
+// re-export wgpu
+pub use wgpu;
+
 
 // the prelude
 pub mod prelude {
@@ -55,7 +58,6 @@ pub mod prelude {
     pub use crate::utils::BIDSEventLogger;
     pub use crate::visual::color;
     pub use crate::visual::geometry::{Rectangle, Size};
-    pub use crate::visual::stimuli::SineGratings;
     pub use crate::visual::stimuli::PatternStimulus;
     // pub use crate::visual::stimuli::ImageStimulus;
     pub use crate::visual::stimuli::ColorStimulus;
@@ -315,7 +317,7 @@ impl WindowManager {
     pub fn create_default_window(&self) -> Window {
         // select monitor 1 if available
             // find all monitors available
-       let monitors = self.get_available_monitors();
+        let monitors = self.get_available_monitors();
         // get the second monitor if available, otherwise use the first one
         let monitor = monitors.get(1).unwrap_or(
             monitors
@@ -324,7 +326,7 @@ impl WindowManager {
         );
 
         println!("Creating default window on monitor {:?}", monitor);
-        self.create_window(&WindowOptions::FullscreenHighestResolution {  monitor: Some(monitor.clone()), refresh_rate: Some(120.0) })
+        self.create_window(&WindowOptions::FullscreenHighestResolution {  monitor: Some(monitor.clone()), refresh_rate: Some(60.0) })
     }
 
     /// Retrive available monitors. This reflects the state of the monitors at the time of the creation of the WindowManager.
@@ -548,14 +550,14 @@ impl ExperimentManager {
 
         let size = winit_window.inner_size();
          // print supported swapchain formats
-            let swapchain_formats = adapter.get_texture_format_features(TextureFormat::Rgba16Float);
+            let swapchain_formats = adapter.get_texture_format_features(TextureFormat::Bgra8Unorm);
             println!("Supported swapchain formats: {:?}", swapchain_formats);
  
  
          let swapchain_capabilities = surface.get_capabilities(&adapter);
-         let swapchain_format = TextureFormat::Rgba16Float;
+         let swapchain_format = TextureFormat::Bgra8Unorm;
          let swapchain_view_format = vec![
-             TextureFormat::Rgba16Float,
+             TextureFormat::Bgra8Unorm,
          ];
      
          let config = wgpu::SurfaceConfiguration {
@@ -898,8 +900,8 @@ impl ExperimentManager {
                                     PhysicalInput::from_window_event(event)
                                 {
                 
-                                    // if escape key is pressed, close window
-                                    if input.key_pressed(Key::Escape) {
+                                    // if escape key was pressed, close window
+                                    if input.key_pressed("\u{1b}") {
                                         win_target.exit();
                                     }
 

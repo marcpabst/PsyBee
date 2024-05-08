@@ -18,24 +18,44 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct Image {
-    image: image::DynamicImage,
+    buffer: Vec<u8>,
+    dimensions: (u32, u32),
+    dirty: bool,
 }
 
 impl Image {
     pub fn new(image: image::DynamicImage) -> Self {
-        Self { image }
+        Self {
+            buffer: image.to_rgba8().to_vec(),
+            dimensions: image.dimensions(),
+            dirty: false,
+        }
     }
 
     pub fn new_from_path(path: &str) -> Result<Self, image::ImageError> {
         println!("Loading image from path: {}", path);
         let image = image::open(path)?;
-        Ok(Self { image })
+        Ok(Self {
+            buffer: image.to_rgba8().to_vec(),
+            dimensions: image.dimensions(),
+            dirty: false,
+        })
+    }
+
+    pub fn set_image(&mut self, image: DynamicImage) {
+        self.buffer = image.to_rgba8().to_vec();
+        self.dirty = true;
+    }
+
+    pub fn set_buffer(&mut self, buffer: Vec<u8>) {
+        self.buffer = buffer;
+        self.dirty = true;
     }
 }
 
 impl FillPattern for Image {
     fn texture_extent(&self, _window: &Window) -> Option<wgpu::Extent3d> {
-        let (width, height) = self.image.dimensions();
+        let (width, height) = self.dimensions;
         Some(wgpu::Extent3d {
             width,
             height,
@@ -44,11 +64,15 @@ impl FillPattern for Image {
     }
 
     fn texture_data(&self, _window: &Window) -> Option<Vec<u8>> {
-        Some(self.image.to_rgba8().to_vec())
+        Some(self.buffer.clone())
     }
 
     fn updated_texture_data(&self, _window: &Window) -> Option<Vec<u8>> {
-        return None;
+        if self.dirty {
+            Some(self.buffer.clone())
+        } else {
+            None
+        }
     }
 
     fn uniform_buffer_data(&self, _window: &Window) -> Option<Vec<u8>> {

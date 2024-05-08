@@ -26,7 +26,7 @@ impl ColorStimulus {
         color: impl IntoRawRgba,
     ) -> Self {
         ColorStimulus {
-            _inner: PatternStimulus::new(window, shape, Uniform::new(color)),
+            _inner: PatternStimulus::new_from_pattern(window, shape, Uniform::new(color)),
         }
     }
 

@@ -25,7 +25,7 @@ fn calibrate(wn: WindowManager) -> Result<(), PsychophysicsError> {
     println!("{:?}", color_cal);
 
     // create the stimulus (coloured rectangle)
-    let mut stimulus = PatternStimulus::new(
+    let mut stimulus = PatternStimulus::new_from_pattern(
         &window,
         Rectangle::FULLSCREEN,
         Uniform::new(RawRgba {

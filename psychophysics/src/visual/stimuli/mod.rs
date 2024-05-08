@@ -4,12 +4,19 @@ use super::{window::WindowState, Window};
 
 pub mod base_stimulus;
 pub mod color_stimulus;
+pub mod gabor_stimulus;
 pub mod pattern_stimulus;
 pub mod patterns;
 
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+pub mod video_stimulus;
+
 pub use color_stimulus::ColorStimulus;
+pub use gabor_stimulus::GaborStimulus;
 pub use pattern_stimulus::PatternStimulus;
-pub use patterns::SineGratings;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+pub use video_stimulus::VideoStimulus;
 
 /// The stimulus trait.
 pub trait Stimulus: Send + Sync {

@@ -57,10 +57,6 @@ pub enum Size {
     Difference(Box<Size>, Box<Size>),
 }
 
-
-
-
-
 #[derive(Clone, Debug)]
 pub struct SizeVector2D {
     pub x: Size,
@@ -373,6 +369,22 @@ pub trait ToVertices: Send + Sync {
 
     fn n_vertices(&self) -> usize {
         self.to_vertices_px(1.0, 1.0, 1, 1).len()
+    }
+}
+
+impl ToVertices for Box<dyn ToVertices> {
+    fn to_vertices_px(
+        &self,
+        screenwidth_mm: f64,
+        viewing_distance_mm: f64,
+        width_px: u32,
+        height_px: u32,
+    ) -> Vec<Vertex> {
+        self.as_ref().to_vertices_px(screenwidth_mm, viewing_distance_mm, width_px, height_px)
+    }
+
+    fn clone_box(&self) -> Box<dyn ToVertices> {
+        self.as_ref().clone_box()
     }
 }
 

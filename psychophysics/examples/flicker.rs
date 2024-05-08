@@ -1,6 +1,4 @@
-use psychophysics::{
-    prelude::*, ExperimentManager, WindowManager, WindowOptions,
-};
+use psychophysics::{prelude::*, ExperimentManager, WindowManager, WindowOptions};
 
 // CONFIGURATION
 const KEY_FREQ_UP: Key = Key::KeyF;
@@ -12,9 +10,7 @@ const KEY_LOG: Key = Key::KeyS;
 const MONITOR_HZ: f64 = 60.0;
 
 // EXPERIMENT
-fn flicker_experiment(
-    wm: WindowManager,
-) -> Result<(), PsychophysicsError> {
+fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
     log::info!("Starting flicker experiment");
 
     let monitors = wm.get_available_monitors();
@@ -22,11 +18,10 @@ fn flicker_experiment(
         .get(1)
         .unwrap_or(monitors.first().expect("No monitor found!"));
 
-    let window_options: WindowOptions =
-        WindowOptions::FullscreenHighestResolution {
-            monitor: Some(monitor.clone()),
-            refresh_rate: Some(MONITOR_HZ),
-        };
+    let window_options: WindowOptions = WindowOptions::FullscreenHighestResolution {
+        monitor: Some(monitor.clone()),
+        refresh_rate: Some(MONITOR_HZ),
+    };
 
     let window = wm.create_window(&window_options);
 
@@ -35,15 +30,11 @@ fn flicker_experiment(
     window.set_physical_width(700.00);
 
     // create event logger that logs events to a BIDS compatible *.tsv file
-    let mut event_logger = BIDSEventLogger::new(
-        "events.tsv",
-        ["type", "freq", "key"],
-        true,
-    )?;
+    let mut event_logger =
+        BIDSEventLogger::new("events.tsv", ["type", "freq", "key"], true)?;
 
     // open serial port
-    let mut serial_port =
-        SerialPort::open_or_dummy("COM3", 115200, 1000);
+    let mut serial_port = SerialPort::open_or_dummy("COM3", 115200, 1000);
 
     // create a event receiver
     let mut event_receiver = PhysicalInputReceiver::new(&window);
@@ -73,13 +64,13 @@ fn flicker_experiment(
 
     // create text stimulus
     let start_stim = TextStimulus::new(
-        &window, // the window we want to display the stimulus in
+        &window,                // the window we want to display the stimulus in
         "Press space to start", // the text we want to display
-        Rectangle::FULLSCREEN, // full screen
+        Rectangle::FULLSCREEN,  // full screen
     );
 
     let freq_stim = TextStimulus::new(
-        &window, // the window we want to display the stimulus in
+        &window,                      // the window we want to display the stimulus in
         format!("{} Hz", current_hz), // the text we want to display
         Rectangle::new(
             -Size::ScreenWidth(0.5),

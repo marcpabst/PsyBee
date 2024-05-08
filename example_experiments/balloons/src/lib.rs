@@ -21,7 +21,7 @@ use psychophysics::{
     prelude::*,
     visual::{
         geometry::Transformable,
-        stimuli::{patterns::SineGratings, Stimulus},
+        stimuli::{patterns::Gabor, Stimulus},
     },
     ExperimentManager, WindowManager, WindowOptions,
 };
@@ -216,7 +216,7 @@ fn baloons(wm: WindowManager) -> Result<(), PsychophysicsError> {
 
     let rect = Circle::new(0.0, 0.0, 100.0);
 
-    let mut image_stimulus = PatternStimulus::new(&window, rect, image);
+    let mut image_stimulus = PatternStimulus::new_from_pattern(&window, rect, image);
 
     // create all the balloons
     let mut balloons = Vec::new();
@@ -232,7 +232,7 @@ fn baloons(wm: WindowManager) -> Result<(), PsychophysicsError> {
         let circle = Circle::new(0.0, 0.0, N_BALLOON_RADIUS as f64);
 
         // create the actual stimulus as a combination of the circle and the (masked) pattern
-        let stimulus = PatternStimulus::new(&window, circle, gratings);
+        let stimulus = PatternStimulus::new_from_pattern(&window, circle, gratings);
 
         // create a random velocity
         let normal = rand_distr::Normal::new(0.0, 1.0).unwrap();

@@ -1,4 +1,4 @@
-use crate::input::Key;
+use crate::input::{Key, PhysicalInputReceiver};
 #[cfg(target_arch = "wasm32")]
 use crate::request_animation_frame;
 use crate::GPUState;
@@ -110,6 +110,13 @@ impl Window {
         return self.gpu_state.write_blocking();
     }
 
+    /// Creates a new physical input receiver that will receive physical input events from the window.
+    pub fn create_physical_input_receiver(&self) -> PhysicalInputReceiver {
+        PhysicalInputReceiver {
+            receiver: self.physical_input_receiver.activate_cloned(),
+        }
+    }
+
 
     // /// Returns a MutexGuard to the WindowState behind the mutex asynchronously.
     // pub async fn get_window_state(&self) -> MutexGuard<WindowState> {
@@ -169,7 +176,7 @@ impl Window {
   
 
     /// Submits a frame to the render task. This will in turn call the prepare() and render() functions of all renderables in the frame.
-    /// The future will return when the frame has been commited to the global render queue.
+    /// This will block until the frame has been consumed by the render task.
     pub fn submit_frame(&self, frame: Frame) {
         let frame_sender = self.frame_sender.clone();
         let frame_ok_receiver = self.frame_ok_receiver.clone();
@@ -304,7 +311,7 @@ pub async fn render_task(window: Window) {
                     let view = suface_texture.texture.create_view(
                         &wgpu::TextureViewDescriptor {
                             format: Some(
-                                wgpu::TextureFormat::RGBA16Float,
+                                wgpu::TextureFormat::Bgra8Unorm,
                             ),
                             ..wgpu::TextureViewDescriptor::default()
                         },
@@ -381,6 +388,8 @@ pub async fn render_task(window: Window) {
             // wait for frame to be submitted
             let frame = rx.recv().await.unwrap();
 
+       
+
             // acquire lock on frame
             let mut frame = (frame.lock_blocking());
 
@@ -396,15 +405,20 @@ pub async fn render_task(window: Window) {
 
             let view = suface_texture.texture.create_view(
                 &wgpu::TextureViewDescriptor {
-                    format: Some(wgpu::TextureFormat::Rgba16Float),
+                    format: Some(wgpu::TextureFormat::Bgra8Unorm),
                     ..wgpu::TextureViewDescriptor::default()
                 },
             );
+
+              
 
             let mut encoder =
                 gpu_state.device.create_command_encoder(
                     &wgpu::CommandEncoderDescriptor { label: None },
                 );
+
+                 // start timer
+
             // clear the frame
             {
                 // clear the frame (once the lifetime annoyance is fixed, this can be removed only a single render pass is needed
@@ -430,6 +444,8 @@ pub async fn render_task(window: Window) {
                     },
                 );
             }
+
+
             frame
                 .prepare(
                     &window,
@@ -442,7 +458,11 @@ pub async fn render_task(window: Window) {
             frame.render(&mut encoder, &view);
 
             let _ = gpu_state.queue.submit(Some(encoder.finish()));
+            
             suface_texture.present();
+
+            // log the time it took to render the frame
+            
 
             // notify sender that frame has been consumed
             let _ = block_on(tx.send(true));
@@ -480,13 +500,18 @@ impl Frame {
         window_state: &WindowState,
         gpu_state: &GPUState,
     ) -> () {
+       
         // call prepare() on all renderables
         for renderable in
             &mut self.renderables.lock().await.iter_mut()
         {
+       
             renderable
-                .prepare(window, window_state, gpu_state)
+                .prepare(window, window_state, gpu_state);
+
+                
         }
+       
     }
 
     fn render(
@@ -511,6 +536,18 @@ impl Frame {
     ) -> () {
         let stimulus = Box::new(stimulus.clone());
         self.renderables.lock_blocking().push(stimulus);
+    }
+
+    pub fn add_many<E>(
+        &mut self,
+        stimuli: &Vec<E>,
+    ) -> ()
+    where
+        E: Stimulus + Clone + 'static,
+    {
+        for stimulus in stimuli {
+            self.add(stimulus);
+        }
     }
 }
 

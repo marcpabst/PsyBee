@@ -48,30 +48,41 @@ pub enum PhysicalInput {
     RawMouseMovementInput(winit::event::DeviceEvent),
 }
 
+// Implemented by types that represent physical input events.
 impl PhysicalInput {
     /// Returns true if this element represents a press of the given key.
-    pub fn key_pressed(&self, key: Key) -> bool {
+    pub fn key_pressed(&self, key: &str) -> bool {
         matches!(
             self,
             PhysicalInput::KeyInput(winit::event::WindowEvent::KeyboardInput { event, .. })
-                if event.state == winit::event::ElementState::Pressed && event.physical_key == winit::keyboard::PhysicalKey::Code(key)
+                if event.state == winit::event::ElementState::Pressed && event.logical_key.to_text() == Some(key.into())
         )
     }
 
     /// Returns true if this element represents a release of the given key.
-    pub fn key_released(&self, key: Key) -> bool {
+    pub fn key_released(&self, key: &str) -> bool {
         matches!(
             self,
             PhysicalInput::KeyInput(winit::event::WindowEvent::KeyboardInput { event, .. })
-                if event.state == winit::event::ElementState::Released && event.physical_key == winit::keyboard::PhysicalKey::Code(key)
+                if event.state == winit::event::ElementState::Released && event.logical_key.to_text() == Some(key.into())
         )
+    }
+
+    // Returns an appropriate text representation of the key event.
+    pub fn to_text(&self) -> Option<&str> {
+        // make sure that the key event is a key event
+        match self {
+            PhysicalInput::KeyInput(winit::event::WindowEvent::KeyboardInput {
+                event,
+                ..
+            }) => event.logical_key.to_text(),
+            _ => None,
+        }
     }
 
     /// try to convert a winit window event to a PhysicalInput
     /// returns None if the event is not a PhysicalInput
-    pub fn from_window_event(
-        event: winit::event::WindowEvent,
-    ) -> Option<Self> {
+    pub fn from_window_event(event: winit::event::WindowEvent) -> Option<Self> {
         match event {
             winit::event::WindowEvent::KeyboardInput { .. } => {
                 Some(PhysicalInput::KeyInput(event))
@@ -94,9 +105,7 @@ impl PhysicalInput {
 
     /// try to convert a winit device event to a PhysicalInput
     /// returns None if the event is not a PhysicalInput
-    pub fn from_device_event(
-        event: winit::event::DeviceEvent,
-    ) -> Option<Self> {
+    pub fn from_device_event(event: winit::event::DeviceEvent) -> Option<Self> {
         match event {
             winit::event::DeviceEvent::Key(ref _key) => {
                 Some(PhysicalInput::RawKeyInput(event))
@@ -112,20 +121,12 @@ impl PhysicalInput {
     }
 
     /// try to convert a PhysicalInput to a winit window event
-    pub fn to_winit_window_event(
-        &self,
-    ) -> Option<winit::event::WindowEvent> {
+    pub fn to_winit_window_event(&self) -> Option<winit::event::WindowEvent> {
         match self {
             PhysicalInput::KeyInput(event) => Some(event.clone()),
-            PhysicalInput::MouseWheelInput(event) => {
-                Some(event.clone())
-            }
-            PhysicalInput::CursorMovementInput(event) => {
-                Some(event.clone())
-            }
-            PhysicalInput::MouseButtonInput(event) => {
-                Some(event.clone())
-            }
+            PhysicalInput::MouseWheelInput(event) => Some(event.clone()),
+            PhysicalInput::CursorMovementInput(event) => Some(event.clone()),
+            PhysicalInput::MouseButtonInput(event) => Some(event.clone()),
             PhysicalInput::TouchInput(event) => Some(event.clone()),
             _ => None,
         }
@@ -134,7 +135,7 @@ impl PhysicalInput {
 
 /// Receives physical input events.
 pub struct PhysicalInputReceiver {
-    receiver: async_broadcast::Receiver<PhysicalInput>,
+    pub(crate) receiver: async_broadcast::Receiver<PhysicalInput>,
 }
 
 /// Contains a vector of key events. This is returned by the `get_keys` method of the `KeyPressReceiver`.
@@ -145,12 +146,12 @@ pub struct PhysicalInputVec(Vec<PhysicalInput>);
 // convenience methods for PhysicalInputVec
 impl PhysicalInputVec {
     /// Check if the given KeyEventVec contains the provided key in the `Pressed` state (convenience method).
-    pub fn key_pressed(&self, key: Key) -> bool {
+    pub fn key_pressed(&self, key: &str) -> bool {
         self.iter().any(|key_event| key_event.key_pressed(key))
     }
 
     /// Check if the given KeyEventVec contains the provided key in the `Released` state (convenience method).
-    pub fn key_released(&self, key: Key) -> bool {
+    pub fn key_released(&self, key: &str) -> bool {
         self.iter().any(|key_event| key_event.key_released(key))
     }
 }
@@ -165,11 +166,10 @@ impl Deref for PhysicalInputVec {
 
 impl PhysicalInputReceiver {
     /// Create a new KeyPressReceiver for the given window.
+    #[deprecated(note = "use the window's `create_physical_input_receiver` method")]
     pub fn new(window: &Window) -> Self {
         Self {
-            receiver: window
-                .physical_input_receiver
-                .activate_cloned(),
+            receiver: window.physical_input_receiver.activate_cloned(),
         }
     }
 
