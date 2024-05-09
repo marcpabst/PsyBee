@@ -5,7 +5,10 @@ use psychophysics::{
     input::PhysicalInputVec,
     visual::{
         geometry::{Circle, Rectangle, Size, ToVertices},
-        stimuli::{GaborStimulus, Stimulus},
+        stimuli::{
+            text_stimulus::TextStimulus, GaborStimulus, ImageStimulus, SpriteStimulus,
+            Stimulus,
+        },
         window::{Frame, WindowState},
         Window,
     },
@@ -15,7 +18,7 @@ use psychophysics::{
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 use psychophysics::visual::stimuli::VideoStimulus;
 
-use pyo3::{prelude::*, types::PyFunction, Python};
+use pyo3::{prelude::*, Python};
 use send_wrapper::SendWrapper;
 
 #[pyclass(unsendable, name = "ExperimentManager")]
@@ -171,6 +174,16 @@ impl PyFrame {
         }
 
         if let Ok(stim) = stim.extract::<PyGaborStimulus>() {
+            self.0.add(&stim);
+            return;
+        }
+
+        if let Ok(stim) = stim.extract::<PyImageStimulus>() {
+            self.0.add(&stim);
+            return;
+        }
+
+        if let Ok(stim) = stim.extract::<PySpriteStimulus>() {
             self.0.add(&stim);
             return;
         }
@@ -358,6 +371,80 @@ impl Stimulus for PyVideoStimulus {
     }
 }
 
+// ImageStimulus
+#[pyclass(name = "ImageStimulus", extends = PyStimulus)]
+#[derive(Clone)]
+pub struct PyImageStimulus(ImageStimulus);
+
+#[pymethods]
+impl PyImageStimulus {
+    #[new]
+    fn __new__(window: &PyWindow, shape: &PyShape, path: &str) -> (Self, PyStimulus) {
+        let stim = ImageStimulus::new(&window.0, shape.0.clone_box(), path);
+        (PyImageStimulus(stim), PyStimulus())
+    }
+}
+
+impl Stimulus for PyImageStimulus {
+    fn prepare(
+        &mut self,
+        window: &Window,
+        window_state: &WindowState,
+        gpu_state: &GPUState,
+    ) {
+        self.0.prepare(window, window_state, gpu_state)
+    }
+
+    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
+        self.0.render(enc, view)
+    }
+}
+
+// SpriteStimulus
+#[pyclass(name = "SpriteStimulus", extends = PyStimulus)]
+#[derive(Clone)]
+pub struct PySpriteStimulus(SpriteStimulus);
+
+#[pymethods]
+impl PySpriteStimulus {
+    #[new]
+    fn __new__(
+        window: &PyWindow,
+        shape: &PyShape,
+        sprite_path: &str,
+        num_sprites_x: u32,
+        num_sprites_y: u32,
+    ) -> (Self, PyStimulus) {
+        let stim = SpriteStimulus::new_from_spritesheet(
+            &window.0,
+            shape.0.clone_box(),
+            sprite_path,
+            num_sprites_x,
+            num_sprites_y,
+        );
+        (PySpriteStimulus(stim), PyStimulus())
+    }
+
+    fn advance_image_index(&mut self) {
+        self.0.advance_image_index()
+    }
+}
+
+impl Stimulus for PySpriteStimulus {
+    fn prepare(
+        &mut self,
+        window: &Window,
+        window_state: &WindowState,
+        gpu_state: &GPUState,
+    ) {
+        self.0.prepare(window, window_state, gpu_state)
+    }
+
+    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
+        self.0.render(enc, view)
+    }
+}
+
 // GaborStimulus
 #[pyclass(name = "GaborStimulus", extends = PyStimulus)]
 #[derive(Clone)]
@@ -371,13 +458,19 @@ impl PyGaborStimulus {
         shape: &PyShape,
         phase: f32,
         cycle_length: PySize,
+        std_x: PySize,
+        std_y: PySize,
+        orientation: f32,
         color: (f32, f32, f32),
     ) -> (Self, PyStimulus) {
-        let stim = psychophysics::visual::stimuli::GaborStimulus::new(
+        let stim = GaborStimulus::new(
             &window.0,
             shape.0.clone_box(),
             phase,
             cycle_length.0.clone(),
+            std_x.0.clone(),
+            std_y.0.clone(),
+            orientation,
             psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0),
         );
         (PyGaborStimulus(stim), PyStimulus())
@@ -387,22 +480,35 @@ impl PyGaborStimulus {
         self.0.set_phase(phase)
     }
 
-    fn get_phase(&self) -> f32 {
-        self.0.get_phase()
+    fn phase(&self) -> f32 {
+        self.0.phase()
     }
 
     fn set_cycle_length(&mut self, cycle_length: PySize) {
         self.0.set_cycle_length(cycle_length.0)
     }
 
-    fn get_cycle_length(&self) -> PySize {
-        PySize(self.0.get_cycle_length())
+    fn cycle_length(&self) -> PySize {
+        PySize(self.0.cycle_length())
     }
 
     fn set_color(&mut self, color: (f32, f32, f32)) {
         self.0.set_color(psychophysics::visual::color::SRGBA::new(
             color.0, color.1, color.2, 1.0,
         ))
+    }
+
+    fn color(&self) -> (f32, f32, f32) {
+        let color = self.0.color();
+        (color.r, color.g, color.b)
+    }
+
+    fn set_orientation(&mut self, orientation: f32) {
+        self.0.set_orientation(orientation)
+    }
+
+    fn orientation(&self) -> f32 {
+        self.0.orientation()
     }
 }
 
@@ -420,6 +526,20 @@ impl Stimulus for PyGaborStimulus {
         self.0.render(enc, view)
     }
 }
+
+// // The TextStimulus
+// #[pyclass(name = "TextStimulus", extends = PyStimulus)]
+// #[derive(Clone)]
+// pub struct PyTextStimulus(TextStimulus);
+
+// #[pymethods]
+// impl PyTextStimulus {
+//     #[new]
+//     fn __new__(window: &PyWindow, text: &str) -> (Self, PyStimulus) {
+//         let stim = TextStimulus::new(&window.0, text, rect.0);
+//         (PyTextStimulus(stim), PyStimulus())
+//     }
+// }
 
 // Sizes
 #[pyclass(name = "Size", subclass)]
@@ -486,7 +606,11 @@ fn psychophysics_py<'py, 'a>(
 
     #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
     m.add_class::<PyVideoStimulus>()?;
+
     m.add_class::<PyGaborStimulus>()?;
+    m.add_class::<PyImageStimulus>()?;
+    m.add_class::<PySpriteStimulus>()?;
+
     m.add_class::<PyStimulus>()?;
     m.add_class::<PySize>()?;
     m.add_class::<PyPixels>()?;

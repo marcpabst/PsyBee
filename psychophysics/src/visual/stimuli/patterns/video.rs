@@ -330,8 +330,7 @@ impl FillPattern for Video {
 
         @fragment
         fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-            return vec4<f32>(textureSample(texture, texture_sampler, in.tex_coords).xyz, 0.5);
-            //return textureSample(texture, texture_sampler, in.tex_coords);
+            return vec4<f32>(textureSample(texture, texture_sampler, in.tex_coords).xyz, 1.0);
         }
         "
         .to_string()

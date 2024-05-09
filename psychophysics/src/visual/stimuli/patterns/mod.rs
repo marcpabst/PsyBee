@@ -10,7 +10,6 @@ pub mod checkerboard;
 pub mod gabor;
 pub mod gabor_patch;
 pub mod image;
-pub mod polka_dots;
 pub mod sprite;
 pub mod uniform;
 
@@ -24,7 +23,6 @@ pub use checkerboard::Checkerboard;
 pub use gabor::Gabor;
 pub use gabor_patch::GaborPatch;
 pub use image::Image;
-pub use polka_dots::PolkaDots;
 pub use sprite::Sprite;
 pub use uniform::Uniform;
 

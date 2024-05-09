@@ -6,15 +6,7 @@
 use image::{DynamicImage, GenericImageView};
 
 use super::super::pattern_stimulus::FillPattern;
-use crate::{
-    prelude::PsychophysicsError,
-    utils::AtomicExt,
-    visual::{
-        color::{ColorFormat, IntoRawRgba, RawRgba},
-        geometry::{Size, SizeVector2D, ToPixels},
-        Window,
-    },
-};
+use crate::visual::Window;
 
 #[derive(Clone, Debug)]
 pub struct Image {
@@ -38,7 +30,7 @@ impl Image {
         Ok(Self {
             buffer: image.to_rgba8().to_vec(),
             dimensions: image.dimensions(),
-            dirty: false,
+            dirty: true,
         })
     }
 
@@ -69,7 +61,7 @@ impl FillPattern for Image {
 
     fn updated_texture_data(&self, _window: &Window) -> Option<Vec<u8>> {
         if self.dirty {
-            Some(self.buffer.clone())
+            None
         } else {
             None
         }
@@ -94,8 +86,9 @@ impl FillPattern for Image {
 
         @fragment
         fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-            return vec4<f32>(textureSample(texture, texture_sampler, in.tex_coords).xyz, 0.5);
-            //return textureSample(texture, texture_sampler, in.tex_coords);
+            var o = vec4<f32>(textureSample(texture, texture_sampler, in.tex_coords).xyz, 1.0);
+            // fom rgba to bgra
+            return vec4<f32>(o.b, o.g, o.r, o.a);
         }
         "
         .to_string()

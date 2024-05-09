@@ -172,7 +172,9 @@ impl FillPattern for Sprite {
 
         @fragment
         fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-            return textureSample(texture_array, texture_sampler, in.tex_coords, uniforms.texture_index);
+            var o = textureSample(texture_array, texture_sampler, in.tex_coords, uniforms.texture_index);
+            // fom rgba to bgra
+            return vec4<f32>(o.b, o.g, o.r, o.a);
         }
         "
         .to_string()

@@ -5,15 +5,20 @@ use super::{window::WindowState, Window};
 pub mod base_stimulus;
 pub mod color_stimulus;
 pub mod gabor_stimulus;
+pub mod image_stimulus;
 pub mod pattern_stimulus;
 pub mod patterns;
+pub mod sprite_stimulus;
+pub mod text_stimulus;
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 pub mod video_stimulus;
 
 pub use color_stimulus::ColorStimulus;
 pub use gabor_stimulus::GaborStimulus;
+pub use image_stimulus::ImageStimulus;
 pub use pattern_stimulus::PatternStimulus;
+pub use sprite_stimulus::SpriteStimulus;
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 pub use video_stimulus::VideoStimulus;

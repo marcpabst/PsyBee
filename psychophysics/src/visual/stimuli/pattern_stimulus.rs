@@ -19,6 +19,41 @@ pub struct PatternStimulus<P> {
     pub pattern: Arc<Mutex<P>>,
 }
 
+#[macro_export]
+macro_rules! generate_assessors {
+    // Generate a setter and getter for a single field
+    ($name:ident, $field:ident, Into<$type:ty>) => {
+        // Generate the setter
+        paste::paste! {
+            pub fn [<set_ $field>]<P>(&mut self, $field: P) -> ()
+            where
+                P: Into<$type>,
+            {
+                self.$name.lock().unwrap().$field = $field.into();
+            }
+        }
+
+        // Generate the getter
+        pub fn $field(&self) -> $type {
+            self.$name.lock().unwrap().$field.clone()
+        }
+    };
+
+    ($name:ident, $field:ident, $type:ty) => {
+        // Generate the setter
+        paste::paste! {
+            pub fn [<set_ $field>](&mut self, $field: $type) -> () {
+                self.$name.lock().unwrap().$field = $field;
+            }
+        }
+
+        // Generate the getter
+        pub fn $field(&self) -> $type {
+            self.$name.lock().unwrap().$field.clone()
+        }
+    };
+}
+
 pub trait FillPattern: Send + Sync {
     /// The shader language that the pattern uses. WGSL by default.
     const SHADER_LANGUAGE: &'static str = "wgsl";

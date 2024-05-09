@@ -306,13 +306,21 @@ impl BaseStimulus {
                 ..Default::default()
             });
 
+            let view_dimension = {
+                if texture.depth_or_array_layers() > 1 {
+                    wgpu::TextureViewDimension::D2Array
+                } else {
+                    wgpu::TextureViewDimension::D2
+                }
+            };
+
             // add the texture view to the bind group
             tts_bind_bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
                 binding: 1,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::D2,
+                    view_dimension: view_dimension,
                     sample_type: wgpu::TextureSampleType::Float { filterable: true },
                 },
                 count: None,
