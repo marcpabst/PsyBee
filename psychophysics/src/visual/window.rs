@@ -1,17 +1,18 @@
-use crate::input::{Key, PhysicalInputReceiver};
+use crate::input::{Key, EventReceiver};
 #[cfg(target_arch = "wasm32")]
 use crate::request_animation_frame;
 use crate::GPUState;
 use async_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use futures_lite::Future;
 use palette::IntoColor;
+use derive_debug::Dbg;
 
 use crate::visual::color::ColorFormat;
 use async_trait::async_trait;
 
 use atomic_float::AtomicF64;
 
-use crate::input::PhysicalInput;
+use crate::input::Event;
 
 use nalgebra;
 
@@ -50,9 +51,9 @@ pub struct Window {
     /// The GPU state
     pub gpu_state: Arc<RwLock<GPUState>>,
     /// Broadcast receiver for keyboard events. Used by the main window task to send keyboard events to the experiment task.
-    pub physical_input_receiver:
-        async_broadcast::InactiveReceiver<PhysicalInput>,
-    pub physical_input_sender: async_broadcast::Sender<PhysicalInput>,
+    pub event_receiver:
+        async_broadcast::InactiveReceiver<Event>,
+    pub physical_input_sender: async_broadcast::Sender<Event>,
     /// Channel for frame submission. Used by the experiment task to submit frames to the render task.
     pub frame_sender: Sender<Arc<Mutex<Frame>>>,
     /// Channel for frame submission. Used by the experiment task to submit frames to the render task.
@@ -71,13 +72,15 @@ pub struct Window {
     pub width_px: Arc<AtomicU32>,
     /// The window's height in pixels.
     pub height_px: Arc<AtomicU32>,
-    // render_task_sender
+    /// render_task_sender
     pub render_task_sender: Sender<
         Box<
             dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>>
                 + Send,
         >,
     >,
+    // /// event handlers
+    //pub event_handlers: Vec<Box<dyn Fn(Event) -> () + Send + Sync>>,
 }
 
 trait SyncTestTrait: Send + Sync {}
@@ -111,9 +114,9 @@ impl Window {
     }
 
     /// Creates a new physical input receiver that will receive physical input events from the window.
-    pub fn create_physical_input_receiver(&self) -> PhysicalInputReceiver {
-        PhysicalInputReceiver {
-            receiver: self.physical_input_receiver.activate_cloned(),
+    pub fn create_event_receiver(&self) -> EventReceiver {
+        EventReceiver {
+            receiver: self.event_receiver.activate_cloned(),
         }
     }
 
@@ -472,12 +475,15 @@ pub async fn render_task(window: Window) {
 /// A frame is a collection of renderables that will be rendered together.
 /// Rendering is lazy, i.e. the prepare() and render() functions of the renderables
 /// will only be called once the frame is submitted to the render task.
-#[derive(Clone)]
+#[derive(Clone, Dbg)]
 pub struct Frame {
+    #[dbg(placeholder = "...")]
     renderables: Arc<Mutex<Vec<Box<dyn Stimulus>>>>,
     color_format: ColorFormat,
     pub bg_color: super::color::RawRgba,
 }
+
+
 
 impl Frame {
     /// Set the background color of the frame.

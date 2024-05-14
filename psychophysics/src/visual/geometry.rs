@@ -892,6 +892,13 @@ pub trait Transformable {
     fn translate(&self, x: impl Into<Size>, y: impl Into<Size>)
     {
         let (x, y) = (x.into(), y.into());
+        self.add_transformation(Transformation2D::Translation(x, y));
+    }
+
+    /// Set the translation of the object to the given x and y coordinates. This overwrites any previously applied transformations.
+    fn set_translation(&self, x: impl Into<Size>, y: impl Into<Size>)
+    {
+        let (x, y) = (x.into(), y.into());
         self.set_transformation(Transformation2D::Translation(x, y));
     }
 

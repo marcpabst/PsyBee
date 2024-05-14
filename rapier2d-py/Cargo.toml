@@ -9,9 +9,11 @@ name = "rapier2d_py"
 crate-type = ["cdylib"]
 
 [dependencies]
+derive_more = "0.99.17"
 numpy = { version = "0.21.0", features = ["nalgebra"] }
 paste = "1.0.15"
 rapier2d = "0.19.0"
+pywrap = { path = "../pywrap" }
 
 [dependencies.pyo3]
 version = "0.21.2"

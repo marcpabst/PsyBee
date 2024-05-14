@@ -1,10 +1,10 @@
-use std::sync::Arc;
-
+use psychophysics::input::Event;
+use psychophysics::input::EventReceiver;
 use psychophysics::{
     errors,
-    input::PhysicalInputVec,
+    input::EventVec,
     visual::{
-        geometry::{Circle, Rectangle, Size, ToVertices},
+        geometry::{Circle, Rectangle, Size, ToVertices, Transformable},
         stimuli::{
             text_stimulus::TextStimulus, GaborStimulus, ImageStimulus, SpriteStimulus,
             Stimulus,
@@ -14,6 +14,11 @@ use psychophysics::{
     },
     wgpu, ExperimentManager, GPUState, Monitor, WindowManager, WindowOptions,
 };
+use pywrap::py_wrap;
+use pywrap::transmute_ignore_size;
+use std::sync::Arc;
+
+use pyo3::types::PyFunction;
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 use psychophysics::visual::stimuli::VideoStimulus;
@@ -21,18 +26,13 @@ use psychophysics::visual::stimuli::VideoStimulus;
 use pyo3::{prelude::*, Python};
 use send_wrapper::SendWrapper;
 
-#[pyclass(unsendable, name = "ExperimentManager")]
-pub struct PyExperimentManager(ExperimentManager);
+py_wrap!(ExperimentManager, unsendable);
 
 #[pymethods]
 impl PyExperimentManager {
     #[new]
     fn __new__() -> Self {
         PyExperimentManager(smol::block_on(ExperimentManager::new()))
-    }
-
-    fn __str__(&self) -> String {
-        format!("ExperimentManager")
     }
 
     fn __repr__(&self) -> String {
@@ -69,8 +69,7 @@ impl PyExperimentManager {
     }
 }
 
-#[pyclass(unsendable, name = "Monitor")]
-pub struct PyMonitor(Monitor);
+py_wrap!(Monitor);
 
 #[pymethods]
 impl PyMonitor {
@@ -80,9 +79,7 @@ impl PyMonitor {
     }
 }
 
-#[pyclass(unsendable, name = "Window")]
-#[derive(Debug)]
-pub struct PyWindow(Window);
+py_wrap!(Window);
 
 #[pymethods]
 impl PyWindow {
@@ -103,28 +100,23 @@ impl PyWindow {
         self.0.close();
     }
 
-    fn create_physical_input_receiver(&self) -> PyPhysicalInputReceiver {
-        PyPhysicalInputReceiver(self.0.create_physical_input_receiver())
+    fn create_event_receiver(&self) -> PyEventReceiver {
+        PyEventReceiver(self.0.create_event_receiver())
     }
 }
-#[pyclass(name = "PhysicalInputReceiver")]
-pub struct PyPhysicalInputReceiver(psychophysics::input::PhysicalInputReceiver);
-
-#[pyclass(name = "PhysicalInputVec")]
-pub struct PyPhysicalInputVec(PhysicalInputVec);
-
-#[pyclass(name = "PhysicalInput")]
-pub struct PyPhysicalInput(psychophysics::input::PhysicalInput);
+py_wrap!(EventReceiver);
+py_wrap!(EventVec);
+py_wrap!(Event);
 
 #[pymethods]
-impl PyPhysicalInputReceiver {
-    fn get_inputs(&mut self) -> PyPhysicalInputVec {
-        PyPhysicalInputVec(self.0.get_inputs())
+impl PyEventReceiver {
+    fn events(&mut self) -> PyEventVec {
+        PyEventVec(self.0.events())
     }
 }
 
 #[pymethods]
-impl PyPhysicalInputVec {
+impl PyEventVec {
     fn key_pressed(&self, key: &str) -> bool {
         self.0.iter().any(|key_event| key_event.key_pressed(key))
     }
@@ -133,29 +125,17 @@ impl PyPhysicalInputVec {
         self.0.iter().any(|key_event| key_event.key_released(key))
     }
 
-    fn __str__(&self) -> String {
-        format!("{:?}", self.0)
-    }
-
     fn __len__(&self) -> usize {
         self.0.len()
     }
 
-    // allow indexing into the PhysicalInputVec
-    fn __getitem__(&self, index: usize) -> PyPhysicalInput {
-        PyPhysicalInput(self.0[index].clone())
+    // allow indexing into the EventVec
+    fn __getitem__(&self, index: usize) -> PyEvent {
+        PyEvent(self.0[index].clone())
     }
 }
 
-#[pymethods]
-impl PyPhysicalInput {
-    fn __str__(&self) -> String {
-        format!("{:?}", self.0.to_text())
-    }
-}
-
-#[pyclass(unsendable, name = "Frame")]
-pub struct PyFrame(Frame);
+py_wrap!(Frame);
 
 #[pymethods]
 impl PyFrame {
@@ -193,8 +173,7 @@ impl PyFrame {
 }
 
 /// An object that contains the options for a window.
-#[pyclass(name = "WindowOptions")]
-pub struct PyWindowOptions(WindowOptions);
+py_wrap!(WindowOptions);
 
 #[pymethods]
 impl PyWindowOptions {
@@ -235,8 +214,7 @@ impl PyWindowOptions {
     }
 }
 
-#[pyclass(name = "PyWindowManager")]
-pub struct PyWindowManager(WindowManager);
+py_wrap!(WindowManager);
 
 #[pymethods]
 impl PyWindowManager {
@@ -510,6 +488,14 @@ impl PyGaborStimulus {
     fn orientation(&self) -> f32 {
         self.0.orientation()
     }
+
+    fn translate(&mut self, x: PySize, y: PySize) {
+        self.0.translate(x, y)
+    }
+
+    fn set_translation(&mut self, x: PySize, y: PySize) {
+        self.0.set_translation(x, y)
+    }
 }
 
 impl Stimulus for PyGaborStimulus {
@@ -548,6 +534,13 @@ pub struct PySize(Size);
 impl Clone for PySize {
     fn clone(&self) -> Self {
         PySize(self.0.clone())
+    }
+}
+
+// implement Into<Size> for PySize
+impl Into<Size> for PySize {
+    fn into(self) -> Size {
+        self.0
     }
 }
 
@@ -604,9 +597,6 @@ fn psychophysics_py<'py, 'a>(
     m.add_class::<PyRectangle>()?;
     m.add_class::<PyCircle>()?;
 
-    #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
-    m.add_class::<PyVideoStimulus>()?;
-
     m.add_class::<PyGaborStimulus>()?;
     m.add_class::<PyImageStimulus>()?;
     m.add_class::<PySpriteStimulus>()?;
@@ -617,9 +607,12 @@ fn psychophysics_py<'py, 'a>(
     m.add_class::<PyScreenWidth>()?;
     m.add_class::<PyScreenHeight>()?;
 
-    m.add_class::<PyPhysicalInputReceiver>()?;
-    m.add_class::<PyPhysicalInputVec>()?;
-    m.add_class::<PyPhysicalInput>()?;
+    m.add_class::<PyEventReceiver>()?;
+    m.add_class::<PyEventVec>()?;
+    m.add_class::<PyEvent>()?;
+
+    #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+    m.add_class::<PyVideoStimulus>()?;
 
     Ok(())
 }

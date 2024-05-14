@@ -6,6 +6,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use crate::visual::geometry::Transformable;
 use crate::visual::window::WindowState;
 use crate::visual::{geometry::ToVertices, Window};
 use crate::GPUState;
@@ -203,5 +204,23 @@ impl<P: FillPattern> Stimulus for PatternStimulus<P> {
 
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
         self.base_stimulus.render(enc, view);
+    }
+}
+
+impl<T> Transformable for PatternStimulus<T> {
+    fn set_transformation(
+        &self,
+        transformation: crate::visual::geometry::Transformation2D,
+    ) {
+        // set the transformation of the base stimulus
+        self.base_stimulus.set_transformation(transformation);
+    }
+
+    fn add_transformation(
+        &self,
+        transformation: crate::visual::geometry::Transformation2D,
+    ) {
+        // add the transformation to the base stimulus
+        self.base_stimulus.add_transformation(transformation);
     }
 }

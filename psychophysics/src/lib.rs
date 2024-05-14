@@ -10,7 +10,7 @@ use winit::monitor::VideoMode;
 
 use crate::visual::color::ColorFormat;
 
-use crate::input::PhysicalInput;
+use crate::input::Event;
 
 use async_executor::Executor;
 
@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 use wasm_bindgen::{closure::Closure, JsCast};
 use web_time::Duration;
-use winit::event::{Event, WindowEvent};
+use winit::event::{Event as WinitEvent, WindowEvent};
 use winit::event_loop::{
     ControlFlow, EventLoopBuilder, EventLoopWindowTarget,
 };
@@ -50,7 +50,7 @@ pub use wgpu;
 pub mod prelude {
     pub use crate::errors::PsychophysicsError;
     pub use crate::input::Key;
-    pub use crate::input::PhysicalInputReceiver;
+    pub use crate::input::EventReceiver;
     pub use crate::loop_frames;
     #[cfg(feature = "serial")]
     pub use crate::serial::SerialPort;
@@ -278,6 +278,7 @@ pub struct ExperimentManager {
 }
 
 /// The WindowManager is available as an argument to the experiment function. It can be used to create new windows.
+#[derive(Debug)]
 pub struct WindowManager {
     event_loop_proxy: winit::event_loop::EventLoopProxy<
         PsychophysicsEventLoopEvent,
@@ -326,7 +327,7 @@ impl WindowManager {
         );
 
         println!("Creating default window on monitor {:?}", monitor);
-        self.create_window(&WindowOptions::FullscreenHighestResolution {  monitor: Some(monitor.clone()), refresh_rate: Some(60.0) })
+        self.create_window(&WindowOptions::FullscreenHighestResolution {  monitor: Some(monitor.clone()), refresh_rate: None })
     }
 
     /// Retrive available monitors. This reflects the state of the monitors at the time of the creation of the WindowManager.
@@ -426,6 +427,9 @@ impl ExperimentManager {
                 event_loop_target.primary_monitor().expect("No primary monitor found. If a screen is connected, this is a bug, please report it.")
             };
 
+            //log::error!("Video modes: {:?}", monitor_handle.video_modes().collect::<Vec<VideoMode>>());
+
+
             // filter by resolution if specified
             let video_modes: Vec<VideoMode> =
                 if let Some(resolution) = window_options.resolution()
@@ -442,6 +446,9 @@ impl ExperimentManager {
                 } else {
                     monitor_handle.video_modes().collect()
                 };
+
+            //log::error!("Video ƒmodes: {:?}", video_modes);
+
 
             // filter by refresh rate if specified
             let mut video_modes: Vec<VideoMode> =
@@ -461,7 +468,6 @@ impl ExperimentManager {
                     video_modes
                 };
 
-            // if
 
             // sort by refresh rate
             video_modes.sort_by(|a, b| {
@@ -474,6 +480,8 @@ impl ExperimentManager {
                 (a.size().width * a.size().height)
                     .cmp(&(b.size().width * b.size().height))
             });
+
+            //log::error!("Video modes: {:?}", video_modes);
 
             // match the type of window_options
             let video_mode = match window_options {
@@ -603,7 +611,7 @@ impl ExperimentManager {
          let window = Window {
              state: Arc::new(RwLock::new(window_state)),
              gpu_state: self.gpu_state.clone(),
-             physical_input_receiver,
+             event_receiver: physical_input_receiver,
              physical_input_sender,
              frame_sender,
              frame_receiver,
@@ -615,6 +623,7 @@ impl ExperimentManager {
              width_px: Arc::new(AtomicU32::new(300)),
              height_px: Arc::new(AtomicU32::new(300)),
              render_task_sender: self.render_task_sender.clone(),
+             //event_handlers: vec![],
          };
      
  
@@ -805,9 +814,9 @@ impl ExperimentManager {
         event_loop.set_control_flow(ControlFlow::Poll);
 
         let _ =
-            event_loop.run(move |event: Event<PsychophysicsEventLoopEvent>, win_target| {
+            event_loop.run(move |event: WinitEvent<PsychophysicsEventLoopEvent>, win_target| {
                 match event {
-                    Event::UserEvent(event) => {
+                    WinitEvent::UserEvent(event) => {
                         match event {
                             PsychophysicsEventLoopEvent::CreateNewWindowEvent(
                                 window_options,
@@ -851,7 +860,7 @@ impl ExperimentManager {
                             }
                         }
                     }
-                    Event::WindowEvent {
+                    WinitEvent::WindowEvent {
                         window_id: id,
                         event: WindowEvent::Resized(new_size),
                     } => {
@@ -890,14 +899,14 @@ impl ExperimentManager {
                 }
                   
                     // handle window events
-                    Event::WindowEvent {
+                    WinitEvent::WindowEvent {
                         window_id: id,
                         event,
                     } => {
                         
                         if let  Some(window) = self.get_window_by_id(id) {    
                                 if let Some(input) =
-                                    PhysicalInput::from_window_event(event)
+                                    Event::try_from(event.clone()).ok()
                                 {
                 
                                     // if escape key was pressed, close window

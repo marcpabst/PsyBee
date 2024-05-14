@@ -37,7 +37,7 @@ fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
     let mut serial_port = SerialPort::open_or_dummy("COM3", 115200, 1000);
 
     // create a event receiver
-    let mut event_receiver = PhysicalInputReceiver::new(&window);
+    let mut event_receiver = EventReceiver::new(&window);
 
     // find all available freqs for the monitor by dividing the monitor hz by 2 until we reach 1
     let mut available_freqs = Vec::new();
@@ -123,7 +123,7 @@ fn flicker_experiment(wm: WindowManager) -> Result<(), PsychophysicsError> {
             frame.add(&freq_stim);
 
             // get all keys that were pressed since the last frame
-            let inputs = event_receiver.get_inputs();
+            let inputs = event_receiver.events();
 
             if !inputs.is_empty() {
                 if inputs.key_pressed(KEY_LOG) {

@@ -1,54 +1,54 @@
 import rapier2d_py
 
-# create a rect
-rect = [
-    rapier2d_py.Point(0.0, 0.0),
-    rapier2d_py.Point(1.0, 0.0),
-    rapier2d_py.Point(1.0, 1.0),
-    rapier2d_py.Point(0.0, 1.0),
-    rapier2d_py.Point(0.0, 0.0),
-]
-
-# create collider set
+# create sets
 collider_set = rapier2d_py.ColliderSet()
 rigid_body_set = rapier2d_py.RigidBodySet()
 
-# build a collider
-collider = rapier2d_py.Collider(
+
+# create walls
+walls_vertices = [
+    rapier2d_py.Point(0.0, 0.0),
+    rapier2d_py.Point(100.0, 0.0),
+    rapier2d_py.Point(100.0, 100.0),
+    rapier2d_py.Point(0.0, 100.0),
+    rapier2d_py.Point(0.0, 0.0),
+]
+
+wall_collider = rapier2d_py.Collider(
     collider_type="polyline",
-    vertices=rect,
+    vertices=walls_vertices,
     restitution=1.0,  # no energy loss
     friction=0.0,  # no friction
 )
 
-# add collider to collider set
-collider_set.insert(collider)
+collider_set.insert(wall_collider)
 
-# build a rigid body
-rigid_body = rapier2d_py.RigidBody(
-    body_type="dynamic",
-)
+n_balls = 1
 
-# add rigid body to rigid body set
-rigid_body_handle = rigid_body_set.insert(rigid_body)
+balls = []
 
+for i in range(n_balls):
+    # build a collider
+    ball = rapier2d_py.Collider(
+        collider_type="ball",
+        radius=1.0,
+        restitution=1.0,  # no energy loss
+        friction=0.0,  # no friction
+    )
 
-# add rigid body to collider set
-collider_set.insert_with_parent(collider, rigid_body_handle, rigid_body_set)
+    # build a rigid body
+    ball_rigid_body = rapier2d_py.RigidBody(
+        body_type="dynamic",
+        translation=rapier2d_py.Vector(10.0, 50.0),
+    )
+    # add rigid body to rigid body set
+    rigid_body_handle = rigid_body_set.insert(ball_rigid_body)
+    collider_set.insert_with_parent(ball, rigid_body_handle, rigid_body_set)
 
-# //         let gravity = vector![0.0, 0.0];
-# //         let mut integration_parameters = IntegrationParameters::default();
-# //         integration_parameters.dt = 1.0 / MONITOR_HZ as f32;
-# //         let physics_pipeline = PhysicsPipeline::new();
-# //         let island_manager = IslandManager::new();
-# //         let broad_phase = BroadPhase::new();
-# //         let narrow_phase = NarrowPhase::new();
-# //         let impulse_joint_set = ImpulseJointSet::new();
-# //         let multibody_joint_set = MultibodyJointSet::new();
-# //         let ccd_solver = CCDSolver::new();
-# //         let query_pipeline = QueryPipeline::new();
+    balls.append(rigid_body_handle)
 
-gravity = rapier2d_py.Vector(0.0, 0.0)
+# set-up physics
+gravity = rapier2d_py.Vector(0.0, 10.0)
 integration_parameters = rapier2d_py.IntegrationParameters.default()
 physics_pipeline = rapier2d_py.PhysicsPipeline()
 island_manager = rapier2d_py.IslandManager()
@@ -61,7 +61,7 @@ query_pipeline = rapier2d_py.QueryPipeline()
 
 
 # run physics
-for i in range(1000):
+for i in range(100):
     physics_pipeline.step(
         gravity,
         integration_parameters,
@@ -75,9 +75,5 @@ for i in range(1000):
         ccd_solver,
         query_pipeline,
     )
-
-    # print step
-    print(f"Step {i}")
-
-
-print(collider_set)
+    # print position of first ball
+    print(rigid_body_set.get(balls[0]).translation().y())

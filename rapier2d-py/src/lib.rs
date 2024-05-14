@@ -1,130 +1,6 @@
-// /// A balloon
-// #[derive(Debug, Clone)]
-// pub struct Balloon<T: Stimulus> {
-//     pub position: Vector2<Real>,
-//     pub radius: Real,
-//     pub velocity: Vector2<Real>,
-//     pub hidden: bool,
-//     pub stimulus: T,
-// }
+#![feature(associated_type_bounds)]
 
-// impl<T: Stimulus> BalloonSimulator<T> {
-//     /// Create a new balloon simulator
-//     pub fn new(
-//         balloons: Vec<Balloon<T>>,
-//         origin: Vector2<Real>,
-//         extend: Vector2<Real>,
-//     ) -> Self {
-//         // all the things that can collide with each other will live in the collider set
-//         let mut collider_set = ColliderSet::new();
-
-//         // create the walls (they usually align with the window size)
-//         let walls = ColliderBuilder::polyline(
-//             vec![
-//                 Point::new(origin.x, origin.y),            // bottom left
-//                 Point::new(origin.x, origin.y + extend.y), // top left
-//                 Point::new(origin.x + extend.x, origin.y + extend.y), // top right
-//                 Point::new(origin.x + extend.x, origin.y), // bottom right
-//                 Point::new(origin.x, origin.y),            // bottom left
-//             ],
-//             None,
-//         )
-//         .restitution(1.0) // no energy loss
-//         .friction(0.0) // no friction
-//         .build();
-
-//         collider_set.insert(walls);
-
-//         // create the balloons as rigid bodies and add them to the collider set
-//         let mut balloon_set = RigidBodySet::new();
-//         let mut balloon_handles = Vec::new();
-
-//         // for each balloon, create a rigid body and a collider with the same size
-//         for balloon in balloons.iter() {
-//             let rigid_body = RigidBodyBuilder::dynamic()
-//                 .translation(balloon.position)
-//                 .linvel(balloon.velocity)
-//                 .build();
-
-//             let collider = ColliderBuilder::ball(balloon.radius)
-//                 .restitution(1.0)
-//                 .friction(0.0)
-//                 .build();
-
-//             let ball_body_handle = balloon_set.insert(rigid_body);
-//             balloon_handles.push(ball_body_handle);
-
-//             // insert the collider with the rigid body as parent
-//             collider_set.insert_with_parent(collider, ball_body_handle, &mut balloon_set);
-//         }
-
-//         // create the physics pipeline
-//         let gravity = vector![0.0, 0.0];
-//         let mut integration_parameters = IntegrationParameters::default();
-//         integration_parameters.dt = 1.0 / MONITOR_HZ as f32;
-//         let physics_pipeline = PhysicsPipeline::new();
-//         let island_manager = IslandManager::new();
-//         let broad_phase = BroadPhase::new();
-//         let narrow_phase = NarrowPhase::new();
-//         let impulse_joint_set = ImpulseJointSet::new();
-//         let multibody_joint_set = MultibodyJointSet::new();
-//         let ccd_solver = CCDSolver::new();
-//         let query_pipeline = QueryPipeline::new();
-
-//         Self {
-//             balloons,
-//             collider_set,
-//             balloon_set,
-//             balloon_handles,
-//             gravity,
-//             integration_parameters,
-//             physics_pipeline,
-//             island_manager,
-//             broad_phase,
-//             narrow_phase,
-//             impulse_joint_set,
-//             multibody_joint_set,
-//             ccd_solver,
-//             query_pipeline,
-//             n_steps: 1,
-//         }
-//     }
-// }
-
-// // implement the Iterator trait for the BalloonSimulator
-// // each iteration steps through n_steps of the simulation
-// impl<T: Stimulus + Clone> Iterator for BalloonSimulator<T> {
-//     type Item = Vec<Balloon<T>>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         for _ in 0..self.n_steps {
-//             self.physics_pipeline.step(
-//                 &self.gravity,
-//                 &self.integration_parameters,
-//                 &mut self.island_manager,
-//                 &mut self.broad_phase,
-//                 &mut self.narrow_phase,
-//                 &mut self.balloon_set,
-//                 &mut self.collider_set,
-//                 &mut self.impulse_joint_set,
-//                 &mut self.multibody_joint_set,
-//                 &mut self.ccd_solver,
-//                 Some(&mut self.query_pipeline),
-//                 &(),
-//                 &(),
-//             );
-//         }
-
-//         // update the balloons
-//         for (i, handle) in self.balloon_handles.iter().enumerate() {
-//             let balloon = &mut self.balloons[i];
-//             let rb = self.balloon_set.get(*handle).unwrap();
-//             balloon.position = rb.position().translation.vector;
-//             balloon.velocity = rb.linvel().clone();
-//         }
-//         Some(self.balloons.clone())
-//     }
-// }
+use std::borrow::Borrow;
 
 use paste::paste;
 use pyo3::prelude::*;
@@ -132,10 +8,47 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 use rapier2d::{parry::shape, prelude::*};
 
-// macro that wrap a struct into Py<Struct>(struct)
-macro_rules! wrap {
-    ($name:ident) => {
+use derive_more::Display;
 
+use pywrap::py_forward;
+use pywrap::py_getter;
+use pywrap::py_wrap;
+
+// and for references (if type supports cloning)
+#[inline]
+#[proc_macro]
+pub fn transmute_ignore_size(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = parse_macro_input!(input as ItemFn);
+
+    // Extract the function signature and body
+    let ItemFn { sig, block, .. } = input;
+
+    // Extract function argument and return types
+    let inputs = &sig.inputs;
+    let output = &sig.output;
+
+    // Generate the new function body using unsafe code
+    let expanded = quote! {
+        #sig {
+            {
+                let a = #inputs;
+                unsafe {
+                    let b = ::core::ptr::read(&a as *const _ as *const _);
+                    ::core::mem::forget(a);
+                    b
+                }
+            }
+        }
+    };
+
+    // Convert the expanded code back into a token stream and return it
+    TokenStream::from(expanded)
+}
+
+// macro that wrap a struct into Py<Struct>(struct)
+macro_rules! py_wrap2 {
+    ($name:ident) => {
 
         paste::paste! {
 
@@ -149,10 +62,7 @@ macro_rules! wrap {
                     self.0
                 }
             }
-
         }
-
-
     };
     ($name:ident<$($t:tt),*>) => {
         paste::paste! {
@@ -167,6 +77,8 @@ macro_rules! wrap {
                     self.0
                 }
             }
+
+
         }
     };
 }
@@ -254,8 +166,27 @@ macro_rules! impl_clone_wrap {
     };
 }
 
+macro_rules! impl_debug_wrap {
+    ($name:ident) => {
+        impl std::fmt::Debug for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{:?}", self.0)
+            }
+        }
+
+        // also implement _str_ for the wrapper struct
+        #[pymethods]
+        impl $name {
+            pub fn __str__(&self) -> String {
+                // use the Debug implementation
+                format!("{:?}", self)
+            }
+        }
+    };
+}
+
 // Point
-wrap!(Point<Real>);
+py_wrap2!(Point<Real>);
 impl_clone_wrap!(PyPoint);
 
 #[pymethods]
@@ -267,7 +198,7 @@ impl PyPoint {
 }
 
 // Collider
-wrap!(Collider);
+py_wrap!(Collider);
 impl_clone_wrap!(PyCollider);
 
 #[pymethods]
@@ -352,121 +283,182 @@ impl PyCollider {
 }
 
 // ColliderSet
-wrap!(ColliderSet);
-forward_nullary_new!(ColliderSet);
+py_wrap!(ColliderSet);
+py_forward!(ColliderSet, fn new() -> Self);
+py_forward!(ColliderSet, fn insert(&mut self, collider: Collider) -> ColliderHandle);
+py_forward!(ColliderSet, fn insert_with_parent(&mut self, collider: Collider, parent_handle: RigidBodyHandle, bodies: &mut RigidBodySet) -> ColliderHandle);
 
-#[pymethods]
-impl PyColliderSet {
-    pub fn insert(&mut self, collider: PyCollider) -> PyColliderHandle {
-        PyColliderHandle(self.0.insert(collider.0))
-    }
-
-    pub fn insert_with_parent(
-        &mut self,
-        collider: PyCollider,
-        parent_handle: PyRigidBodyHandle,
-        bodies: &mut PyRigidBodySet,
-    ) -> PyColliderHandle {
-        PyColliderHandle(self.0.insert_with_parent(
-            collider.0,
-            parent_handle.0,
-            &mut bodies.0,
-        ))
-    }
-}
 // ColliderHandle
-wrap!(ColliderHandle);
+py_wrap!(ColliderHandle);
 
 // RigidBodySet
-wrap!(RigidBodySet);
-forward_nullary_new!(RigidBodySet);
-impl_clone_wrap!(PyRigidBodySet);
-
-#[pymethods]
-impl PyRigidBodySet {
-    pub fn insert(&mut self, body: PyRigidBody) -> PyRigidBodyHandle {
-        PyRigidBodyHandle(self.0.insert(body.0))
-    }
-}
+py_wrap!(RigidBodySet);
+py_forward!(RigidBodySet, fn new() -> Self);
+py_forward!(RigidBodySet, fn insert(&mut self, body: RigidBody) -> RigidBodyHandle);
+py_forward!(RigidBodySet, fn get(&self, handle: RigidBodyHandle) -> Option<RigidBody>);
 
 // RigidBodyHandle
-wrap!(RigidBodyHandle);
+py_wrap!(RigidBodyHandle);
 impl_clone_wrap!(PyRigidBodyHandle);
 
 // Vector
-wrap!(Vector<Real>);
-impl_clone_wrap!(PyVector);
+type RealVector = Vector<Real>;
+py_wrap!(RealVector);
+impl_clone_wrap!(PyRealVector);
+impl_debug_wrap!(PyRealVector);
 
 #[pymethods]
-impl PyVector {
+impl PyRealVector {
     #[new]
     fn new(x: f32, y: f32) -> Self {
         Self(Vector::new(x, y))
     }
+
+    pub fn x(&self) -> f32 {
+        self.0.x
+    }
+
+    pub fn y(&self) -> f32 {
+        self.0.y
+    }
 }
 
 // AngVector
-wrap!(AngVector<Real>);
+py_wrap2!(AngVector<Real>);
 impl_clone_wrap!(PyAngVector);
 
 // Isometry
-wrap!(Isometry<Real>);
+py_wrap2!(Isometry<Real>);
 impl_clone_wrap!(PyIsometry);
 
 // RigidBody
-wrap!(RigidBody);
+py_wrap!(RigidBody);
+py_forward!(RigidBody, fn translation(&self) -> RealVector);
+py_forward!(RigidBody, fn linvel(&self) -> RealVector);
+py_forward!(RigidBody, fn set_linvel(&mut self, linvel: RealVector, wake_up: bool) -> ());
 impl_clone_wrap!(PyRigidBody);
 
+// SpringJoint
+py_wrap!(SpringJoint);
+py_forward!(SpringJoint, fn new(reest_length: f32, stiffness: f32, damping: f32) -> Self);
+
+// #[pymethods]
+// impl PyRigidBody {
+//     fn translation(&mut self) -> PyRealVector {
+//         PyRealVector(self.0.translation())
+//     }
+// }
+
 // IntegrationParameters
-wrap!(IntegrationParameters);
+py_wrap!(IntegrationParameters);
 impl_clone_wrap!(PyIntegrationParameters);
 forward_nullary_function!(IntegrationParameters, default -> Self);
 
+#[pymethods]
+impl PyIntegrationParameters {
+    #[staticmethod]
+    fn default2() -> PyIntegrationParameters {
+        let mut i = IntegrationParameters::default();
+        i.dt = 1.0 / 60.0;
+        PyIntegrationParameters(i)
+    }
+}
+
 // PhysicsPipeline
-wrap!(PhysicsPipeline);
-forward_nullary_new!(PhysicsPipeline);
+py_wrap!(PhysicsPipeline);
+
+py_forward!(PhysicsPipeline, fn new() -> Self);
 
 // IslandManager
-wrap!(IslandManager);
+py_wrap!(IslandManager);
 impl_clone_wrap!(PyIslandManager);
-forward_nullary_new!(IslandManager);
+py_forward!(IslandManager, fn new() -> Self);
 
 // DefaultBroadPhase
-wrap!(DefaultBroadPhase);
+py_wrap!(DefaultBroadPhase);
 impl_clone_wrap!(PyDefaultBroadPhase);
-forward_nullary_new!(DefaultBroadPhase);
+py_forward!(DefaultBroadPhase, fn new() -> Self);
 
 // NarrowPhase
-wrap!(NarrowPhase);
+py_wrap!(NarrowPhase);
 impl_clone_wrap!(PyNarrowPhase);
-forward_nullary_new!(NarrowPhase);
+py_forward!(NarrowPhase, fn new() -> Self);
+
+// PyMultibodyJointHandle
+py_wrap!(MultibodyJointHandle);
 
 // ImpulseJointSet
-wrap!(ImpulseJointSet);
+py_wrap!(ImpulseJointSet);
 impl_clone_wrap!(PyImpulseJointSet);
-forward_nullary_new!(ImpulseJointSet);
+py_forward!(ImpulseJointSet, fn new() -> Self);
 
 // MultibodyJointSet
-wrap!(MultibodyJointSet);
+py_wrap!(MultibodyJointSet);
 impl_clone_wrap!(PyMultibodyJointSet);
-forward_nullary_new!(MultibodyJointSet);
+py_forward!(MultibodyJointSet, fn new() -> Self);
+
+#[pymethods]
+impl PyMultibodyJointSet {
+    pub fn insert_spring(
+        &mut self,
+        body1: PyRigidBodyHandle,
+        body2: PyRigidBodyHandle,
+        data: &PySpringJoint,
+        wake_up: bool,
+    ) -> Option<PyMultibodyJointHandle> {
+        let data = data.0;
+        let out = self.0.insert(body1.0, body2.0, data, wake_up);
+        match out {
+            Some(handle) => Some(PyMultibodyJointHandle(handle)),
+            None => None,
+        }
+    }
+}
 
 // CCDSolver
-wrap!(CCDSolver);
+py_wrap!(CCDSolver);
 impl_clone_wrap!(PyCCDSolver);
-forward_nullary_new!(CCDSolver);
+py_forward!(CCDSolver, fn new() -> Self);
 
 // QueryPipeline
-wrap!(QueryPipeline);
-impl_clone_wrap!(PyQueryPipeline);
-forward_nullary_new!(QueryPipeline);
+py_wrap!(QueryPipeline);
 
+impl_clone_wrap!(PyQueryPipeline);
+py_forward!(QueryPipeline, fn new() -> Self);
+
+trait MyTrait {}
+
+struct MyStruct1 {
+    x: f32,
+}
+impl MyTrait for MyStruct1 {}
+
+py_wrap!(MyStruct1);
+
+struct MyStruct2 {
+    x: f32,
+}
+impl MyTrait for MyStruct2 {}
+
+py_wrap!(MyStruct2);
+
+fn extract_as_trait(x: PyObject) -> &impl MyTrait {
+    // try to convert to MyStruct1, if it fails, try to convert to MyStruct2
+    let a = x.extract::<PyRef<PyMyStruct1>>().unwrap();
+    let b = &a.0;
+    b
+}
 // RigidBodyBuilder
 
 #[pymethods]
 impl PyRigidBody {
     #[new]
-    pub fn new(body_type: &str, position: Option<PyIsometry>) -> Self {
+    pub fn new(
+        body_type: &str,
+        position: Option<PyIsometry>,
+        translation: Option<PyRealVector>,
+        linvel: Option<PyRealVector>,
+    ) -> Self {
         let body_type = match body_type {
             "dynamic" => RigidBodyType::Dynamic,
             "kinematic_position_based" => RigidBodyType::KinematicPositionBased,
@@ -478,6 +470,8 @@ impl PyRigidBody {
         let mut builder = RigidBodyBuilder::new(body_type);
 
         builder = option_call!(builder, position, position);
+        builder = option_call!(builder, translation, translation);
+        builder = option_call!(builder, linvel, linvel);
 
         Self(builder.build())
     }
@@ -487,7 +481,7 @@ impl PyRigidBody {
 impl PyPhysicsPipeline {
     pub fn step(
         &mut self,
-        gravity: PyVector,
+        gravity: PyRealVector,
         integration_parameters: PyIntegrationParameters,
         island_manager: &mut PyIslandManager,
         broad_phase: &mut PyDefaultBroadPhase,
@@ -532,7 +526,7 @@ fn rapier2d_py<'py, 'a>(
     m.add_class::<PyColliderSet>()?;
     m.add_class::<PyColliderHandle>()?;
     m.add_class::<PyRigidBody>()?;
-    m.add_class::<PyVector>()?;
+    m.add_class::<PyRealVector>()?;
     m.add_class::<PyAngVector>()?;
     m.add_class::<PyIsometry>()?;
     m.add_class::<PyRigidBodySet>()?;
@@ -546,18 +540,7 @@ fn rapier2d_py<'py, 'a>(
     m.add_class::<PyMultibodyJointSet>()?;
     m.add_class::<PyCCDSolver>()?;
     m.add_class::<PyQueryPipeline>()?;
+    m.add_class::<PySpringJoint>()?;
 
     Ok(())
 }
-
-// wrap!(IntegrationParameters);
-// wrap!(RigidBodyBuilder);
-// wrap!(RigidBodySet);
-// wrap!(ColliderSet);
-// wrap!(PhysicsPipeline);
-// wrap!(IslandManager);
-// wrap!(NarrowPhase);
-// wrap!(ImpulseJointSet);
-// wrap!(MultibodyJointSet);
-// wrap!(CCDSolver);
-// wrap!(QueryPipeline);
