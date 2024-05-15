@@ -7,7 +7,7 @@ use crate::visual::{geometry::Size, Window};
 #[derive(Debug, Clone)]
 pub struct Event {
     /// The timestamp when the event was received.
-    pub timestamp: std::time::Instant,
+    pub timestamp: std::time::SystemTime,
     /// The event data.
     pub data: EventData,
     // /// The winit event (if available) that triggered this input event.
@@ -78,8 +78,35 @@ pub enum EventData {
         /// The id of the touch (if available).
         id: Option<u64>,
     },
-    /// Any other event. Refer to the winit event for more information.
-    Other,
+    /// The window has lost focus.
+    FocusGained,
+    /// The window has gained focus.
+    FocusLost,
+    /// The mouse cursor was moved.
+    CursorMoved {
+        /// The position of the cursor.
+        position: (Size, Size),
+    },
+    /// The mouse cursor was entered into the window.
+    CursorEntered,
+    /// The mouse cursor was exited from the window.
+    CursorExited,
+    /// A pressure-sensitive touchpad was pressed (if available).
+    TouchpadPress {
+        /// The pressure of the touch.
+        pressure: f32,
+        /// The level of the touch.
+        stage: i64,
+    },
+    /// The mouse wheel was scrolled (or the equivalent touchpad gesture).
+    MouseWheel {
+        /// The amount of horizontal scrolling.
+        horizontal: f32,
+        /// The amount of vertical scrolling.
+        vertical: f32,
+    },
+    /// Any other event. The string contains the name of the event.
+    Other(String),
 }
 
 // Implements convenience methods for Event.
@@ -124,7 +151,7 @@ impl TryFrom<winit::event::WindowEvent> for Event {
     type Error = &'static str;
 
     fn try_from(event: winit::event::WindowEvent) -> Result<Self, Self::Error> {
-        let timestamp = std::time::Instant::now();
+        let timestamp = std::time::SystemTime::now();
         let data = match event {
             // match keyboad events
             winit::event::WindowEvent::KeyboardInput {
@@ -146,8 +173,70 @@ impl TryFrom<winit::event::WindowEvent> for Event {
                     },
                 }
             }
+            // match mouse button events
+            winit::event::WindowEvent::MouseInput {
+                device_id,
+                state,
+                button,
+            } => {
+                let button = match button {
+                    winit::event::MouseButton::Left => MouseButton::Left,
+                    winit::event::MouseButton::Right => MouseButton::Right,
+                    winit::event::MouseButton::Middle => MouseButton::Middle,
+                    winit::event::MouseButton::Forward => MouseButton::Forward,
+                    winit::event::MouseButton::Back => MouseButton::Back,
+                    winit::event::MouseButton::Other(id) => MouseButton::Other(id),
+                };
+                let position = (Size::Pixels(0.0), Size::Pixels(0.0));
+                match state {
+                    winit::event::ElementState::Pressed => {
+                        EventData::MouseButtonPress { button, position }
+                    }
+                    winit::event::ElementState::Released => {
+                        EventData::MouseButtonRelease { button, position }
+                    }
+                }
+            }
+            // match touch events
+            winit::event::WindowEvent::Touch(touch) => {
+                let position = (
+                    Size::Pixels(touch.location.x),
+                    Size::Pixels(touch.location.y),
+                );
+
+                EventData::Other("touch".to_string())
+            }
+            // match focus events
+            winit::event::WindowEvent::Focused(focused) => {
+                if focused {
+                    EventData::FocusGained
+                } else {
+                    EventData::FocusLost
+                }
+            }
+            // match cursor movement events
+            winit::event::WindowEvent::CursorMoved { position, .. } => {
+                let position = (
+                    Size::Pixels(position.x) - Size::ScreenWidth(0.5),
+                    Size::Pixels(-position.y) + Size::ScreenHeight(0.5),
+                );
+                EventData::CursorMoved { position }
+            }
+            // match cursor enter events
+            winit::event::WindowEvent::CursorEntered { .. } => EventData::CursorEntered,
+            // match cursor exit events
+            winit::event::WindowEvent::CursorLeft { .. } => EventData::CursorExited,
+            // match touchpad press events
+            winit::event::WindowEvent::TouchpadPressure {
+                device_id,
+                pressure,
+                stage,
+            } => EventData::TouchpadPress {
+                pressure,
+                stage: stage,
+            },
             // match any other event
-            _ => EventData::Other,
+            _ => EventData::Other(format!("{:?}", event)),
         };
 
         Ok(Event {

@@ -79,6 +79,8 @@ pub struct Window {
                 + Send,
         >,
     >,
+    // /// The last cursor position.
+    //pub cursor_position: Arc<Mutex<(Size, Size)>>,
     // /// event handlers
     //pub event_handlers: Vec<Box<dyn Fn(Event) -> () + Send + Sync>>,
 }

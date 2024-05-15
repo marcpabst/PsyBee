@@ -1,5 +1,8 @@
 use psychophysics::input::Event;
+use psychophysics::input::EventData;
 use psychophysics::input::EventReceiver;
+use psychophysics::input::MouseButton;
+
 use psychophysics::{
     errors,
     input::EventVec,
@@ -106,7 +109,6 @@ impl PyWindow {
 }
 py_wrap!(EventReceiver);
 py_wrap!(EventVec);
-py_wrap!(Event);
 
 #[pymethods]
 impl PyEventReceiver {
@@ -361,6 +363,10 @@ impl PyImageStimulus {
         let stim = ImageStimulus::new(&window.0, shape.0.clone_box(), path);
         (PyImageStimulus(stim), PyStimulus())
     }
+
+    fn set_translation(&mut self, x: PySize, y: PySize) {
+        self.0.set_translation(x.0, y.0)
+    }
 }
 
 impl Stimulus for PyImageStimulus {
@@ -528,8 +534,10 @@ impl Stimulus for PyGaborStimulus {
 // }
 
 // Sizes
-#[pyclass(name = "Size", subclass)]
-pub struct PySize(Size);
+// #[pyclass(name = "Size", subclass)]
+// pub struct PySize(Size);
+
+py_wrap!(Size, subclass);
 
 impl Clone for PySize {
     fn clone(&self) -> Self {
@@ -537,12 +545,12 @@ impl Clone for PySize {
     }
 }
 
-// implement Into<Size> for PySize
-impl Into<Size> for PySize {
-    fn into(self) -> Size {
-        self.0
-    }
-}
+// // implement Into<Size> for PySize
+// impl Into<Size> for PySize {
+//     fn into(self) -> Size {
+//         self.0
+//     }
+// }
 
 // Pixels
 #[pyclass(name = "Pixels", extends = PySize)]
@@ -580,6 +588,106 @@ impl PyScreenHeight {
     }
 }
 
+#[pyclass(name = "Event")]
+pub struct PyEvent(Event);
+
+#[pymethods]
+impl PyEvent {
+    fn __repr__(&self) -> String {
+        format!("{:?}", self.0)
+    }
+
+    #[getter]
+    fn timestamp(&self) -> f64 {
+        // timestamo is an Instant, convert to f64 (seconds since epoch)
+        self.0
+            .timestamp
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs_f64()
+    }
+
+    #[getter]
+    fn data(&self) -> PyEventData {
+        let event = self.0.data.clone();
+        match event {
+            EventData::KeyPress { key, code } => PyEventData::KeyPress { key, code },
+            EventData::KeyRelease { key, code } => PyEventData::KeyRelease { key, code },
+            EventData::MouseButtonPress { button, position } => {
+                PyEventData::MouseButtonPress {
+                    button: PyMouseButton::from(button),
+                    position: (PySize(position.0), PySize(position.1)),
+                }
+            }
+            EventData::CursorMoved { position } => PyEventData::CursorMoved {
+                position: (PySize(position.0), PySize(position.1)),
+            },
+            EventData::Other(desc) => PyEventData::Other { desc },
+            // this should never happen
+            _ => PyEventData::Other {
+                desc: "Invalid event data encountered when converting to PyEventData"
+                    .to_string(),
+            },
+        }
+    }
+}
+
+#[pyclass]
+#[derive(Clone)]
+struct MyClass {
+    my_field: Box<i32>,
+}
+
+// #[pyo3::prelude::pyclass(name = "MouseButton")]
+// #[derive(Debug, Clone)]
+// pub struct PyMouseButton(pub MouseButton);
+
+#[pyclass(name = "MouseButton", get_all)]
+#[derive(Debug, Clone)]
+pub enum PyMouseButton {
+    Left {},
+    Right {},
+    Middle {},
+    Forward {},
+    Back {},
+    Other { index: u16 },
+}
+
+impl From<MouseButton> for PyMouseButton {
+    fn from(button: MouseButton) -> Self {
+        match button {
+            MouseButton::Left => PyMouseButton::Left {},
+            MouseButton::Right => PyMouseButton::Right {},
+            MouseButton::Middle => PyMouseButton::Middle {},
+            MouseButton::Forward => PyMouseButton::Forward {},
+            MouseButton::Back => PyMouseButton::Back {},
+            MouseButton::Other(index) => PyMouseButton::Other { index },
+        }
+    }
+}
+
+#[pyclass(name = "EventData", get_all)]
+pub enum PyEventData {
+    KeyPress {
+        key: String,
+        code: u32,
+    },
+    KeyRelease {
+        key: String,
+        code: u32,
+    },
+    MouseButtonPress {
+        button: PyMouseButton,
+        position: (PySize, PySize),
+    },
+    CursorMoved {
+        position: (PySize, PySize),
+    },
+    Other {
+        desc: String,
+    },
+}
+
 // Handling for user input
 
 #[pymodule]
@@ -610,6 +718,7 @@ fn psychophysics_py<'py, 'a>(
     m.add_class::<PyEventReceiver>()?;
     m.add_class::<PyEventVec>()?;
     m.add_class::<PyEvent>()?;
+    m.add_class::<PyEventData>()?;
 
     #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
     m.add_class::<PyVideoStimulus>()?;

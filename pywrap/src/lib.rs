@@ -217,7 +217,7 @@ pub fn py_wrap(s: TokenStream) -> TokenStream {
         #[pyo3::prelude::pymethods]
         impl #py_name {
             fn __str__(&self) -> String {
-                format!("Rust: {:?}", self.0)
+                format!("{:?}", self.0)
             }
         }
 

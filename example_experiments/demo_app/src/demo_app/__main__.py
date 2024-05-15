@@ -158,11 +158,11 @@ def my_experiment(wm):
 
         ball_stims.append(stim)
 
-    # stim2 = ImageStimulus(
-    #     window,
-    #     Rectangle(Pixels(-230), Pixels(-150), Pixels(460), Pixels(300)),
-    #     os.path.join(resources, "rustacean-flat-noshadow.png"),
-    # )
+    stim2 = ImageStimulus(
+        window,
+        Rectangle(Pixels(-50), Pixels(-50), Pixels(100), Pixels(100)),
+        os.path.join(resources, "crosshair.png"),
+    )
 
     # stim3 = psy.SpriteStimulus(
     #     window,
@@ -187,6 +187,7 @@ def my_experiment(wm):
             for i, stim in enumerate(ball_stims):
                 # add the stimulus to the frame
                 frame.add(stim)
+                frame.add(stim2)
 
                 # move the stimulus
                 stim.set_translation(Pixels(new_pos[i][0]), Pixels(new_pos[i][1]))
@@ -194,8 +195,16 @@ def my_experiment(wm):
             window.submit_frame(frame)
 
             # check for new events
-            event = kb.events()
-            print(event)
+            events = kb.events()
+            for i in range(len(events)):
+                event = events[i]
+                data = event.data
+
+                if isinstance(data, psy.EventData.CursorMoved):
+                    print(f"Mouse was moved to {data.position[0]}, {data.position[1]}")
+
+                    # update the position of the image stimulus
+                    stim2.set_translation(data.position[0], data.position[1])
 
         # for i in range(100):
         #     frame = window.get_frame()

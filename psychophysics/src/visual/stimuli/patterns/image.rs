@@ -86,7 +86,7 @@ impl FillPattern for Image {
 
         @fragment
         fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-            var o = vec4<f32>(textureSample(texture, texture_sampler, in.tex_coords).xyz, 1.0);
+            var o = vec4<f32>(textureSample(texture, texture_sampler, in.tex_coords));
             // fom rgba to bgra
             return vec4<f32>(o.b, o.g, o.r, o.a);
         }
