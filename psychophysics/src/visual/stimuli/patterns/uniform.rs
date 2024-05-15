@@ -34,7 +34,7 @@ impl Uniform {
 }
 
 impl FillPattern for Uniform {
-    fn uniform_buffer_data(&self, _window: &Window) -> Option<Vec<u8>> {
+    fn uniform_buffer_data(&mut self, _window: &Window) -> Option<Vec<u8>> {
         let bytes = self.color.to_ne_bytes().to_vec();
         Some(bytes)
     }

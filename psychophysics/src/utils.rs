@@ -64,6 +64,27 @@ pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};
 
+/// Nonblocking logging. When using the `pyo3-log` crate, logging from a background thread can under certain circumstances cause a deadlock.
+/// This function is a workaround for this issue. It logs the message in a separate thread, but doesn't wait for the logging to finish.
+/// This is very bad for performance, but it's better than a deadlock.
+/// Example:
+/// ```
+/// log_nonblocking!(log::Level::Info, "This is a nonblocking log message");
+/// ```
+#[macro_export]
+macro_rules! log_nonblocking {
+    ($lvl:expr, $($arg:tt)*) => {
+        if log::log_enabled!($lvl) {
+            // then we log the message in a separate thread
+            std::thread::spawn(move || {
+                log::log!($lvl, $($arg)*);
+            });
+        }
+    };
+}
+
+pub(crate) use log_nonblocking;
+
 /// Includes an image as a reference to a byte array.
 /// This is useful for including images in the binary.
 /// The image is loaded at compile time.
@@ -81,6 +102,7 @@ macro_rules! include_image {
     }};
 }
 
+#[macro_export]
 macro_rules! impl_into_string_vector_tuple {
     () => (
         impl IntoStringVector for () {
@@ -136,8 +158,7 @@ where
     I: IntoIterator<Item = S>,
     S: Into<String> + 'static,
 {
-    let column_names: Vec<String> =
-        column_names.into_iter().map(Into::into).collect();
+    let column_names: Vec<String> = column_names.into_iter().map(Into::into).collect();
 
     // check that all column names are unique
     let mut unique_column_names = column_names.clone();
@@ -171,8 +192,7 @@ impl CSVEventLogger {
     {
         let filepath = path.into();
 
-        let columns: Vec<String> =
-            columns.into_iter().map(Into::into).collect();
+        let columns: Vec<String> = columns.into_iter().map(Into::into).collect();
 
         if !check_unique_column_names(columns.clone()) {
             return Err(errors::PsychophysicsError::ColumnNamesNotUniqueError);
@@ -186,11 +206,9 @@ impl CSVEventLogger {
                 if overwrite {
                     std::fs::remove_file(&filepath)?;
                 } else {
-                    return Err(
-                        errors::PsychophysicsError::FileExistsAndNotEmptyError(
-                            filepath.to_string_lossy().to_string(),
-                        ),
-                    );
+                    return Err(errors::PsychophysicsError::FileExistsAndNotEmptyError(
+                        filepath.to_string_lossy().to_string(),
+                    ));
                 }
             }
         }
@@ -253,11 +271,9 @@ impl CSVEventLogger {
         // assert that all column names are in self.columns
         for column_name in column_names.iter() {
             if !self.columns.contains(column_name) {
-                return Err(
-                    errors::PsychophysicsError::ColumnNameDoesNotExistError(
-                        column_name.clone(),
-                    ),
-                );
+                return Err(errors::PsychophysicsError::ColumnNameDoesNotExistError(
+                    column_name.clone(),
+                ));
             }
         }
 
@@ -269,8 +285,7 @@ impl CSVEventLogger {
         }
 
         // we need to cal self.log() with the correct order of columns, replacing missing columns with an empty string
-        let mut new_column_values: Vec<String> =
-            Vec::with_capacity(self.columns.len());
+        let mut new_column_values: Vec<String> = Vec::with_capacity(self.columns.len());
 
         for column in self.columns.iter() {
             if column_names.contains(column) {
@@ -318,12 +333,9 @@ impl BIDSEventLogger {
         }
 
         // add mandatory columns "onset" and "duration"
-        let columns: Vec<String> =
-            columns.into_iter().map(Into::into).collect();
-        let mandatory_columns =
-            vec!["onset".to_string(), "duration".to_string()];
-        let columns: Vec<String> =
-            mandatory_columns.into_iter().chain(columns).collect();
+        let columns: Vec<String> = columns.into_iter().map(Into::into).collect();
+        let mandatory_columns = vec!["onset".to_string(), "duration".to_string()];
+        let columns: Vec<String> = mandatory_columns.into_iter().chain(columns).collect();
 
         let logger = CSVEventLogger::new(path, columns, '\t' as u8, overwrite)?;
 
@@ -349,11 +361,10 @@ impl BIDSEventLogger {
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let columns_values: Vec<String> =
-            vec![onset.to_string(), duration.to_string()]
-                .into_iter()
-                .chain(columns_values.into_iter())
-                .collect();
+        let columns_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
+            .into_iter()
+            .chain(columns_values.into_iter())
+            .collect();
 
         // log event
         self.logger.log(columns_values)
@@ -378,17 +389,15 @@ impl BIDSEventLogger {
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let column_names: Vec<String> =
-            vec!["onset".to_string(), "duration".to_string()]
-                .into_iter()
-                .chain(column_names.into_iter())
-                .collect();
+        let column_names: Vec<String> = vec!["onset".to_string(), "duration".to_string()]
+            .into_iter()
+            .chain(column_names.into_iter())
+            .collect();
 
-        let column_values: Vec<String> =
-            vec![onset.to_string(), duration.to_string()]
-                .into_iter()
-                .chain(column_values.into_iter())
-                .collect();
+        let column_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
+            .into_iter()
+            .chain(column_values.into_iter())
+            .collect();
 
         // log event
         self.logger.log_cols(column_names, column_values)

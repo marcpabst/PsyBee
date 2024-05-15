@@ -29,17 +29,28 @@ impl SpriteStimulus {
         sprite_path: &str,
         num_sprites_x: u32,
         num_sprites_y: u32,
+        fps: Option<f64>,
+        repeat: Option<u64>,
     ) -> Self {
-        println!("Creating new sprite stimulus");
         PatternStimulus::new_from_pattern(
             window,
             shape,
-            Sprite::new_from_spritesheet(sprite_path, num_sprites_x, num_sprites_y)
-                .expect("Failed to load spritesheet"),
+            Sprite::new_from_spritesheet(
+                sprite_path,
+                num_sprites_x,
+                num_sprites_y,
+                fps,
+                repeat,
+            )
+            .expect("Failed to load spritesheet"),
         )
     }
 
     pub fn advance_image_index(&mut self) -> () {
         self.pattern.lock().unwrap().advance_image_index()
+    }
+
+    pub fn reset(&mut self) -> () {
+        self.pattern.lock().unwrap().reset()
     }
 }

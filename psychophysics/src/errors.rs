@@ -57,9 +57,9 @@ pub enum PsychophysicsError {
     #[error("The provided vector is empty.")]
     EmptyVectorError,
 
-    // index out of bounds
-    #[error("The index {0} is out of bounds for an array or vector of length {1}.")]
-    IndexOutOfBoundsError(usize, usize),
+    // // index out of bounds
+    // #[error("The index {0} is out of bounds for an array or vector of length {1}.")]
+    // IndexOutOfBoundsError(usize, usize),
 
     // single image error
     #[error("Only one image was provided. This is currently not supported.")]

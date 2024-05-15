@@ -8,7 +8,6 @@ use crate::visual::{
 use crate::GPUState;
 use async_lock::Mutex;
 use num_traits::ToPrimitive;
-use rapier2d::data;
 use std::sync::atomic::AtomicBool;
 use std::sync::{atomic::AtomicUsize, Arc};
 use wgpu::util::DeviceExt;

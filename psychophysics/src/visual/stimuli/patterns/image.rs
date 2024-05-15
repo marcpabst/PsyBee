@@ -25,7 +25,7 @@ impl Image {
     }
 
     pub fn new_from_path(path: &str) -> Result<Self, image::ImageError> {
-        println!("Loading image from path: {}", path);
+        log::debug!("Loading image from path: {}", path);
         let image = image::open(path)?;
         Ok(Self {
             buffer: image.to_rgba8().to_vec(),
@@ -67,7 +67,7 @@ impl FillPattern for Image {
         }
     }
 
-    fn uniform_buffer_data(&self, _window: &Window) -> Option<Vec<u8>> {
+    fn uniform_buffer_data(&mut self, _window: &Window) -> Option<Vec<u8>> {
         Some(vec![0; 32])
     }
 

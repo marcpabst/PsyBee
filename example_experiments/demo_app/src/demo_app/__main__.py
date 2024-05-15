@@ -5,13 +5,13 @@ import rapier2d_py
 import numpy as np
 import time
 
-from rubicon.objc import NSObject, ObjCClass
-from rubicon.objc.runtime import load_library
 
-app_kit = load_library("AppKit")
+# logging
+import logging
 
-n_balls = 2
-n_init_steps = 1000
+
+n_balls = 4
+n_init_steps = 10000
 
 
 def correct_velocity(velocity, speed):
@@ -55,7 +55,7 @@ class BubbleSimulation:
             # build a collider
             ball = rapier2d_py.Collider(
                 collider_type="ball",
-                radius=120.0,
+                radius=200.0,
                 restitution=1.0,  # no energy loss
                 friction=0.0,  # no friction
             )
@@ -132,7 +132,6 @@ class BubbleSimulation:
 # Define the experiment
 def my_experiment(wm):
     # set-up the simulation
-    print("Setting up the simulation")
     sim = BubbleSimulation()
 
     # run the simulation for a few steps
@@ -140,7 +139,6 @@ def my_experiment(wm):
         next(sim)
 
     # create a window
-    print("Creating a window")
     window = wm.create_default_window()
 
     # receive keyboard input from the window
@@ -149,15 +147,16 @@ def my_experiment(wm):
     resources = os.path.join(os.path.dirname(__file__), "resources")
 
     ball_stims = []
+
     for i in range(n_balls):
 
         stim = GaborStimulus(
             window,
-            Circle(Pixels(0), Pixels(0), Pixels(50)),
+            Circle(Pixels(0), Pixels(0), ScreenWidth(0.05)),
             0,
-            Pixels(10),
             Pixels(20),
-            Pixels(20),
+            ScreenWidth(0.02),
+            ScreenWidth(0.02),
             0,
             (0.0, 0.0, 0.0),
         )
@@ -170,23 +169,29 @@ def my_experiment(wm):
         os.path.join(resources, "crosshair.png"),
     )
 
-    # stim3 = psy.SpriteStimulus(
-    #     window,
-    #     Rectangle(
-    #         ScreenWidth(-0.1), ScreenWidth(-0.1), ScreenWidth(0.2), ScreenWidth(0.2)
-    #     ),
-    #     os.path.join(
-    #         resources,
-    #         "white-sails-rocking-action-25-frames-1317px-by-1437px-per-frame.png",
-    #     ),
-    #     5,
-    #     5,
-    # )
+    stim3 = psy.SpriteStimulus(
+        window,
+        Rectangle(
+            ScreenWidth(-0.05), ScreenWidth(-0.05), ScreenWidth(0.1), ScreenWidth(0.1)
+        ),
+        os.path.join(
+            resources,
+            "buble_pop_two_spritesheet_512px_by512px_per_frame.png",
+        ),
+        4,
+        2,
+        fps=20,
+        repeat=1,
+    )
 
     # sleep for 1s
     time.sleep(1)
     subject_id = wm.prompt("Press any key to start the experiment")
     print(f"Subject ID: {subject_id}")
+
+    stim3.reset()
+
+    last_mouse_pos = (Pixels(0), Pixels(0))
 
     while True:
         for i in range(100):
@@ -198,10 +203,12 @@ def my_experiment(wm):
             for i, stim in enumerate(ball_stims):
                 # add the stimulus to the frame
                 frame.add(stim)
-                frame.add(stim2)
 
                 # move the stimulus
                 stim.set_translation(Pixels(new_pos[i][0]), Pixels(new_pos[i][1]))
+
+            frame.add(stim2)
+            frame.add(stim3)
 
             window.submit_frame(frame)
 
@@ -212,24 +219,49 @@ def my_experiment(wm):
                 data = event.data
 
                 if isinstance(data, psy.EventData.CursorMoved):
-                    print(f"Mouse was moved to {data.position[0]}, {data.position[1]}")
 
                     # update the position of the image stimulus
                     stim2.set_translation(data.position[0], data.position[1])
 
-        # for i in range(100):
-        #     frame = window.get_frame()
-        #     frame.add(stim2)
-        #     window.submit_frame(frame)
+                    # update the position of the mouse
+                    last_mouse_pos = data.position
 
-        # for i in range(100):
-        #     stim3.advance_image_index()
-        #     frame = window.get_frame()
-        #     frame.add(stim3)
-        #     window.submit_frame(frame)
+                if isinstance(data, psy.EventData.MouseButtonPress):
+
+                    # remove the last stimulus from ball_stims
+                    ball_stims.pop() if len(ball_stims) > 0 else None
+
+                    # move stimulus 3 to the position of the mouse
+                    stim3.set_translation(last_mouse_pos[0], last_mouse_pos[1])
+
+                    # reset the sprite
+                    stim3.reset()
+
+                if isinstance(data, psy.EventData.KeyPress):
+                    if data.key == "n" and len(ball_stims) < n_balls:
+
+                        # add a new stimulus to ball_stims
+                        stim = GaborStimulus(
+                            window,
+                            Circle(Pixels(0), Pixels(0), ScreenWidth(0.05)),
+                            0,
+                            Pixels(20),
+                            ScreenWidth(0.02),
+                            ScreenWidth(0.02),
+                            0,
+                            (0.0, 0.0, 0.0),
+                        )
+
+                        ball_stims.append(stim)
 
 
 if __name__ == "__main__":
+
+    # Set the logging level
+    FORMAT = "%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s"
+
+    logging.basicConfig(format=FORMAT)
+    logging.getLogger().setLevel(logging.INFO)
 
     # Create an experiment manager
     em = ExperimentManager()

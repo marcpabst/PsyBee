@@ -341,10 +341,12 @@ impl WindowManager {
                 // send event
                 self.event_loop_proxy.send_event(user_event).expect("Failed to send event to event loop. This is likely a bug, please report it.");
                 
-                log::info!("Waiting for window to be created...");
+                
+                log::debug!("Requested new window, waiting for response");
+
                 // wait for response
                 let window = receiver.recv_blocking().unwrap();
-                log::info!("Window created");
+                log::debug!("New window successfully created");
 
                 return window;
     }
@@ -361,7 +363,7 @@ impl WindowManager {
                 .expect("No monitor found - this should not happen"),
         );
 
-        println!("Creating default window on monitor {:?}", monitor);
+        log::debug!("Creating default window on monitor {:?}", monitor);
         self.create_window(&WindowOptions::FullscreenHighestResolution {  monitor: Some(monitor.clone()), refresh_rate: None })
     }
 
@@ -411,7 +413,7 @@ impl ExperimentManager {
             .await
             .expect("Failed to find an appropiate graphics adapter. This is likely a bug, please report it.");
 
-        println!("Adapter: {:?}", adapter.get_info());
+        log::debug!("Adapter: {:?}", adapter.get_info());
 
         // Create the logical device and command queue
         let (device, queue) = adapter
@@ -462,8 +464,7 @@ impl ExperimentManager {
                 event_loop_target.primary_monitor().expect("No primary monitor found. If a screen is connected, this is a bug, please report it.")
             };
 
-            //log::error!("Video modes: {:?}", monitor_handle.video_modes().collect::<Vec<VideoMode>>());
-
+            log::debug!("Video modes: {:?}", monitor_handle.video_modes().collect::<Vec<VideoMode>>());
 
             // filter by resolution if specified
             let video_modes: Vec<VideoMode> =
@@ -481,8 +482,6 @@ impl ExperimentManager {
                 } else {
                     monitor_handle.video_modes().collect()
                 };
-
-            //log::error!("Video ƒmodes: {:?}", video_modes);
 
 
             // filter by refresh rate if specified
@@ -516,7 +515,7 @@ impl ExperimentManager {
                     .cmp(&(b.size().width * b.size().height))
             });
 
-            //log::error!("Video modes: {:?}", video_modes);
+            log::debug!("Video modes: {:?}", video_modes);
 
             // match the type of window_options
             let video_mode = match window_options {
@@ -562,7 +561,7 @@ impl ExperimentManager {
         // winit_window.set_cursor_visible(false);
         winit_window.focus_window();
 
-        log::info!("winit window created");
+        log::debug!("Window created: {:?}", winit_window);
 
         let winit_window = Arc::new(winit_window);
 
@@ -572,9 +571,9 @@ impl ExperimentManager {
         let adapter = &gpu_state.adapter;
         let device = &gpu_state.device;
 
-        log::info!("Creating surface");
+        log::debug!("Creating wgup surface...");
 
-        let mut surface =  
+        let surface =  
             instance.create_surface(winit_window.clone()).expect("Failed to create surface. This is likely a bug, please report it.");
      
         // // get HAL using callback (but only on macos)
@@ -589,13 +588,12 @@ impl ExperimentManager {
 
         // print supported swapchain formats
         let swapchain_formats = surface.get_capabilities(&adapter).formats;
-        println!("Supported swapchain formats: {:?}", swapchain_formats);
+        log::debug!("Supported swapchain formats: {:?}", swapchain_formats);
 
         let size = winit_window.inner_size();
-         // print supported swapchain formats
-            let swapchain_formats = adapter.get_texture_format_features(TextureFormat::Bgra8Unorm);
-            println!("Supported swapchain formats: {:?}", swapchain_formats);
  
+        let swapchain_formats = adapter.get_texture_format_features(TextureFormat::Bgra8Unorm);
+
  
          let swapchain_capabilities = surface.get_capabilities(&adapter);
          let swapchain_format = TextureFormat::Bgra8Unorm;
@@ -614,7 +612,7 @@ impl ExperimentManager {
              desired_maximum_frame_latency: 1,
          };
 
-         println!("Surface config: {:?}", config);
+         log::debug!("Surface configuration: {:?}", config);
      
          surface.configure(&device, &config);
      
@@ -775,11 +773,6 @@ impl ExperimentManager {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            simple_logger::SimpleLogger::new()
-                .with_level(log::LevelFilter::Error)
-                .init()
-                .unwrap();
-
             smol::block_on(
                 self.run_event_loop(event_loop, experiment_fn),
             );
@@ -902,7 +895,7 @@ impl ExperimentManager {
                                 window_options,
                                 sender,
                             ) => {
-                                log::info!("Event loop received CreateNewWindowEvent - creating new window");
+                                log::debug!("Event loop received CreateNewWindowEvent - creating new window");
 
                                 let window = self.create_window(
                                     &window_options,
@@ -929,24 +922,23 @@ impl ExperimentManager {
                                 message,
                                 sender,
                             ) => {
-                                log::error!("Event loop received PromptEvent - showing prompt");
+                                log::debug!("Event loop received PromptEvent - showing prompt");
 
                                 let result = self.prompt(&message);
-                                // log::error!("Prompt result: {:?}", result);
                                 
                                 sender.send_blocking(result).expect("Failed to send result to sender. This is likely a bug, please report it.");
                             }
                             PsychophysicsEventLoopEvent::NewWindowCreatedEvent(
                                 window,
                             ) => {
-                                log::info!("New window created");
+                                log::debug!("Event loop received NewWindowCreatedEvent");
                                 // add window to list of windows
                                 //self.windows.push(window);
                             }
                             PsychophysicsEventLoopEvent::RunOnMainThread(
                                 task,
                             ) => {
-                                log::info!("Running task on main thread");
+                                log::debug!("Running task on main thread");
                                 let _ = block_on(task());
                             }
                         }
@@ -955,7 +947,7 @@ impl ExperimentManager {
                         window_id: id,
                         event: WindowEvent::Resized(new_size),
                     } => {
-                        log::info!(
+                        log::debug!(
                             "Window {:?} resized to {:?}",
                             id,
                             new_size
@@ -994,6 +986,8 @@ impl ExperimentManager {
                         window_id: id,
                         event,
                     } => {
+
+                        
                         
                         if let  Some(window) = self.get_window_by_id(id) {    
                                 if let Some(input) =

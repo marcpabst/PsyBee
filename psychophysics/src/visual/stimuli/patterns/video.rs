@@ -311,7 +311,7 @@ impl FillPattern for Video {
         Some(self.buffer.lock().unwrap().clone())
     }
 
-    fn uniform_buffer_data(&self, _window: &Window) -> Option<Vec<u8>> {
+    fn uniform_buffer_data(&mut self, _window: &Window) -> Option<Vec<u8>> {
         Some(vec![0; 32])
     }
 

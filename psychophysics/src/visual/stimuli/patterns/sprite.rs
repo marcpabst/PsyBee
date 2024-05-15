@@ -20,8 +20,16 @@ use crate::{
 /// by changing the texture index.
 #[derive(Clone, Debug)]
 pub struct Sprite {
+    // The images that the sprite holds
     images: Vec<image::DynamicImage>,
-    current_index: usize,
+    /// The index of the current image (0-based, does not wrap around)
+    current_index: u64,
+    /// Frames per second of the sprite (None for manual control)
+    fps: Option<f64>,
+    /// The number of times the sprite should repeat (None for infinite)
+    repeat: Option<u64>,
+    /// Time the frame was initialized
+    init_time: std::time::Instant,
 }
 
 impl std::fmt::Display for Sprite {
@@ -32,7 +40,11 @@ impl std::fmt::Display for Sprite {
 
 impl Sprite {
     /// Create a new sprite from a list of images. All images must have the same dimensions, otherwise this function will return an error.
-    pub fn new(images: Vec<image::DynamicImage>) -> Result<Self, PsychophysicsError> {
+    pub fn new(
+        images: Vec<image::DynamicImage>,
+        fps: Option<f64>,
+        repeat: Option<u64>,
+    ) -> Result<Self, PsychophysicsError> {
         // check that the vector is not empty
         if images.is_empty() {
             return Err(PsychophysicsError::EmptyVectorError);
@@ -47,6 +59,9 @@ impl Sprite {
             Ok(Self {
                 images,
                 current_index: 0,
+                fps: fps,
+                repeat: repeat,
+                init_time: std::time::Instant::now(),
             })
         } else {
             Err(PsychophysicsError::NonIdenticalDimensionsError(
@@ -57,12 +72,16 @@ impl Sprite {
     }
 
     /// Create a new sprite from a list of image paths. All images must have the same dimensions, otherwise this function will return an error.
-    pub fn new_from_paths(paths: Vec<&str>) -> Result<Self, PsychophysicsError> {
+    pub fn new_from_paths(
+        paths: Vec<&str>,
+        fps: Option<f64>,
+        repeat: Option<u64>,
+    ) -> Result<Self, PsychophysicsError> {
         let images = paths
             .iter()
             .map(|path| image::open(path))
             .collect::<Result<Vec<_>, _>>()?;
-        Self::new(images)
+        Self::new(images, fps, repeat)
     }
 
     /// Create a new sprite from a spritesheet. The sprite sheet must contain images of the same size.
@@ -70,6 +89,8 @@ impl Sprite {
         path: &str,
         num_sprites_x: u32,
         num_sprites_y: u32,
+        fps: Option<f64>,
+        repeat: Option<u64>,
     ) -> Result<Self, PsychophysicsError> {
         let image = image::open(path)?;
         let (width, height) = image.dimensions();
@@ -97,24 +118,23 @@ impl Sprite {
             }
         }
 
-        Self::new(images)
+        Self::new(images, fps, repeat)
     }
 
-    /// Set the current texture index of the sprite. If the index is out of bounds, this function will return an error.
-    pub fn set_image_index(&mut self, index: usize) -> Result<(), PsychophysicsError> {
-        if index < self.images.len() {
-            self.current_index = index;
-            Ok(())
-        } else {
-            Err(PsychophysicsError::IndexOutOfBoundsError(
-                index,
-                self.images.len(),
-            ))
-        }
+    /// Set the current texture index of the sprite.
+    pub fn set_image_index(&mut self, index: u64) {
+        self.current_index = index;
     }
 
+    /// Move to the next image in the sprite.
     pub fn advance_image_index(&mut self) {
-        self.current_index = (self.current_index + 1) % self.images.len();
+        self.current_index += 1;
+    }
+
+    // Reset the sprite.
+    pub fn reset(&mut self) {
+        self.current_index = 0;
+        self.init_time = std::time::Instant::now();
     }
 }
 
@@ -134,7 +154,7 @@ impl FillPattern for Sprite {
             let d = image.to_rgba8().to_vec();
             data.extend_from_slice(&d);
         }
-        println!("Sprite texture data length: {}", data.len());
+        log::debug!("Sprite texture data length: {}", data.len());
         Some(data)
     }
 
@@ -142,11 +162,30 @@ impl FillPattern for Sprite {
         return None;
     }
 
-    fn uniform_buffer_data(&self, _window: &Window) -> Option<Vec<u8>> {
-        Some(self.current_index.to_ne_bytes().to_vec())
+    fn uniform_buffer_data(&mut self, _window: &Window) -> Option<Vec<u8>> {
+        // if fps is set, calculate the index based on the time
+        let mut index = self.current_index;
+        if let Some(fps) = self.fps {
+            let elapsed = self.init_time.elapsed().as_secs_f64();
+            let frames = elapsed * fps;
+            index = frames as u64;
+        }
+
+        if let Some(repeat) = self.repeat {
+            // if repeat is set, make sure that the new index is within the maximum index
+            // if not, set index to the last image
+            if index >= self.images.len() as u64 * repeat {
+                index = self.images.len() as u64 * repeat - 1;
+            }
+        }
+
+        // calculate the current index by wrapping around the number of images
+        let mut wrapped_index = index % self.images.len() as u64;
+
+        Some(wrapped_index.to_ne_bytes().to_vec())
     }
 
-    fn updated_uniform_buffers_data(&self, window: &Window) -> Option<Vec<u8>> {
+    fn updated_uniform_buffers_data(&mut self, window: &Window) -> Option<Vec<u8>> {
         self.uniform_buffer_data(window)
     }
 

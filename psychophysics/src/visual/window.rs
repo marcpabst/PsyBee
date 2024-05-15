@@ -268,10 +268,7 @@ impl Window {
 /// This is the window's main render task. On native, it will submit frames when they are ready (and block when an approriate presentation mode is used).
 /// On wasm, it will submit frames when the browser requests a new frame.
 pub async fn render_task(window: Window) {
-    log::debug!(
-        "Render task running on thread {:?}",
-        std::thread::current().id()
-    );
+   
     // get rx and tx from handle
     let tx = window.frame_ok_sender.clone();
     let rx = window.frame_receiver.clone();
@@ -384,10 +381,7 @@ pub async fn render_task(window: Window) {
     // on native, we submit frames when they are ready
     #[cfg(not(target_arch = "wasm32"))]
     {
-        log::debug!(
-            "Render task running on thread {:?}",
-            std::thread::current().id()
-        );
+      
 
         loop {
             // wait for frame to be submitted

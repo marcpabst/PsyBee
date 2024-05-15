@@ -47,7 +47,7 @@ impl Checkerboard {
 }
 
 impl FillPattern for Checkerboard {
-    fn uniform_buffer_data(&self, window: &Window) -> Option<Vec<u8>> {
+    fn uniform_buffer_data(&mut self, window: &Window) -> Option<Vec<u8>> {
         let screen_width_mm = window.physical_width.load_relaxed();
         let viewing_distance_mm = window.viewing_distance.load_relaxed();
         let screen_width_px = window.width_px.load_relaxed();

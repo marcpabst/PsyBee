@@ -85,7 +85,7 @@ pub trait FillPattern: Send + Sync {
     /// Get the uniform buffer size (in bytes) for the pattern. This is the size of the buffer that will be passed to the fragment shader.
     ///
     /// If the pattern does not use a uniform buffer, this function should return `None`.
-    fn uniform_buffer_size(&self, window: &Window) -> Option<usize> {
+    fn uniform_buffer_size(&mut self, window: &Window) -> Option<usize> {
         // by default, return the size of self.uniform_buffer_data()
         // this is slightly inefficient, but it's the best we can do without knowing the actual data
         if let Some(data) = self.uniform_buffer_data(window) {
@@ -101,13 +101,13 @@ pub trait FillPattern: Send + Sync {
     /// If the pattern does not use a uniform buffer, this function should return `None`.
     ///
     /// Must match the size returned by `uniform_buffer_size`. Also, make sure that you honor WGPU's alignment requirements.
-    fn uniform_buffer_data(&self, _window: &Window) -> Option<Vec<u8>> {
+    fn uniform_buffer_data(&mut self, _window: &Window) -> Option<Vec<u8>> {
         None
     }
 
     /// Returns the current uniform buffer data for the pattern. As opposed to `uniform_buffer_data`,
     /// this function should return `None` if the buffer did not change since the last time this function was called.
-    fn updated_uniform_buffers_data(&self, window: &Window) -> Option<Vec<u8>> {
+    fn updated_uniform_buffers_data(&mut self, window: &Window) -> Option<Vec<u8>> {
         self.uniform_buffer_data(window)
     }
 
@@ -137,7 +137,7 @@ impl<P: FillPattern> PatternStimulus<P> {
     pub fn new_from_pattern(
         window: &Window,
         geometry: impl ToVertices + 'static,
-        pattern: P,
+        mut pattern: P,
     ) -> Self {
         // get the uniform buffer data
         let _uniform_buffer_size = pattern.uniform_buffer_size(window);
@@ -187,7 +187,7 @@ impl<P: FillPattern> Stimulus for PatternStimulus<P> {
         gpu_state: &GPUState,
     ) -> () {
         // update the uniform buffer
-        let pattern = self.pattern.lock().unwrap();
+        let mut pattern = self.pattern.lock().unwrap();
         if let Some(uniform_buffer_data) = pattern.updated_uniform_buffers_data(window) {
             self.base_stimulus
                 .set_uniform_buffers(&[uniform_buffer_data.as_slice()], gpu_state);
