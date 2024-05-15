@@ -22,8 +22,6 @@ use pywrap::py_wrap;
 use pywrap::transmute_ignore_size;
 use std::sync::Arc;
 
-use pyo3::types::PyFunction;
-
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 use psychophysics::visual::stimuli::VideoStimulus;
 
@@ -52,7 +50,7 @@ impl PyExperimentManager {
             .collect()
     }
 
-    fn run_experiment(&mut self, py: Python, experiment_fn: Py<PyFunction>) {
+    fn run_experiment(&mut self, py: Python, experiment_fn: Py<PyAny>) {
         let rust_experiment_fn =
             move |wm: WindowManager| -> Result<(), errors::PsychophysicsError> {
                 Python::with_gil(|py| -> PyResult<()> {
@@ -69,11 +67,15 @@ impl PyExperimentManager {
         // wrap self in a SendWrapper so that it can be sent through the magic barrier
         let mut self_wrapper = SendWrapper::new(self);
 
+        // give up the GIL and run the experiment
         py.allow_threads(move || self_wrapper.0.run_experiment(rust_experiment_fn));
     }
 
-    fn prompt(&self, prompt: &str) -> String {
-        self.0.prompt(prompt)
+    fn prompt(&self, prompt: &str, py: Python<'_>) -> String {
+        let self_wrapper = SendWrapper::new(self);
+
+        // prompt the user
+        py.allow_threads(move || self_wrapper.0.prompt(prompt))
     }
 }
 
@@ -95,8 +97,12 @@ impl PyWindow {
         PyFrame(self.0.get_frame())
     }
 
-    fn submit_frame(&mut self, frame: &PyFrame) {
-        self.0.submit_frame(frame.0.clone());
+    fn submit_frame(&mut self, frame: &PyFrame, py: Python<'_>) {
+        let self_wrapper = SendWrapper::new(self);
+        // submit the frame
+        py.allow_threads(move || {
+            self_wrapper.0.submit_frame(frame.0.clone());
+        });
     }
 
     fn __repr__(&self) -> String {
@@ -179,7 +185,6 @@ impl PyFrame {
     }
 }
 
-/// An object that contains the options for a window.
 py_wrap!(WindowOptions);
 
 #[pymethods]
@@ -226,8 +231,9 @@ py_forward!(WindowManager, fn prompt(&self, prompt: &str) -> String);
 
 #[pymethods]
 impl PyWindowManager {
-    fn create_default_window(&self) -> PyWindow {
-        PyWindow(self.0.create_default_window())
+    fn create_default_window(&self, py: Python<'_>) -> PyWindow {
+        let mut self_wrapper = SendWrapper::new(self);
+        py.allow_threads(move || PyWindow(self_wrapper.0.create_default_window()))
     }
 }
 
@@ -365,9 +371,17 @@ pub struct PyImageStimulus(ImageStimulus);
 #[pymethods]
 impl PyImageStimulus {
     #[new]
-    fn __new__(window: &PyWindow, shape: &PyShape, path: &str) -> (Self, PyStimulus) {
-        let stim = ImageStimulus::new(&window.0, shape.0.clone_box(), path);
-        (PyImageStimulus(stim), PyStimulus())
+    fn __new__(
+        window: &PyWindow,
+        shape: &PyShape,
+        path: &str,
+        py: Python<'_>,
+    ) -> (Self, PyStimulus) {
+        let self_wrapper = SendWrapper::new(window);
+        py.allow_threads(move || {
+            let stim = ImageStimulus::new(&window.0, shape.0.clone_box(), path);
+            (PyImageStimulus(stim), PyStimulus())
+        })
     }
 
     fn set_translation(&mut self, x: PySize, y: PySize) {
@@ -404,6 +418,8 @@ impl PySpriteStimulus {
         sprite_path: &str,
         num_sprites_x: u32,
         num_sprites_y: u32,
+        fps: Option<f64>,
+        repeat: Option<u64>,
     ) -> (Self, PyStimulus) {
         let stim = SpriteStimulus::new_from_spritesheet(
             &window.0,
@@ -411,12 +427,22 @@ impl PySpriteStimulus {
             sprite_path,
             num_sprites_x,
             num_sprites_y,
+            fps,
+            repeat,
         );
         (PySpriteStimulus(stim), PyStimulus())
     }
 
     fn advance_image_index(&mut self) {
         self.0.advance_image_index()
+    }
+
+    fn reset(&mut self) {
+        self.0.reset()
+    }
+
+    fn set_translation(&mut self, x: PySize, y: PySize) {
+        self.0.set_translation(x, y)
     }
 }
 
@@ -452,18 +478,22 @@ impl PyGaborStimulus {
         std_y: PySize,
         orientation: f32,
         color: (f32, f32, f32),
+        py: Python<'_>,
     ) -> (Self, PyStimulus) {
-        let stim = GaborStimulus::new(
-            &window.0,
-            shape.0.clone_box(),
-            phase,
-            cycle_length.0.clone(),
-            std_x.0.clone(),
-            std_y.0.clone(),
-            orientation,
-            psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0),
-        );
-        (PyGaborStimulus(stim), PyStimulus())
+        let self_wrapper = SendWrapper::new(window);
+        py.allow_threads(move || {
+            let stim = GaborStimulus::new(
+                &window.0,
+                shape.0.clone_box(),
+                phase,
+                cycle_length.0.clone(),
+                std_x.0.clone(),
+                std_y.0.clone(),
+                orientation,
+                psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0),
+            );
+            (PyGaborStimulus(stim), PyStimulus())
+        })
     }
 
     fn set_phase(&mut self, phase: f32) {
@@ -697,10 +727,10 @@ pub enum PyEventData {
 // Handling for user input
 
 #[pymodule]
-fn psychophysics_py<'py, 'a>(
-    _py: Python<'py>,
-    m: &'a pyo3::prelude::PyModule,
-) -> Result<(), pyo3::PyErr> {
+fn psychophysics_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+    //pyo3::prepare_freethreaded_python();
+
     m.add_class::<PyExperimentManager>()?;
     m.add_class::<PyMonitor>()?;
     m.add_class::<PyWindowOptions>()?;
