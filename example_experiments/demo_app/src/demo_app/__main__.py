@@ -3,6 +3,12 @@ import psychophysics_py as psy
 import os
 import rapier2d_py
 import numpy as np
+import time
+
+from rubicon.objc import NSObject, ObjCClass
+from rubicon.objc.runtime import load_library
+
+app_kit = load_library("AppKit")
 
 n_balls = 2
 n_init_steps = 1000
@@ -176,6 +182,11 @@ def my_experiment(wm):
     #     5,
     #     5,
     # )
+
+    # sleep for 1s
+    time.sleep(1)
+    subject_id = wm.prompt("Press any key to start the experiment")
+    print(f"Subject ID: {subject_id}")
 
     while True:
         for i in range(100):

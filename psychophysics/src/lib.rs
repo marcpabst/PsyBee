@@ -5,6 +5,12 @@ use async_lock::{Mutex, RwLock};
 use atomic_float::AtomicF64;
 use futures_lite::future::block_on;
 use futures_lite::Future;
+use objc2::rc::Id;
+use objc2_app_kit::NSAlertStyle;
+use objc2_app_kit::NSView;
+use objc2_foundation::CGPoint;
+use objc2_foundation::CGSize;
+use objc2_foundation::NSRect;
 use wgpu::hal::metal;
 use winit::monitor::VideoMode;
 
@@ -13,6 +19,12 @@ use crate::visual::color::ColorFormat;
 use crate::input::Event;
 
 use async_executor::Executor;
+
+use objc2_app_kit::NSAlert;
+use objc2_app_kit::NSTextField;
+use objc2_foundation::{
+    ns_string, MainThreadMarker, NSObject, NSObjectProtocol, NSString,
+};
 
 use input::Key;
 use wgpu::TextureFormat;
@@ -213,6 +225,7 @@ impl WindowOptions {
 }
 
 pub enum PsychophysicsEventLoopEvent {
+    PromptEvent(String, Sender<String>),
     CreateNewWindowEvent(WindowOptions, Sender<Window>),
     NewWindowCreatedEvent(Window),
     RunOnMainThread(Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send,>),
@@ -230,7 +243,10 @@ impl std::fmt::Debug for PsychophysicsEventLoopEvent
             },
             PsychophysicsEventLoopEvent::RunOnMainThread(_) => {
                 write!(f, "RunOnMainThread")
-            }
+            },
+            PsychophysicsEventLoopEvent::PromptEvent(_, _) => {
+                write!(f, "PromptEvent")
+            },
         }
     }
 }
@@ -288,6 +304,25 @@ pub struct WindowManager {
 }
 
 impl WindowManager {
+
+    /// Show a prompt to the user. This function will block until the user has entered a string and pressed enter.
+    pub fn prompt(&self, message: &str) -> String {
+        // dispatch a new UserEvent to the event loop
+        let (sender, receiver) = bounded(1);
+        let user_event = PsychophysicsEventLoopEvent::PromptEvent(
+            message.to_string(),
+            sender,
+        );
+
+        // send event
+        self.event_loop_proxy.send_event(user_event).expect("Failed to send event to event loop. This is likely a bug, please report it.");
+
+        // wait for response
+        let response = receiver.recv_blocking().expect("Failed to receive response from event loop. This is likely a bug, please report it.");
+        return response;
+        //return receiver.recv_blocking().unwrap();
+    }
+
     /// Create a new window with the given options. This function will dispatch a new UserEvent to the event loop
     /// and wait until the winit window has been created. Then it will setup the wgpu device and surface and return
     /// a new Window object.
@@ -376,7 +411,7 @@ impl ExperimentManager {
             .await
             .expect("Failed to find an appropiate graphics adapter. This is likely a bug, please report it.");
 
-    println!("Adapter: {:?}", adapter.get_info());
+        println!("Adapter: {:?}", adapter.get_info());
 
         // Create the logical device and command queue
         let (device, queue) = adapter
@@ -630,6 +665,51 @@ impl ExperimentManager {
          return window;
 }
 
+    /// Prompt for text input. On Windows/macOS/Linux, this will prompt on `stdout`. On iOS, this will prompt using a native dialog. 
+    /// Currently not supported on WASM (but should use `window.prompt` in the future) and not supported on Android.
+    pub fn prompt(&self, message: &str) -> String {
+        // temporary MacOS implementation using NSAlert
+        #[cfg(target_os = "macos")]
+        // we need to use run_on_main_thread here because NSAlert is not thread safe
+
+        let mtm = unsafe { MainThreadMarker::new_unchecked() };
+        let alert = unsafe { NSAlert::new(mtm) };
+
+        unsafe { alert.setMessageText(ns_string!("Please povide a subject id")) };
+        // set button text
+        unsafe { alert.addButtonWithTitle(ns_string!("OK")) };
+        // set style to informational
+        unsafe { alert.setAlertStyle(NSAlertStyle::Warning) };
+
+        // add a text field
+        let textfield =   MainThreadMarker::alloc(mtm);
+        // initialize the textfield
+        let rect = NSRect::new((CGPoint::new(0.0, 0.0)), (CGSize::new(200.0, 24.0)));
+        let textfield= unsafe { NSTextField::initWithFrame(textfield, rect) };
+
+  
+        let textfield_v = Id::into_super(textfield.clone());
+        let textfield_v = Id::into_super(textfield_v);
+
+        unsafe { alert.setAccessoryView(Some(&textfield_v)) };
+        
+
+        // show the alert
+        let response = unsafe { alert.runModal() };
+    
+        // get the text from the textfield
+        let text = unsafe { textfield.stringValue() };
+        let text = text.to_string();
+
+        // return the text
+        return text;
+        
+
+        #[cfg(not(target_os = "macos"))]
+        todo!();
+    }
+
+
     /// Send a task to the render thread. The task will be executed on the render thread and will block the current thread until it is finished.
     pub fn run_on_main_thread<R, Fut>(
         &self,
@@ -844,6 +924,17 @@ impl ExperimentManager {
                                 self.windows.push(window.clone());
                                 
                                 sender.send_blocking(window).expect("Failed to send window to sender. This is likely a bug, please report it.");
+                            },
+                            PsychophysicsEventLoopEvent::PromptEvent(
+                                message,
+                                sender,
+                            ) => {
+                                log::error!("Event loop received PromptEvent - showing prompt");
+
+                                let result = self.prompt(&message);
+                                // log::error!("Prompt result: {:?}", result);
+                                
+                                sender.send_blocking(result).expect("Failed to send result to sender. This is likely a bug, please report it.");
                             }
                             PsychophysicsEventLoopEvent::NewWindowCreatedEvent(
                                 window,

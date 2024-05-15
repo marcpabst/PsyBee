@@ -17,6 +17,7 @@ use psychophysics::{
     },
     wgpu, ExperimentManager, GPUState, Monitor, WindowManager, WindowOptions,
 };
+use pywrap::py_forward;
 use pywrap::py_wrap;
 use pywrap::transmute_ignore_size;
 use std::sync::Arc;
@@ -69,6 +70,10 @@ impl PyExperimentManager {
         let mut self_wrapper = SendWrapper::new(self);
 
         py.allow_threads(move || self_wrapper.0.run_experiment(rust_experiment_fn));
+    }
+
+    fn prompt(&self, prompt: &str) -> String {
+        self.0.prompt(prompt)
     }
 }
 
@@ -217,6 +222,7 @@ impl PyWindowOptions {
 }
 
 py_wrap!(WindowManager);
+py_forward!(WindowManager, fn prompt(&self, prompt: &str) -> String);
 
 #[pymethods]
 impl PyWindowManager {

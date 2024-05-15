@@ -20,3 +20,5 @@ test_sources = [
     "tests",
 ]
 
+[tool.briefcase.app.myapp.macOS]
+requires = ['rubicon-objc']

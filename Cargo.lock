@@ -5067,6 +5067,9 @@ dependencies = [
  "nalgebra 0.32.5",
  "ndarray",
  "num-traits",
+ "objc2 0.5.1",
+ "objc2-app-kit",
+ "objc2-foundation",
  "palette",
  "paste",
  "photometry",
@@ -5097,6 +5100,7 @@ name = "psychophysics-py"
 version = "0.1.0"
 dependencies = [
  "derive-debug",
+ "objc2-app-kit",
  "psychophysics",
  "pyo3",
  "pywrap",
