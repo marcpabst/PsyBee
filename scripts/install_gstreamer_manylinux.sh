@@ -1,15 +1,17 @@
 #!/bin/bash
 # uninstall old python versions
-dnf remove -y python3 python3-pip
-dnf install -y alsa-lib-devel gstreamer1 gstreamer1-devel
+dnf install -y alsa-lib-devel gstreamer1 gstreamer1-devel gstreamer1-plugins-base-devel
 
 # install pip for python3
 python3 -m ensurepip
 
+
 # print python version
+echo "Python version"
 python3 --version
 
 # print pip version
+echo "Pip version"
 pip3 --version
 
 # list /usr/local/lib/pkgconfig
@@ -20,9 +22,6 @@ ls /usr/local/lib/pkgconfig
 echo "Contents of /usr/lib64/pkgconfig"
 ls /usr/lib64/pkgconfig
 
-# list /usr/lib/pkgconfig
-echo "Contents of /usr/lib/pkgconfig"
-ls /usr/lib/pkgconfig
-
 # print PKG_CONFIG_PATH
+echo "PKG_CONFIG_PATH"
 echo $PKG_CONFIG_PATH
