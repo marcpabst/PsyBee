@@ -22,7 +22,7 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     defaults:
       run:
-        working-directory: ./psychophysics-py
+        working-directory: psychophysics-py/
     strategy:
       matrix:
         platform:
@@ -60,7 +60,7 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     defaults:
       run:
-        working-directory: ./psychophysics-py
+        working-directory: psychophysics-py/
     strategy:
       matrix:
         platform:
@@ -90,7 +90,7 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     defaults:
       run:
-        working-directory: ./psychophysics-py
+        working-directory: psychophysics-py/
     strategy:
       matrix:
         platform:
