@@ -41,7 +41,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --manifest-path ./psychophysics-py/Cargo.toml
           sccache: 'true'
-          manylinux: "2_28-cross"
+          manylinux: "manylinux_2_28"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
