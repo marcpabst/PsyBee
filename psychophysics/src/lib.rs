@@ -664,6 +664,7 @@ impl ExperimentManager {
     pub fn prompt(&self, _message: &str) -> String {
         // temporary MacOS implementation using NSAlert
         #[cfg(target_os = "macos")]
+        {
         // we need to use run_on_main_thread here because NSAlert is not thread safe
 
         let mtm = unsafe { MainThreadMarker::new_unchecked() };
@@ -697,9 +698,8 @@ impl ExperimentManager {
 
         // return the text
         return text;
+        }
         
-
-        #[cfg(not(target_os = "macos"))]
         todo!();
     }
 
