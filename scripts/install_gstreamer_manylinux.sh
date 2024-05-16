@@ -17,5 +17,11 @@ ldconfig
 # list /usr/local/lib/pkgconfig
 ls /usr/local/lib/pkgconfig
 
+# list /usr/lib64/pkgconfig
+ls /usr/lib64/pkgconfig
+
+# check which pkg-config
+which pkg-config
+
 # print PKG_CONFIG_PATH
 echo $PKG_CONFIG_PATH
