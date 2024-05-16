@@ -1,4 +1,4 @@
-name: Psychophysics
+name: psychophysics (Rust)
 
 on:
   push:

@@ -5,12 +5,13 @@ use async_lock::{Mutex, RwLock};
 use atomic_float::AtomicF64;
 use futures_lite::future::block_on;
 use futures_lite::Future;
-use objc2::rc::Id;
-use objc2_app_kit::NSAlertStyle;
 
-use objc2_foundation::CGPoint;
-use objc2_foundation::CGSize;
-use objc2_foundation::NSRect;
+#[cfg(target_os = "macos")]
+use objc2::rc::Id;
+#[cfg(target_os = "macos")]
+use objc2_foundation::{CGPoint, CGSize, NSRect, ns_string, MainThreadMarker};
+#[cfg(target_os = "macos")]
+use objc2_app_kit::{NSAlertStyle, NSAlert, NSTextField}:
 
 use winit::monitor::VideoMode;
 
@@ -20,11 +21,6 @@ use crate::input::Event;
 
 use async_executor::Executor;
 
-use objc2_app_kit::NSAlert;
-use objc2_app_kit::NSTextField;
-use objc2_foundation::{
-    ns_string, MainThreadMarker,
-};
 
 
 use wgpu::TextureFormat;

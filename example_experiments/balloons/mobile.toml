@@ -1,8 +1,0 @@
-[app]
-name = "balloons"
-stylized-name = "Balloons"
-domain = "childvisionlab.co.uk"
-template-pack = "wgpu"
-
-[apple]
-development-team = "697W2CS7L2"
