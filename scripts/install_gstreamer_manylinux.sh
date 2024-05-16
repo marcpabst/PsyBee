@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dnf install -y python3-pip alsa-lib-devel gstreamer1 gstreamer1-devel gstreamer1-plugins-base-tools gstreamer1-plugins-base-devel
+dnf install -y python3-pip alsa-lib-devel gstreamer1 gstreamer1-devel
 
 # list /usr/local/lib/pkgconfig
 echo "Contents of /usr/local/lib/pkgconfig"
