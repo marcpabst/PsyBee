@@ -1,6 +1,6 @@
 #!/bin/bash
 # uninstall old python versions
-dnf install -y alsa-lib-devel.$TARGET gstreamer1.$TARGET gstreamer1-devel.$TARGET gstreamer1-plugins-base-devel.$TARGET
+dnf install -y alsa-lib-devel gstreamer1 gstreamer1-devel gstreamer1-plugins-base-devel
 
 # install pip for python3
 python3 -m ensurepip
