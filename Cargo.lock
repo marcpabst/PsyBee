@@ -2763,7 +2763,6 @@ version = "0.1.0"
 dependencies = [
  "derive-debug",
  "log",
- "objc2-app-kit",
  "psychophysics",
  "pyo3",
  "pyo3-log",

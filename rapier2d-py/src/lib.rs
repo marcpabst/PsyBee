@@ -15,39 +15,9 @@ use pywrap::py_getter;
 use pywrap::py_wrap;
 
 // and for references (if type supports cloning)
-#[inline]
-#[proc_macro]
-pub fn transmute_ignore_size(input: TokenStream) -> TokenStream {
-    // Parse the input tokens into a syntax tree
-    let input = parse_macro_input!(input as ItemFn);
-
-    // Extract the function signature and body
-    let ItemFn { sig, block, .. } = input;
-
-    // Extract function argument and return types
-    let inputs = &sig.inputs;
-    let output = &sig.output;
-
-    // Generate the new function body using unsafe code
-    let expanded = quote! {
-        #sig {
-            {
-                let a = #inputs;
-                unsafe {
-                    let b = ::core::ptr::read(&a as *const _ as *const _);
-                    ::core::mem::forget(a);
-                    b
-                }
-            }
-        }
-    };
-
-    // Convert the expanded code back into a token stream and return it
-    TokenStream::from(expanded)
-}
 
 // macro that wrap a struct into Py<Struct>(struct)
-macro_rules! py_wrap2 {
+macro_rules! py_wrap2 {a
     ($name:ident) => {
 
         paste::paste! {
