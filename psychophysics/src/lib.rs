@@ -44,8 +44,6 @@ pub mod camera;
 pub mod errors;
 pub mod input;
 
-#[cfg(feature = "serial")]
-pub mod serial;
 pub mod utils;
 pub mod visual;
 use winit::event_loop::EventLoop;

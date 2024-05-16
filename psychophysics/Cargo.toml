@@ -19,7 +19,6 @@ crate-type = ["lib"]
 
 # General dependencies
 [dependencies]
-env_logger = "0.10.1"
 wgpu = "0.19.1"
 raw-window-handle = "0.6"
 winit = { version = "0.29"}
@@ -28,10 +27,7 @@ bytemuck = { version="1.14.0", features=["derive"] }
 nalgebra = "0.32.3"
 glyphon = "0.5.0"
 web-time = "1.0.0"
-ndarray = "0.15.6"
 image = "0.24.7"
-cpal = "0.15.2"
-anyhow = "1.0.75"
 rodio = "0.17.3"
 wasm-bindgen = "0.2.89"
 fontdb = "0.16.0"
@@ -42,24 +38,16 @@ futures-lite = "2.1.0"
 async-executor = "1.8.0"
 async-channel = "2.1.1"
 log = "0.4.20"
-simple_logger = "4.3.0"
 atomic_float = "0.1.0"
 num-traits = "0.2.17"
-spin_sleep = "1.1.1"
 half = { version = "2.3.1", features = ["bytemuck"] }
 palette = "0.7.3"
 async-lock = "3.2.0"
 async-trait = "0.1.75"
 byte-slice-cast = "1.2.2"
-derive_builder = "0.12.0"
-strum = "0.25.0"
-strum_macros = "0.25.3"
 csv = "1.3.0"
 thiserror = "1.0.56"
-imageproc = "0.23.0"
-pollster = "0.3.0"
 derive_more = "0.99.17"
-rustfft = "6.2.0"
 paste = "1.0.15"
 derive-debug = "0.1.2"
 
