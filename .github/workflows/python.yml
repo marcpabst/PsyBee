@@ -35,7 +35,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           before-script-linux: "scripts/install_gstreamer_manylinux.sh"
-          docker-options: "-u 0"
+          # docker-options: "-u 0"
           target: ${{ matrix.platform.target }}
           args: --release --out dist --manifest-path ./psychophysics-py/Cargo.toml
           sccache: 'true'
