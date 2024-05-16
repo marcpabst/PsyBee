@@ -3,6 +3,13 @@ name = "psychophysics"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.70"
+authors = ["Marc Pabst"]
+description = "A library for psychophysical experiments"
+repository = "https://github.com/marcpabst/psychophysics"
+license = "MPL-2.0"
+keywords = ["psychophysics", "psychology", "experiments", "stimuli", "perception"]
+categories = ["science", "science::neuroscience", "graphics", "gui", "multimedia"]
+
 
 [lib]
 name = "psychophysics"
@@ -65,7 +72,7 @@ objc2-foundation = "0.2.0"
 smol = "1.3.0"
 
 # Desktop dependencies (macOS, Linux, Windows)
-[target.'cfg(all(target_arch = "x86_64", unix))'.dependencies]
+[target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
 glib = "0.19.5"
 gst = { package = "gstreamer", version = "0.22.3"}
 gst-app = { package = "gstreamer-app", version = "0.22.0"}
