@@ -16,3 +16,6 @@ ldconfig
 
 # list /usr/local/lib/pkgconfig
 ls /usr/local/lib/pkgconfig
+
+# print PKG_CONFIG_PATH
+echo $PKG_CONFIG_PATH
