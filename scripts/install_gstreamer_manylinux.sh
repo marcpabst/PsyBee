@@ -1,6 +1,7 @@
 #!/bin/bash
-
-dnf install -y python3-pip alsa-lib-devel gstreamer1 gstreamer1-devel
+# uninstall old python versions
+dnf remove -y python3 python3-pip
+dnf install -y python39 python39-pip alsa-lib-devel gstreamer1 gstreamer1-devel
 
 # print python version
 python3 --version
