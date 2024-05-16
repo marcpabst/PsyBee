@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-on-ubuntu:
+  build-for-linux:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
     - name: Build
       run: cd ./psychophysics && cargo build --verbose
 
-  build-on-windows:
+  build-for-windows:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
@@ -28,5 +28,15 @@ jobs:
     - name: Setup GStreamer
       id:   setup_gstreamer
       uses: blinemedical/setup-gstreamer@v1.4.0
+    - name: Build
+      run: cd ./psychophysics && cargo build --verbose
+
+  build-for-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - name: Install gstreamer
+      run: brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
     - name: Build
       run: cd ./psychophysics && cargo build --verbose
