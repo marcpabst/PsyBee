@@ -1,4 +1,4 @@
-use crate::input::{Key, EventReceiver};
+use crate::input::{EventReceiver};
 #[cfg(target_arch = "wasm32")]
 use crate::request_animation_frame;
 use crate::GPUState;
@@ -8,7 +8,7 @@ use palette::IntoColor;
 use derive_debug::Dbg;
 
 use crate::visual::color::ColorFormat;
-use async_trait::async_trait;
+
 
 use atomic_float::AtomicF64;
 
@@ -390,7 +390,7 @@ pub async fn render_task(window: Window) {
        
 
             // acquire lock on frame
-            let mut frame = (frame.lock_blocking());
+            let mut frame = frame.lock_blocking();
 
             // acquire lock on window
             let window_state =

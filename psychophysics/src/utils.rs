@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use async_lock::{Mutex, MutexGuard, RwLock};
+
 use bytemuck;
-use futures_lite::future::block_on;
+
 
 pub(crate) trait AtomicExt<T> {
     fn load_relaxed(&self) -> T;
@@ -59,7 +59,7 @@ impl AtomicExt<bool> for std::sync::atomic::AtomicBool {
     }
 }
 
-use nalgebra::U3;
+
 pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};
@@ -83,7 +83,7 @@ macro_rules! log_nonblocking {
     };
 }
 
-pub(crate) use log_nonblocking;
+
 
 /// Includes an image as a reference to a byte array.
 /// This is useful for including images in the binary.

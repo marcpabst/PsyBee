@@ -3,15 +3,12 @@ use std::sync::{Arc, Mutex};
 use byte_slice_cast::AsSliceOf;
 use gst_app::AppSink;
 
-use image::{DynamicImage, GenericImageView};
+use image::{GenericImageView};
 
 use super::super::pattern_stimulus::FillPattern;
 use crate::{
     prelude::PsychophysicsError,
-    utils::AtomicExt,
     visual::{
-        color::{ColorFormat, IntoRawRgba, RawRgba},
-        geometry::{Size, SizeVector2D, ToPixels},
         Window,
     },
 };

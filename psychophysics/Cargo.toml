@@ -10,6 +10,7 @@ crate-type = ["lib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# General dependencies
 [dependencies]
 env_logger = "0.10.1"
 wgpu = "0.19.1"
@@ -28,7 +29,8 @@ rodio = "0.17.3"
 wasm-bindgen = "0.2.89"
 fontdb = "0.16.0"
 fastrand = "2.0.1"
-async-broadcast = { git = "https://github.com/kuviman/async-broadcast", rev = "6767b8a76cd2a1b57da0dd435488df112514afe8" }
+async-broadcast = "=0.7.0"
+#async-broadcast = { git = "https://github.com/kuviman/async-broadcast", rev = "6767b8a76cd2a1b57da0dd435488df112514afe8" }
 futures-lite = "2.1.0"
 async-executor = "1.8.0"
 async-channel = "2.1.1"
@@ -58,17 +60,18 @@ objc2-app-kit = { version = "0.2.0", features = ["NSAlert", "NSApplication", "NS
 objc2-foundation = "0.2.0"
 
 
-
+# Non-wasm32 dependencies
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 smol = "1.3.0"
 
-
-[target.'cfg(not(any(target_arch = "wasm32", target_os = "ios")))'.dependencies]
+# Desktop dependencies (macOS, Linux, Windows)
+[target.'cfg(all(target_arch = "x86_64", unix))'.dependencies]
 glib = "0.19.5"
 gst = { package = "gstreamer", version = "0.22.3"}
 gst-app = { package = "gstreamer-app", version = "0.22.0"}
 gst-video = { package = "gstreamer-video", version = "0.22.3"}
 
+# Wasm32 dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version="0.3.67", features=["Window", "HtmlVideoElement", "HtmlCanvasElement", "Document", "Element", "MediaStream", "Node", "CanvasRenderingContext2d", "ImageData"] }
 js-sys = "0.3.66"

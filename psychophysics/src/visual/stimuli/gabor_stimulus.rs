@@ -10,8 +10,7 @@ use crate::generate_assessors;
 use crate::visual::color::IntoRawRgba;
 use crate::visual::geometry::Size;
 use crate::visual::{
-    color::RawRgba, geometry::ToVertices, stimuli::base_stimulus::BaseStimulus,
-    window::WindowState, Window,
+    color::RawRgba, geometry::ToVertices, Window,
 };
 
 pub type GaborStimulus = PatternStimulus<Gabor>;

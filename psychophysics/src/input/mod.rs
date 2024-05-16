@@ -175,7 +175,7 @@ impl TryFrom<winit::event::WindowEvent> for Event {
             }
             // match mouse button events
             winit::event::WindowEvent::MouseInput {
-                device_id,
+                device_id: _,
                 state,
                 button,
             } => {
@@ -199,7 +199,7 @@ impl TryFrom<winit::event::WindowEvent> for Event {
             }
             // match touch events
             winit::event::WindowEvent::Touch(touch) => {
-                let position = (
+                let _position = (
                     Size::Pixels(touch.location.x),
                     Size::Pixels(touch.location.y),
                 );
@@ -228,7 +228,7 @@ impl TryFrom<winit::event::WindowEvent> for Event {
             winit::event::WindowEvent::CursorLeft { .. } => EventData::CursorExited,
             // match touchpad press events
             winit::event::WindowEvent::TouchpadPressure {
-                device_id,
+                device_id: _,
                 pressure,
                 stage,
             } => EventData::TouchpadPress {

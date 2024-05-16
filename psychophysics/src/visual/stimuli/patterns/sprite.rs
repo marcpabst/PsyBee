@@ -8,10 +8,7 @@ use image::{DynamicImage, GenericImageView};
 use super::super::pattern_stimulus::FillPattern;
 use crate::{
     prelude::PsychophysicsError,
-    utils::AtomicExt,
     visual::{
-        color::{ColorFormat, IntoRawRgba, RawRgba},
-        geometry::{Size, SizeVector2D, ToPixels},
         Window,
     },
 };
@@ -180,7 +177,7 @@ impl FillPattern for Sprite {
         }
 
         // calculate the current index by wrapping around the number of images
-        let mut wrapped_index = index % self.images.len() as u64;
+        let wrapped_index = index % self.images.len() as u64;
 
         Some(wrapped_index.to_ne_bytes().to_vec())
     }

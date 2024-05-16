@@ -3,15 +3,14 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
-use image::{DynamicImage, GenericImageView};
+
 
 use super::super::pattern_stimulus::FillPattern;
 use crate::{
-    prelude::PsychophysicsError,
     utils::AtomicExt,
     visual::{
         color::{ColorFormat, IntoRawRgba, RawRgba},
-        geometry::{Size, SizeVector2D, ToPixels},
+        geometry::{Size, ToPixels},
         Window,
     },
 };

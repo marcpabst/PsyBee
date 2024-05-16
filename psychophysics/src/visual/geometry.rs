@@ -709,7 +709,7 @@ impl Transformation2D {
     pub fn to_transformation_matrix(&self, screenwidth_mm: f64, viewing_distance_mm: f64, width_px: u32, height_px: u32) -> Matrix3<f32> {
         match self {
             Transformation2D::Identity => Matrix3::identity(),
-            Transformation2D::RotationCenter(angle) => {
+            Transformation2D::RotationCenter(_angle) => {
                 todo!()
             }
             Transformation2D::RotationPoint(angle, x, y) => {
@@ -733,7 +733,7 @@ impl Transformation2D {
                     x * (1.0 - angle.cos()) + y * angle.sin(), y * (1.0 - angle.cos()) - x * angle.sin(), 1.0,
                 )
             }
-            Transformation2D::ScaleCenter(x, y) => {
+            Transformation2D::ScaleCenter(_x, _y) => {
                todo!()
             }
             Transformation2D::ScalePoint(x, y, x0, y0) => {
@@ -757,7 +757,7 @@ impl Transformation2D {
                     x0 * (1.0 - x), y0 * (1.0 - y), 1.0,
                 )
             }
-            Transformation2D::ShearCenter(x, y) => {
+            Transformation2D::ShearCenter(_x, _y) => {
                 todo!()
             }
             Transformation2D::ShearPoint(x, y, x0, y0) => {

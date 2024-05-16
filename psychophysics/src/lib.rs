@@ -1,4 +1,4 @@
-use async_broadcast::broadcast;
+
 use async_channel::{bounded, Receiver, Sender};
 use async_lock::{Mutex, RwLock};
 
@@ -7,11 +7,11 @@ use futures_lite::future::block_on;
 use futures_lite::Future;
 use objc2::rc::Id;
 use objc2_app_kit::NSAlertStyle;
-use objc2_app_kit::NSView;
+
 use objc2_foundation::CGPoint;
 use objc2_foundation::CGSize;
 use objc2_foundation::NSRect;
-use wgpu::hal::metal;
+
 use winit::monitor::VideoMode;
 
 use crate::visual::color::ColorFormat;
@@ -23,10 +23,10 @@ use async_executor::Executor;
 use objc2_app_kit::NSAlert;
 use objc2_app_kit::NSTextField;
 use objc2_foundation::{
-    ns_string, MainThreadMarker, NSObject, NSObjectProtocol, NSString,
+    ns_string, MainThreadMarker,
 };
 
-use input::Key;
+
 use wgpu::TextureFormat;
 
 use std::fmt::Formatter;
@@ -34,8 +34,8 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use wasm_bindgen::{closure::Closure, JsCast};
-use web_time::Duration;
+
+
 use winit::event::{Event as WinitEvent, WindowEvent};
 use winit::event_loop::{
     ControlFlow, EventLoopBuilder, EventLoopWindowTarget,
@@ -592,7 +592,7 @@ impl ExperimentManager {
 
         let size = winit_window.inner_size();
  
-        let swapchain_formats = adapter.get_texture_format_features(TextureFormat::Bgra8Unorm);
+        let _swapchain_formats = adapter.get_texture_format_features(TextureFormat::Bgra8Unorm);
 
  
          let swapchain_capabilities = surface.get_capabilities(&adapter);
@@ -665,7 +665,7 @@ impl ExperimentManager {
 
     /// Prompt for text input. On Windows/macOS/Linux, this will prompt on `stdout`. On iOS, this will prompt using a native dialog. 
     /// Currently not supported on WASM (but should use `window.prompt` in the future) and not supported on Android.
-    pub fn prompt(&self, message: &str) -> String {
+    pub fn prompt(&self, _message: &str) -> String {
         // temporary MacOS implementation using NSAlert
         #[cfg(target_os = "macos")]
         // we need to use run_on_main_thread here because NSAlert is not thread safe
@@ -682,7 +682,7 @@ impl ExperimentManager {
         // add a text field
         let textfield =   MainThreadMarker::alloc(mtm);
         // initialize the textfield
-        let rect = NSRect::new((CGPoint::new(0.0, 0.0)), (CGSize::new(200.0, 24.0)));
+        let rect = NSRect::new(CGPoint::new(0.0, 0.0), CGSize::new(200.0, 24.0));
         let textfield= unsafe { NSTextField::initWithFrame(textfield, rect) };
 
   
@@ -693,7 +693,7 @@ impl ExperimentManager {
         
 
         // show the alert
-        let response = unsafe { alert.runModal() };
+        let _response = unsafe { alert.runModal() };
     
         // get the text from the textfield
         let text = unsafe { textfield.stringValue() };
@@ -929,7 +929,7 @@ impl ExperimentManager {
                                 sender.send_blocking(result).expect("Failed to send result to sender. This is likely a bug, please report it.");
                             }
                             PsychophysicsEventLoopEvent::NewWindowCreatedEvent(
-                                window,
+                                _window,
                             ) => {
                                 log::debug!("Event loop received NewWindowCreatedEvent");
                                 // add window to list of windows
