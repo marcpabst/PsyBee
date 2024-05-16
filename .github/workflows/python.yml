@@ -29,7 +29,7 @@ jobs:
           - runner: ubuntu-latest
             target: aarch64
           - runner: ubuntu-latest
-            target: aarmv7l
+            target: armv7l
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
