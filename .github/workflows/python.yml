@@ -35,13 +35,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           # add /usr/lib64/pkgconfig to PKG_CONFIG_PATH
-          docker-options: "-e PKG_CONFIG_PATH=/usr/lib64/pkgconfig"
+          # docker-options: "-e PKG_CONFIG_PATH=/usr/lib64/pkgconfig"
           before-script-linux: "scripts/install_gstreamer_manylinux.sh"
           # docker-options: "-u 0"
           target: ${{ matrix.platform.target }}
           args: --release --out dist --manifest-path ./psychophysics-py/Cargo.toml
           sccache: 'true'
-          manylinux: auto
+          manylinux: "manylinux_2_28"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
