@@ -3,7 +3,7 @@
 yum remove -y pkgconf
 # install the real pkg-config
 yum install -y pkgconfig
-yum install -y alsa-lib-devel gstreamer1-devel gstreamer1-plugins-base-tools gstreamer1-plugins-base-devel
+yum install -y alsa-lib-devel gstreamer1 gstreamer1-devel gstreamer1-plugins-base-tools gstreamer1-plugins-base-devel
 
 # print the version of gstreamer
 gst-inspect-1.0 --version
