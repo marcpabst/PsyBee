@@ -34,6 +34,8 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
+          # add /usr/lib64/pkgconfig to PKG_CONFIG_PATH
+          docker-options: "-e PKG_CONFIG_PATH=/usr/lib64/pkgconfig"
           before-script-linux: "scripts/install_gstreamer_manylinux.sh"
           # docker-options: "-u 0"
           target: ${{ matrix.platform.target }}
