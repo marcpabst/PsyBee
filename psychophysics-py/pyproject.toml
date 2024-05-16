@@ -4,6 +4,9 @@ build-backend = "maturin"
 
 [project]
 name = "psychophysics-py"
+authors = [{name = "Marc Pabst", email = "mail@marcpabst.com"}]
+description = "Python bindings for the psychophysics Rust library"
+license = "MPL-2.0"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
