@@ -8,7 +8,6 @@ name: psychophysics-py (Rust)
 on:
   push:
     branches:
-      - main
       - master
     tags:
       - '*'
@@ -21,6 +20,9 @@ permissions:
 jobs:
   linux:
     runs-on: ${{ matrix.platform.runner }}
+    defaults:
+      run:
+        working-directory: ./psychophysics-py
     strategy:
       matrix:
         platform:
@@ -56,6 +58,9 @@ jobs:
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
+    defaults:
+      run:
+        working-directory: ./psychophysics-py
     strategy:
       matrix:
         platform:
@@ -83,6 +88,9 @@ jobs:
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
+    defaults:
+      run:
+        working-directory: ./psychophysics-py
     strategy:
       matrix:
         platform:
