@@ -9,7 +9,7 @@ use psychophysics::{
     visual::{
         geometry::{Circle, Rectangle, Size, ToVertices, Transformable},
         stimuli::{
-            text_stimulus::TextStimulus, GaborStimulus, ImageStimulus, SpriteStimulus,
+            GaborStimulus, ImageStimulus, SpriteStimulus,
             Stimulus,
         },
         window::{Frame, WindowState},
@@ -20,7 +20,7 @@ use psychophysics::{
 use pywrap::py_forward;
 use pywrap::py_wrap;
 use pywrap::transmute_ignore_size;
-use std::sync::Arc;
+
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 use psychophysics::visual::stimuli::VideoStimulus;
@@ -232,7 +232,7 @@ py_forward!(WindowManager, fn prompt(&self, prompt: &str) -> String);
 #[pymethods]
 impl PyWindowManager {
     fn create_default_window(&self, py: Python<'_>) -> PyWindow {
-        let mut self_wrapper = SendWrapper::new(self);
+        let self_wrapper = SendWrapper::new(self);
         py.allow_threads(move || PyWindow(self_wrapper.0.create_default_window()))
     }
 }
@@ -377,7 +377,7 @@ impl PyImageStimulus {
         path: &str,
         py: Python<'_>,
     ) -> (Self, PyStimulus) {
-        let self_wrapper = SendWrapper::new(window);
+        let _self_wrapper = SendWrapper::new(window);
         py.allow_threads(move || {
             let stim = ImageStimulus::new(&window.0, shape.0.clone_box(), path);
             (PyImageStimulus(stim), PyStimulus())
@@ -480,7 +480,7 @@ impl PyGaborStimulus {
         color: (f32, f32, f32),
         py: Python<'_>,
     ) -> (Self, PyStimulus) {
-        let self_wrapper = SendWrapper::new(window);
+        let _self_wrapper = SendWrapper::new(window);
         py.allow_threads(move || {
             let stim = GaborStimulus::new(
                 &window.0,
