@@ -11,7 +11,7 @@ use objc2::rc::Id;
 #[cfg(target_os = "macos")]
 use objc2_foundation::{CGPoint, CGSize, NSRect, ns_string, MainThreadMarker};
 #[cfg(target_os = "macos")]
-use objc2_app_kit::{NSAlertStyle, NSAlert, NSTextField}:
+use objc2_app_kit::{NSAlertStyle, NSAlert, NSTextField};
 
 use winit::monitor::VideoMode;
 
@@ -699,7 +699,7 @@ impl ExperimentManager {
         // return the text
         return text;
         }
-        
+
         todo!();
     }
 
