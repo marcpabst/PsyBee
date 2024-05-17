@@ -160,6 +160,18 @@ impl TryFrom<winit::event::WindowEvent> for Event {
                 ..
             } => {
                 let key_str = event.logical_key.to_text().unwrap_or_default();
+
+                let key_code = u32::default();
+
+                #[cfg(any(
+                    target_os = "windows",
+                    target_os = "macos",
+                    target_os = "linux",
+                    target_os = "freebsd",
+                    target_os = "dragonfly",
+                    target_os = "openbsd",
+                    target_os = "netbsd"
+                ))]
                 let key_code = event.physical_key.to_scancode().unwrap_or_default();
 
                 match event.state {
