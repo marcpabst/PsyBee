@@ -1,5 +1,14 @@
 use std::ops::Deref;
 pub use winit::keyboard::KeyCode as Key;
+#[cfg(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "dragonfly",
+    target_os = "openbsd",
+    target_os = "netbsd"
+))]
 use winit::platform::scancode::PhysicalKeyExtScancode;
 
 use crate::visual::{geometry::Size, Window};
