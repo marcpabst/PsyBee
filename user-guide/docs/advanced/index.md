@@ -12,6 +12,7 @@ Event-driven programming is a powerful form of encapsulation that is useful when
 !!! info
     In general, all things that can be done with event-driven programming can also be done with traditional, loop-based programming. See the section on [dealing with events](events.md) for more information.
 
+
 <div class="grid cards" markdown>
 -   Here is a diagram of a single trial in a traditional, **non-**event-driven experiment:
 
