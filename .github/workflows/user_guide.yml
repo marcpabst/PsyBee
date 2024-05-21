@@ -1,15 +1,14 @@
 name: user-guide
 
-
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - user-guide/**
   pull_request:
     branches:
-      - main
+      - master
     paths:
       - user-guide/**
 
@@ -19,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout main
+      - name: Checkout master
         uses: actions/checkout@v2
 
       - name: Deploy docs
