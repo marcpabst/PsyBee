@@ -1,6 +1,0 @@
-[book]
-authors = ["m. pabst"]
-language = "en"
-multilingual = false
-src = "src"
-title = "User Guide for psyhcophysics-rs"
