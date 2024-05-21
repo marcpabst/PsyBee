@@ -3,8 +3,12 @@ name: psychophysics (Rust)
 on:
   push:
     branches: [ "master" ]
+    paths:
+      - "psychophysics/**"
   pull_request:
     branches: [ "master" ]
+    paths:
+      - "psychophysics/**"
 
 env:
   CARGO_TERM_COLOR: always

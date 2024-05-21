@@ -118,7 +118,7 @@ fn parse_sigature(
     );
 }
 
-/// ussage:
+/// usage:
 /// ```rust
 /// unsafe_transmute_ignore_size!(A, B);
 /// ```
@@ -468,6 +468,18 @@ fn split_token_stream_by_comma(
     result.push(current);
     result
 }
+
+/// This macro wraps a trait that will be exposed to Python (as a trait object).
+/// Example:
+/// ```rust
+/// py_trait!(SomeTrait);
+/// ```
+///
+/// This will generate the following code:
+/// ```rust
+/// #[pyo3::prelude::pyclass]
+/// struct PySomeTrait(pub Box<dyn SomeTrait>);
+/// ```
 
 /// This macro exposes a read-only field of a wrapped struct to Python.
 /// It generates a getter for the field that will be annotated with #[getter].

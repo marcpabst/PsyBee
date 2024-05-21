@@ -1,0 +1,30 @@
+name: user-guide
+
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "user-guide/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "user-guide/**"
+
+jobs:
+  build:
+    name: Deploy docs
+    runs-on: ubuntu-latest
+    # use ./user-guide/
+    
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v2
+
+      - name: Deploy docs
+        uses: mhausenblas/mkdocs-deploy-gh-pages@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONFIG_FILE: user-guide/mkdocs.yml

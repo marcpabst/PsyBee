@@ -37,13 +37,10 @@ use winit::event_loop::{
     ControlFlow, EventLoopBuilder, EventLoopWindowTarget,
 };
 
-// this is behind a feature flag because it is not yet stable
-#[cfg(feature = "gst")]
-pub mod camera;
 
 pub mod errors;
 pub mod input;
-
+pub mod audio;
 pub mod utils;
 pub mod visual;
 use winit::event_loop::EventLoop;

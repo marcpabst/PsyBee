@@ -2,5 +2,5 @@
 resolver = "2"
 members = [
     "psychophysics",
-    "psychophysics-py", "pywrap", "rapier2d-py",
+    "psychophysics-py", "ptest", "pywrap", "rapier2d-py",
 ]

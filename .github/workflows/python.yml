@@ -8,8 +8,14 @@ name: psychophysics-py (Python)
 on:
   push:
     branches: [ "master" ]
+    paths:
+      - "psychophysics/**"
+      - "psychophysics-py/**"
   pull_request:
     branches: [ "master" ]
+    paths:
+      - "psychophysics/**"
+      - "psychophysics-py/**"
 
 permissions:
   contents: read

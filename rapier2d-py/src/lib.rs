@@ -16,57 +16,6 @@ use pywrap::py_wrap;
 
 // and for references (if type supports cloning)
 
-// macro that wrap a struct into Py<Struct>(struct)
-macro_rules! py_wrap2 {a
-    ($name:ident) => {
-
-        paste::paste! {
-
-             // the wrapper struct
-            #[pyclass(name = "" $name)]
-            pub struct [<Py $name>](pub $name);
-
-            // Into trait implementation
-            impl Into<$name> for [<Py $name>] {
-                fn into(self) -> $name {
-                    self.0
-                }
-            }
-        }
-    };
-    ($name:ident<$($t:tt),*>) => {
-        paste::paste! {
-
-             // the wrapper struct
-            #[pyclass(name = "" $name)]
-            pub struct [<Py $name>](pub $name<$($t),*>);
-
-            // Into trait implementation
-            impl Into<$name<$($t),*>> for [<Py $name>] {
-                fn into(self) -> $name<$($t),*> {
-                    self.0
-                }
-            }
-
-
-        }
-    };
-}
-
-macro_rules! forward_nullary_new {
-    ($name:ident) => {
-        paste::paste! {
-            #[pymethods]
-            impl [<Py $name>] {
-                #[new]
-                pub fn new() -> Self {
-                    Self($name::new())
-                }
-            }
-        }
-    };
-}
-
 macro_rules! forward_nullary_function {
     ($name:ident, $method:ident -> $ret:tt) => {
         paste::paste! {
