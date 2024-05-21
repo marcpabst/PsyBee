@@ -23,7 +23,7 @@ markdown_extensions:
 nav:
   - Introduction: index.md
   - installation.md
-  - Tutorials: getting-started.md
+  - getting-started.md
   - Concepts:
     - concepts/frame/index.md
     - concepts/events.md
