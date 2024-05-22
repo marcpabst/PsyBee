@@ -43,6 +43,7 @@ pub mod input;
 pub mod audio;
 pub mod utils;
 pub mod visual;
+
 use winit::event_loop::EventLoop;
 
 // re-export wgpu

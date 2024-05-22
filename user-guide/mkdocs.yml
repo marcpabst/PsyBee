@@ -27,6 +27,7 @@ nav:
   - Concepts:
     - concepts/frame/index.md
     - concepts/events.md
+    - concepts/sizes.md
     - concepts/visual-stimuli/index.md
   - advanced/index.md
   - Background:

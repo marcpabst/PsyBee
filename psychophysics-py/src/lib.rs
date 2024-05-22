@@ -1,11 +1,13 @@
 use std::any::Any;
 
+use psychophysics::audio::AudioStimulus;
 use psychophysics::input::Event;
 use psychophysics::input::EventData;
 use psychophysics::input::EventReceiver;
 use psychophysics::input::MouseButton;
 
 use psychophysics::{
+    audio::AudioDevice,
     errors,
     input::EventVec,
     visual::{
@@ -544,6 +546,71 @@ impl PyGaborStimulus {
     }
 }
 
+py_wrap!(AudioDevice, unsendable);
+py_forward!(AudioDevice, fn new() -> AudioDevice);
+
+// Wrapper for the Stimulus trait
+#[pyclass(name = "AudioStimulus", subclass)]
+pub struct PyAudioStimulus(Box<dyn AudioStimulus + 'static>);
+
+#[pymethods]
+impl PyAudioStimulus {
+    fn reset(&mut self) {
+        self.0.reset();
+    }
+
+    fn set_volume(&mut self, volume: f32) {
+        self.0.set_volume(volume);
+    }
+
+    fn play(&mut self) {
+        self.0.play();
+    }
+
+    fn pause(&mut self) {
+        self.0.pause();
+    }
+
+    fn seek(&mut self, time: f32) {
+        self.0.seek(time);
+    }
+}
+
+// The SineWaveStimulus
+#[pyclass(name = "SineWaveStimulus", extends = PyAudioStimulus)]
+#[derive(Clone)]
+pub struct PySineWaveStimulus();
+
+#[pymethods]
+impl PySineWaveStimulus {
+    #[new]
+    fn __new__(
+        audio_device: &PyAudioDevice,
+        frequency: f32,
+        duration: f32,
+    ) -> (Self, PyAudioStimulus) {
+        let stim = psychophysics::audio::SineWaveStimulus::new(
+            &audio_device.0,
+            frequency,
+            duration,
+        );
+        (PySineWaveStimulus(), PyAudioStimulus(Box::new(stim)))
+    }
+}
+
+#[pyclass(name = "FileStimulus", extends = PyAudioStimulus)]
+#[derive(Clone)]
+pub struct PyFileStimulus();
+
+#[pymethods]
+impl PyFileStimulus {
+    #[new]
+    fn __new__(audio_device: &PyAudioDevice, file_path: &str) -> (Self, PyAudioStimulus) {
+        let stim = psychophysics::audio::FileStimulus::new(&audio_device.0, file_path);
+        (PyFileStimulus(), PyAudioStimulus(Box::new(stim)))
+    }
+}
+
 // // The TextStimulus
 // #[pyclass(name = "TextStimulus", extends = PyStimulus)]
 // #[derive(Clone)]
@@ -657,12 +724,6 @@ impl PyEvent {
     }
 }
 
-#[pyclass]
-#[derive(Clone)]
-struct MyClass {
-    my_field: Box<i32>,
-}
-
 // #[pyo3::prelude::pyclass(name = "MouseButton")]
 // #[derive(Debug, Clone)]
 // pub struct PyMouseButton(pub MouseButton);
@@ -744,6 +805,11 @@ fn psychophysics_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEventVec>()?;
     m.add_class::<PyEvent>()?;
     m.add_class::<PyEventData>()?;
+
+    m.add_class::<PyAudioDevice>()?;
+    m.add_class::<PyAudioStimulus>()?;
+    m.add_class::<PySineWaveStimulus>()?;
+    m.add_class::<PyFileStimulus>()?;
 
     #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
     m.add_class::<PyVideoStimulus>()?;

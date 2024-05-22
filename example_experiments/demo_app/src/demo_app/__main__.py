@@ -134,30 +134,33 @@ def my_experiment(wm):
     # set-up the simulation
     sim = BubbleSimulation()
 
-    # run the simulation for a few steps
-    for i in range(n_init_steps):
-        next(sim)
-
     # create a window
     window = wm.create_default_window()
 
     # receive keyboard input from the window
     kb = window.create_event_receiver()
 
+    default_audio_device = psy.AudioDevice()
+
+
     resources = os.path.join(os.path.dirname(__file__), "resources")
+
+    audio_stim1 = psy.FileStimulus(default_audio_device, "./resources/bubles.mp3")
 
     ball_stims = []
 
     for i in range(n_balls):
 
-        stim = GaborStimulus(
-            window,
-            Circle(Pixels(0), Pixels(0), ScreenWidth(0.05)),
+        stim = GaborStimulus(window,
+            # the stimulus is a circle
+            Circle(Pixels(0), Pixels(0), ScreenWidth(0.05)), 
+            # zero phase offset and 20 pixels cycle length
+            0, Pixels(20),
+            # 1% of the screen width for the sigmas
+            ScreenWidth(0.01), ScreenWidth(0.01), 
+            # 0 degrees orientation
             0,
-            Pixels(20),
-            ScreenWidth(0.01),
-            ScreenWidth(0.01),
-            0,
+            # black color
             (0.0, 0.0, 0.0),
         )
 
@@ -169,19 +172,10 @@ def my_experiment(wm):
         os.path.join(resources, "crosshair.png"),
     )
 
-    stim3 = psy.SpriteStimulus(
-        window,
-        Rectangle(
-            ScreenWidth(-0.05), ScreenWidth(-0.05), ScreenWidth(0.1), ScreenWidth(0.1)
-        ),
-        os.path.join(
-            resources,
-            "buble_pop_two_spritesheet_512px_by512px_per_frame.png",
-        ),
-        4,
-        2,
-        fps=20,
-        repeat=1,
+    stim3 = psy.SpriteStimulus(window,
+        Rectangle(ScreenWidth(-0.05), ScreenWidth(-0.05), ScreenWidth(0.1), ScreenWidth(0.1)),
+        "resources/buble_pop_two_spritesheet_512px_by512px_per_frame.png",
+        4, 2, fps=20, repeat=1,
     )
 
     # sleep for 1s
@@ -229,8 +223,14 @@ def my_experiment(wm):
 
                 if isinstance(data, psy.EventData.MouseButtonPress):
 
-                    # remove the last stimulus from ball_stims
-                    ball_stims.pop() if len(ball_stims) > 0 else None
+
+                    # play the audio stimulus
+                    audio_stim1.reset()
+                    audio_stim1.play()
+
+                    # # remove the last stimulus from ball_stims
+                    # ball_stims.pop() if len(ball_stims) > 0 else None
+
 
                     # move stimulus 3 to the position of the mouse
                     stim3.set_translation(last_mouse_pos[0], last_mouse_pos[1])
