@@ -196,7 +196,6 @@ pub fn py_wrap(s: TokenStream) -> TokenStream {
 
 
         #[pyo3::prelude::pyclass(name= #exported_name #additional_args)]
-        #[derive(Debug)]
         pub struct #py_name(pub #name);
 
         // implement the Into trait for the newtype pattern
@@ -213,16 +212,17 @@ pub fn py_wrap(s: TokenStream) -> TokenStream {
             }
         }
 
-        // impl __str__
-        #[pyo3::prelude::pymethods]
-        impl #py_name {
-            fn __str__(&self) -> String {
-                format!("{:?}", self.0)
-            }
-        }
+        // // impl __str__
+        // #[pyo3::prelude::pymethods]
+        // impl #py_name {
+        //     fn __str__(&self) -> String {
+        //         format!("{:?}", self.0)
+        //     }
+        // }
 
         // create dummy trait that is only implemented by our type
-        pub trait #dumm_trait1_name {}
+        pub trait #dumm_trait1_name { }
+
         impl #dumm_trait1_name for #name {}
 
         impl<T> From<&T> for #py_name
@@ -237,12 +237,48 @@ pub fn py_wrap(s: TokenStream) -> TokenStream {
                 Self(inner)
             }
         }
+
+
     };
 
     TokenStream::from(expanded)
 }
 
-/// This macto implements a trait
+/// Register a trait for a specific type. This is used to allow the extraction of trait objects from PyAny objects.
+#[proc_macro]
+pub fn py_register_trait(input: TokenStream) -> TokenStream {
+    let input = proc_macro2::TokenStream::from(input);
+    let split = split_token_stream_by_comma(input);
+
+    let trait_name = split
+        .get(0)
+        .expect("Expected trait name as first argument")
+        .clone();
+
+    let trait_name: Ident = syn::parse2(trait_name).unwrap();
+
+    let type_name = split
+        .get(1)
+        .expect("Expected type name as second argument")
+        .clone();
+
+    let type_name: Ident = syn::parse2(type_name).unwrap();
+
+    let wrapper_type = format_ident!("Py{}", type_name);
+
+    let expanded = quote! {
+
+        // submite the trait to the inventory
+        submit! {
+            RegisteredTrait {
+                wrapper_type: #wrapper_type,
+                trait_name: #trait_name,
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
 
 // Method to add a prefix to the first token in a proc_macro2::TokenStream
 fn add_prefix_to_first_token(
@@ -468,18 +504,6 @@ fn split_token_stream_by_comma(
     result.push(current);
     result
 }
-
-/// This macro wraps a trait that will be exposed to Python (as a trait object).
-/// Example:
-/// ```rust
-/// py_trait!(SomeTrait);
-/// ```
-///
-/// This will generate the following code:
-/// ```rust
-/// #[pyo3::prelude::pyclass]
-/// struct PySomeTrait(pub Box<dyn SomeTrait>);
-/// ```
 
 /// This macro exposes a read-only field of a wrapped struct to Python.
 /// It generates a getter for the field that will be annotated with #[getter].

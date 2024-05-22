@@ -999,6 +999,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
+name = "dyn-clone"
+version = "1.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
+
+[[package]]
 name = "either"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2724,6 +2730,8 @@ dependencies = [
  "csv",
  "derive-debug",
  "derive_more",
+ "downcast-rs",
+ "dyn-clone",
  "fastrand 2.1.0",
  "fontdb 0.16.2",
  "futures-lite 2.3.0",
@@ -2762,6 +2770,7 @@ name = "psychophysics-py"
 version = "0.1.0"
 dependencies = [
  "derive-debug",
+ "dyn-clone",
  "log",
  "psychophysics",
  "pyo3",

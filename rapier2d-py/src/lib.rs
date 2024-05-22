@@ -1,6 +1,7 @@
 #![feature(associated_type_bounds)]
 
 use std::borrow::Borrow;
+use std::ops::Deref;
 
 use paste::paste;
 use pyo3::prelude::*;
@@ -13,6 +14,7 @@ use derive_more::Display;
 use pywrap::py_forward;
 use pywrap::py_getter;
 use pywrap::py_wrap;
+use pywrap::transmute_ignore_size;
 
 // and for references (if type supports cloning)
 
@@ -85,31 +87,15 @@ macro_rules! impl_clone_wrap {
     };
 }
 
-macro_rules! impl_debug_wrap {
-    ($name:ident) => {
-        impl std::fmt::Debug for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{:?}", self.0)
-            }
-        }
-
-        // also implement _str_ for the wrapper struct
-        #[pymethods]
-        impl $name {
-            pub fn __str__(&self) -> String {
-                // use the Debug implementation
-                format!("{:?}", self)
-            }
-        }
-    };
-}
-
 // Point
-py_wrap2!(Point<Real>);
-impl_clone_wrap!(PyPoint);
+type RealPoint = Point<Real>;
+
+#[pyclass(name = "RealPoint")]
+#[derive(Clone, Display)]
+pub struct PyRealPoint(pub Point<Real>);
 
 #[pymethods]
-impl PyPoint {
+impl PyRealPoint {
     #[new]
     pub fn new(x: f32, y: f32) -> Self {
         Self(Point::new(x, y))
@@ -130,7 +116,7 @@ impl PyCollider {
         half_height: Option<f32>,
         radius: Option<f32>,
         border_radius: Option<f32>,
-        vertices: Option<Vec<PyPoint>>,
+        vertices: Option<Vec<PyRealPoint>>,
         indices: Option<Vec<[u32; 2]>>,
 
         // options for all colliders
@@ -162,8 +148,8 @@ impl PyCollider {
             "polyline" => {
                 let vertices = vertices
                     .expect("Vertices are required")
-                    .into_iter()
-                    .map(|p| p.0)
+                    .iter()
+                    .map(|v| v.0)
                     .collect();
                 ColliderBuilder::polyline(vertices, indices)
             }
@@ -224,7 +210,6 @@ impl_clone_wrap!(PyRigidBodyHandle);
 type RealVector = Vector<Real>;
 py_wrap!(RealVector);
 impl_clone_wrap!(PyRealVector);
-impl_debug_wrap!(PyRealVector);
 
 #[pymethods]
 impl PyRealVector {
@@ -243,18 +228,19 @@ impl PyRealVector {
 }
 
 // AngVector
-py_wrap2!(AngVector<Real>);
-impl_clone_wrap!(PyAngVector);
+type RealAngVector = Vector<Real>;
+py_wrap!(RealAngVector);
 
 // Isometry
-py_wrap2!(Isometry<Real>);
-impl_clone_wrap!(PyIsometry);
+type RealIsometry = Isometry<Real>;
+py_wrap!(RealIsometry);
+impl_clone_wrap!(PyRealIsometry);
 
 // RigidBody
 py_wrap!(RigidBody);
 py_forward!(RigidBody, fn translation(&self) -> RealVector);
 py_forward!(RigidBody, fn linvel(&self) -> RealVector);
-py_forward!(RigidBody, fn set_linvel(&mut self, linvel: RealVector, wake_up: bool) -> ());
+py_forward!(RigidBody, fn set_linvel(&mut self, linvel: &RealVector, wake_up: bool) -> ());
 impl_clone_wrap!(PyRigidBody);
 
 // SpringJoint
@@ -345,36 +331,12 @@ py_wrap!(QueryPipeline);
 impl_clone_wrap!(PyQueryPipeline);
 py_forward!(QueryPipeline, fn new() -> Self);
 
-trait MyTrait {}
-
-struct MyStruct1 {
-    x: f32,
-}
-impl MyTrait for MyStruct1 {}
-
-py_wrap!(MyStruct1);
-
-struct MyStruct2 {
-    x: f32,
-}
-impl MyTrait for MyStruct2 {}
-
-py_wrap!(MyStruct2);
-
-fn extract_as_trait(x: PyObject) -> &impl MyTrait {
-    // try to convert to MyStruct1, if it fails, try to convert to MyStruct2
-    let a = x.extract::<PyRef<PyMyStruct1>>().unwrap();
-    let b = &a.0;
-    b
-}
-// RigidBodyBuilder
-
 #[pymethods]
 impl PyRigidBody {
     #[new]
     pub fn new(
         body_type: &str,
-        position: Option<PyIsometry>,
+        position: Option<PyRealIsometry>,
         translation: Option<PyRealVector>,
         linvel: Option<PyRealVector>,
     ) -> Self {
@@ -400,7 +362,7 @@ impl PyRigidBody {
 impl PyPhysicsPipeline {
     pub fn step(
         &mut self,
-        gravity: PyRealVector,
+        gravity: &PyRealVector,
         integration_parameters: PyIntegrationParameters,
         island_manager: &mut PyIslandManager,
         broad_phase: &mut PyDefaultBroadPhase,
@@ -441,13 +403,13 @@ fn rapier2d_py<'py, 'a>(
     m: &'a pyo3::prelude::PyModule,
 ) -> Result<(), pyo3::PyErr> {
     m.add_class::<PyCollider>()?;
-    m.add_class::<PyPoint>()?;
+    m.add_class::<PyRealPoint>()?;
     m.add_class::<PyColliderSet>()?;
     m.add_class::<PyColliderHandle>()?;
     m.add_class::<PyRigidBody>()?;
     m.add_class::<PyRealVector>()?;
-    m.add_class::<PyAngVector>()?;
-    m.add_class::<PyIsometry>()?;
+    m.add_class::<PyRealAngVector>()?;
+    m.add_class::<PyRealIsometry>()?;
     m.add_class::<PyRigidBodySet>()?;
     m.add_class::<PyRigidBodyHandle>()?;
     m.add_class::<PyIntegrationParameters>()?;

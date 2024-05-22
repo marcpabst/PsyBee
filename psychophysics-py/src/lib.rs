@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use psychophysics::input::Event;
 use psychophysics::input::EventData;
 use psychophysics::input::EventReceiver;
@@ -8,10 +10,7 @@ use psychophysics::{
     input::EventVec,
     visual::{
         geometry::{Circle, Rectangle, Size, ToVertices, Transformable},
-        stimuli::{
-            GaborStimulus, ImageStimulus, SpriteStimulus,
-            Stimulus,
-        },
+        stimuli::{GaborStimulus, ImageStimulus, SpriteStimulus, Stimulus},
         window::{Frame, WindowState},
         Window,
     },
@@ -20,7 +19,6 @@ use psychophysics::{
 use pywrap::py_forward;
 use pywrap::py_wrap;
 use pywrap::transmute_ignore_size;
-
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 use psychophysics::visual::stimuli::VideoStimulus;
@@ -159,29 +157,8 @@ impl PyFrame {
             ));
     }
 
-    fn add(&mut self, stim: &PyAny) {
-        #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
-        if let Ok(stim) = stim.extract::<PyVideoStimulus>() {
-            self.0.add(&stim);
-            return;
-        }
-
-        if let Ok(stim) = stim.extract::<PyGaborStimulus>() {
-            self.0.add(&stim);
-            return;
-        }
-
-        if let Ok(stim) = stim.extract::<PyImageStimulus>() {
-            self.0.add(&stim);
-            return;
-        }
-
-        if let Ok(stim) = stim.extract::<PySpriteStimulus>() {
-            self.0.add(&stim);
-            return;
-        }
-
-        panic!("Unknown stimulus type");
+    fn add(&mut self, stim: &PyStimulus) {
+        self.0.add(dyn_clone::clone_box(&*stim.0));
     }
 }
 
@@ -301,13 +278,13 @@ impl PyCircle {
 
 // Wrapper for the Stimulus trait
 #[pyclass(name = "Stimulus", subclass)]
-pub struct PyStimulus();
+pub struct PyStimulus(Box<dyn Stimulus + 'static>);
 
 // The VideoStimulus
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 #[pyclass(name = "VideoStimulus", extends = PyStimulus)]
 #[derive(Clone)]
-pub struct PyVideoStimulus(VideoStimulus);
+pub struct PyVideoStimulus();
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 #[pymethods]
@@ -331,42 +308,40 @@ impl PyVideoStimulus {
             thumbnail,
             init,
         );
-        (PyVideoStimulus(stim), PyStimulus())
+        (PyVideoStimulus(), PyStimulus(Box::new(stim)))
     }
 
-    fn init(&mut self) {
-        self.0.init().unwrap()
+    // insteaf of self, we take a mutable reference to the PyVideoStimulus
+    fn init(slf: PyRef<'_, Self>) {
+        // downcast the TraibObject: Stmulus to a VideoStimulus
+        slf.into_super()
+            .0
+            .downcast_ref::<VideoStimulus>()
+            .expect("Failed to downcast to VideoStimulus")
+            .init();
     }
 
-    fn play(&mut self) {
-        self.0.play().unwrap()
+    fn play(slf: PyRef<'_, Self>) {
+        slf.into_super()
+            .0
+            .downcast_ref::<VideoStimulus>()
+            .expect("Failed to downcast to VideoStimulus")
+            .play();
     }
 
-    fn pause(&mut self) {
-        self.0.pause().unwrap()
-    }
-}
-
-#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
-impl Stimulus for PyVideoStimulus {
-    fn prepare(
-        &mut self,
-        window: &Window,
-        window_state: &WindowState,
-        gpu_state: &GPUState,
-    ) {
-        self.0.prepare(window, window_state, gpu_state)
-    }
-
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
-        self.0.render(enc, view)
+    fn pause(slf: PyRef<'_, Self>) {
+        slf.into_super()
+            .0
+            .downcast_ref::<VideoStimulus>()
+            .expect("Failed to downcast to VideoStimulus")
+            .pause();
     }
 }
 
 // ImageStimulus
 #[pyclass(name = "ImageStimulus", extends = PyStimulus)]
 #[derive(Clone)]
-pub struct PyImageStimulus(ImageStimulus);
+pub struct PyImageStimulus();
 
 #[pymethods]
 impl PyImageStimulus {
@@ -380,34 +355,23 @@ impl PyImageStimulus {
         let _self_wrapper = SendWrapper::new(window);
         py.allow_threads(move || {
             let stim = ImageStimulus::new(&window.0, shape.0.clone_box(), path);
-            (PyImageStimulus(stim), PyStimulus())
+            (PyImageStimulus(), PyStimulus(Box::new(stim)))
         })
     }
 
-    fn set_translation(&mut self, x: PySize, y: PySize) {
-        self.0.set_translation(x.0, y.0)
-    }
-}
-
-impl Stimulus for PyImageStimulus {
-    fn prepare(
-        &mut self,
-        window: &Window,
-        window_state: &WindowState,
-        gpu_state: &GPUState,
-    ) {
-        self.0.prepare(window, window_state, gpu_state)
-    }
-
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
-        self.0.render(enc, view)
+    fn set_translation(slf: PyRef<'_, Self>, x: PySize, y: PySize) {
+        slf.into_super()
+            .0
+            .downcast_ref::<ImageStimulus>()
+            .expect("Failed to downcast to ImageStimulus")
+            .set_translation(x.0, y.0);
     }
 }
 
 // SpriteStimulus
 #[pyclass(name = "SpriteStimulus", extends = PyStimulus)]
 #[derive(Clone)]
-pub struct PySpriteStimulus(SpriteStimulus);
+pub struct PySpriteStimulus();
 
 #[pymethods]
 impl PySpriteStimulus {
@@ -430,41 +394,38 @@ impl PySpriteStimulus {
             fps,
             repeat,
         );
-        (PySpriteStimulus(stim), PyStimulus())
+        (PySpriteStimulus(), PyStimulus(Box::new(stim)))
     }
 
-    fn advance_image_index(&mut self) {
-        self.0.advance_image_index()
+    fn advance_image_index(slf: PyRefMut<'_, Self>) {
+        slf.into_super()
+            .0
+            .downcast_mut::<SpriteStimulus>()
+            .expect("Failed to downcast to SpriteStimulus")
+            .advance_image_index();
     }
 
-    fn reset(&mut self) {
-        self.0.reset()
+    fn reset(slf: PyRefMut<'_, Self>) {
+        slf.into_super()
+            .0
+            .downcast_mut::<SpriteStimulus>()
+            .expect("Failed to downcast to SpriteStimulus")
+            .reset();
     }
 
-    fn set_translation(&mut self, x: PySize, y: PySize) {
-        self.0.set_translation(x, y)
-    }
-}
-
-impl Stimulus for PySpriteStimulus {
-    fn prepare(
-        &mut self,
-        window: &Window,
-        window_state: &WindowState,
-        gpu_state: &GPUState,
-    ) {
-        self.0.prepare(window, window_state, gpu_state)
-    }
-
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
-        self.0.render(enc, view)
+    fn set_translation(slf: PyRef<'_, Self>, x: PySize, y: PySize) {
+        slf.into_super()
+            .0
+            .downcast_ref::<SpriteStimulus>()
+            .expect("Failed to downcast to SpriteStimulus")
+            .set_translation(x.0, y.0);
     }
 }
 
 // GaborStimulus
 #[pyclass(name = "GaborStimulus", extends = PyStimulus)]
 #[derive(Clone)]
-pub struct PyGaborStimulus(GaborStimulus);
+pub struct PyGaborStimulus();
 
 #[pymethods]
 impl PyGaborStimulus {
@@ -492,66 +453,94 @@ impl PyGaborStimulus {
                 orientation,
                 psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0),
             );
-            (PyGaborStimulus(stim), PyStimulus())
+            (PyGaborStimulus(), PyStimulus(Box::new(stim)))
         })
     }
 
-    fn set_phase(&mut self, phase: f32) {
-        self.0.set_phase(phase)
+    fn set_phase(slf: PyRefMut<'_, Self>, phase: f32) {
+        slf.into_super()
+            .0
+            .downcast_mut::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .set_phase(phase);
     }
 
-    fn phase(&self) -> f32 {
-        self.0.phase()
+    fn phase(slf: PyRef<'_, Self>) -> f32 {
+        slf.into_super()
+            .0
+            .downcast_ref::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .phase()
     }
 
-    fn set_cycle_length(&mut self, cycle_length: PySize) {
-        self.0.set_cycle_length(cycle_length.0)
+    fn set_cycle_length(slf: PyRefMut<'_, Self>, cycle_length: PySize) {
+        slf.into_super()
+            .0
+            .downcast_mut::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .set_cycle_length(cycle_length.0);
     }
 
-    fn cycle_length(&self) -> PySize {
-        PySize(self.0.cycle_length())
+    fn cycle_length(slf: PyRef<'_, Self>) -> PySize {
+        PySize(
+            slf.into_super()
+                .0
+                .downcast_ref::<GaborStimulus>()
+                .expect("Failed to downcast to GaborStimulus")
+                .cycle_length(),
+        )
     }
 
-    fn set_color(&mut self, color: (f32, f32, f32)) {
-        self.0.set_color(psychophysics::visual::color::SRGBA::new(
-            color.0, color.1, color.2, 1.0,
-        ))
+    fn set_color(slf: PyRefMut<'_, Self>, color: (f32, f32, f32)) {
+        slf.into_super()
+            .0
+            .downcast_mut::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .set_color(psychophysics::visual::color::SRGBA::new(
+                color.0, color.1, color.2, 1.0,
+            ));
     }
 
-    fn color(&self) -> (f32, f32, f32) {
-        let color = self.0.color();
+    fn color(slf: PyRef<'_, Self>) -> (f32, f32, f32) {
+        let color = slf
+            .into_super()
+            .0
+            .downcast_ref::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .color();
         (color.r, color.g, color.b)
     }
 
-    fn set_orientation(&mut self, orientation: f32) {
-        self.0.set_orientation(orientation)
+    fn set_orientation(slf: PyRefMut<'_, Self>, orientation: f32) {
+        slf.into_super()
+            .0
+            .downcast_mut::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .set_orientation(orientation);
     }
 
-    fn orientation(&self) -> f32 {
-        self.0.orientation()
+    fn orientation(slf: PyRef<'_, Self>) -> f32 {
+        slf.into_super()
+            .0
+            .downcast_ref::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .orientation()
     }
 
-    fn translate(&mut self, x: PySize, y: PySize) {
-        self.0.translate(x, y)
+    fn translate(slf: PyRef<'_, Self>, x: PySize, y: PySize) {
+        slf.into_super()
+            .0
+            .downcast_ref::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .translate(x.0, y.0);
     }
 
-    fn set_translation(&mut self, x: PySize, y: PySize) {
-        self.0.set_translation(x, y)
-    }
-}
-
-impl Stimulus for PyGaborStimulus {
-    fn prepare(
-        &mut self,
-        window: &Window,
-        window_state: &WindowState,
-        gpu_state: &GPUState,
-    ) {
-        self.0.prepare(window, window_state, gpu_state)
-    }
-
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
-        self.0.render(enc, view)
+    fn set_translation(slf: PyRef<'_, Self>, x: PySize, y: PySize) {
+        slf.into_super()
+            .0
+            .downcast_ref::<GaborStimulus>()
+            .expect("Failed to downcast to GaborStimulus")
+            .set_translation(x.0, y.0);
     }
 }
 

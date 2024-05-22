@@ -33,11 +33,11 @@ class BubbleSimulation:
 
         # create walls for a FHD screen, with (0,0) at the center
         walls_vertices = [
-            rapier2d_py.Point(-960.0, -540.0),
-            rapier2d_py.Point(960.0, -540.0),
-            rapier2d_py.Point(960.0, 540.0),
-            rapier2d_py.Point(-960.0, 540.0),
-            rapier2d_py.Point(-960.0, -540.0),
+            rapier2d_py.RealPoint(-960.0, -540.0),
+            rapier2d_py.RealPoint(960.0, -540.0),
+            rapier2d_py.RealPoint(960.0, 540.0),
+            rapier2d_py.RealPoint(-960.0, 540.0),
+            rapier2d_py.RealPoint(-960.0, -540.0),
         ]
 
         wall_collider = rapier2d_py.Collider(
@@ -155,8 +155,8 @@ def my_experiment(wm):
             Circle(Pixels(0), Pixels(0), ScreenWidth(0.05)),
             0,
             Pixels(20),
-            ScreenWidth(0.02),
-            ScreenWidth(0.02),
+            ScreenWidth(0.01),
+            ScreenWidth(0.01),
             0,
             (0.0, 0.0, 0.0),
         )
@@ -197,6 +197,7 @@ def my_experiment(wm):
         for i in range(100):
             # stim1.set_orientation(stim1.orientation() + 0.01)
             frame = window.get_frame()
+            frame.set_bg_color((0.5, 0.5, 0.5))
             # advance the simulation
             new_pos = next(sim)
 
@@ -246,8 +247,8 @@ def my_experiment(wm):
                             Circle(Pixels(0), Pixels(0), ScreenWidth(0.05)),
                             0,
                             Pixels(20),
-                            ScreenWidth(0.02),
-                            ScreenWidth(0.02),
+                            ScreenWidth(0.01),
+                            ScreenWidth(0.01),
                             0,
                             (0.0, 0.0, 0.0),
                         )

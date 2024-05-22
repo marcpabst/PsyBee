@@ -55,7 +55,7 @@ macro_rules! generate_assessors {
     };
 }
 
-pub trait FillPattern: Send + Sync {
+pub trait FillPattern: Send + Sync + Clone {
     /// The shader language that the pattern uses. WGSL by default.
     const SHADER_LANGUAGE: &'static str = "wgsl";
 
@@ -179,7 +179,7 @@ impl<P: FillPattern> std::ops::Deref for PatternStimulus<P> {
     }
 }
 
-impl<P: FillPattern> Stimulus for PatternStimulus<P> {
+impl<P: FillPattern + 'static> Stimulus for PatternStimulus<P> {
     fn prepare(
         &mut self,
         window: &Window,

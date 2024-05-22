@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use crate::GPUState;
 
 use super::{window::WindowState, Window};
@@ -24,7 +26,7 @@ pub use sprite_stimulus::SpriteStimulus;
 pub use video_stimulus::VideoStimulus;
 
 /// The stimulus trait.
-pub trait Stimulus: Send + Sync {
+pub trait Stimulus: Send + Sync + downcast_rs::Downcast + dyn_clone::DynClone {
     /// Prepare the renderable object for rendering.
     fn prepare(
         &mut self,
@@ -35,6 +37,7 @@ pub trait Stimulus: Send + Sync {
     /// Render the object to the screen.
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();
 }
+downcast_rs::impl_downcast!(Stimulus);
 
 // macro that implements the Stimulus trait for a newtype with an _inner field that implements the trait
 #[macro_export]

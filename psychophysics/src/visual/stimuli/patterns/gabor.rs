@@ -4,7 +4,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
 use super::super::pattern_stimulus::FillPattern;
 use crate::{
     utils::AtomicExt,
@@ -174,12 +173,14 @@ impl FillPattern for Gabor {
         fn fs_main(in: VertexOutput) -> @location(0) vec4f {
             let frequency = 1.0 / uniforms.cycle_length;
             let pos = vec4<f32>(in.position.xy, 0., 0.);
-            var alpha = grating(pos.x, pos.y, uniforms.orientation, uniforms.phase, frequency);
+
+            // get the value of the grating
+            var c = grating(pos.x, pos.y, uniforms.orientation, uniforms.phase, frequency);
 
             // apply gaussian envelope
-            alpha = alpha * gaussian(pos.x, pos.y, 0.0, 0.0, uniforms.std_x, uniforms.std_y);
+            let gaussian_alpha = gaussian(pos.x, pos.y, 0.0, 0.0, uniforms.std_x, uniforms.std_y);
 
-            return vec4<f32>(1.0 * alpha, 1.0 * alpha, 1.0 * alpha, 1.0);
+            return vec4<f32>(c, c, c, gaussian_alpha);
         }
         "
         .to_string()

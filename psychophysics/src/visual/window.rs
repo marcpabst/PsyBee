@@ -534,21 +534,20 @@ impl Frame {
     /// Add a renderable to the frame.
     pub fn add(
         &mut self,
-        stimulus: &(impl Stimulus + Clone + 'static),
+        stimulus: Box<dyn Stimulus>,
     ) -> () {
-        let stimulus = Box::new(stimulus.clone());
         self.renderables.lock_blocking().push(stimulus);
     }
 
     pub fn add_many<E>(
         &mut self,
-        stimuli: &Vec<E>,
+        stimuli: Vec<E>,
     ) -> ()
     where
-        E: Stimulus + Clone + 'static,
+        E: Into<Box<dyn Stimulus>>,
     {
         for stimulus in stimuli {
-            self.add(stimulus);
+            self.add(stimulus.into());
         }
     }
 }
