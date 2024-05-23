@@ -1,5 +1,11 @@
 # Sizes
 
+<div class="grid cards" markdown>
+- :fontawesome-solid-quote-right: _When you can measure what you are speaking about, and express it in numbers, you know something about it; but when you cannot measure it, when you cannot express it in numbers, your knowledge is of a meagre and unsatisfactory kind._  
+<sub>**Lord Kelvin (1824-1907), in a lecture to the Institution of Civil Engineers**</sub>
+</div>
+
+
 Most functions in psychopysics accept both numerical scalar values (such as `int` or `float` - these will **always** be interpreted as pixels) and the `Size` type. Size types are used to represent physical quantities in psychophysics, and are used to ensure that the units of the quantities are consistent. For example, the `Size` type can be used to represent the size of a stimulus in degrees of visual angle.
 
 Once you have brought the `psychophysics.size` module into your namespace, you can create `Size` values either by calling the constructor functions, ot by using the shorthand syntax. For example, you can create a `Size` value representing 100 pixels like this:

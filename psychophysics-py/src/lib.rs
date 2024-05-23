@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::sync::Arc;
 
 use psychophysics::audio::AudioStimulus;
 use psychophysics::input::Event;
@@ -16,8 +17,10 @@ use psychophysics::{
         window::{Frame, WindowState},
         Window,
     },
-    wgpu, ExperimentManager, GPUState, Monitor, WindowManager, WindowOptions,
+    wgpu, ExperimentManager, ExperimentManagerOld, GPUState, Monitor, WindowOptions,
 };
+use pyo3::types::PyIterator;
+use pyo3::types::PyList;
 use pywrap::py_forward;
 use pywrap::py_wrap;
 use pywrap::transmute_ignore_size;
@@ -27,14 +30,64 @@ use psychophysics::visual::stimuli::VideoStimulus;
 
 use pyo3::{prelude::*, Python};
 use send_wrapper::SendWrapper;
+use smol::lock::Mutex;
 
-py_wrap!(ExperimentManager, unsendable);
+/// A type that wraps an Arc<Mutex<Box<dyn Stimulus + 'static>>> so that it can be passed to Python
+#[pyclass(name = "StimulusList")]
+#[derive(Clone)]
+pub struct PyStimulusList(Arc<Mutex<Vec<Box<dyn Stimulus + 'static>>>>);
 
 #[pymethods]
-impl PyExperimentManager {
+impl PyStimulusList {
+    fn __len__(&self) -> usize {
+        self.0.lock_blocking().len()
+    }
+
+    /// getitem method to allow indexing into the StimulusList
+    fn __getitem__(&self, index: usize) -> PyStimulus {
+        PyStimulus(dyn_clone::clone_box(&*self.0.lock_blocking()[index]))
+    }
+
+    /// setitem method to allow setting items in the StimulusList
+    fn __setitem__(&mut self, index: usize, value: PyStimulus) {
+        self.0.lock_blocking()[index] = value.0;
+    }
+
+    /// push method to allow appending to the StimulusList
+    fn append(&mut self, value: PyStimulus) {
+        self.0.lock_blocking().push(value.0);
+    }
+
+    /// extend method to allow extending the StimulusList
+    fn extend(&mut self, other: Vec<PyStimulus>) {
+        self.0
+            .lock_blocking()
+            .extend(other.into_iter().map(|s| s.0));
+    }
+
+    /// clear method to allow clearing the StimulusList
+    fn clear(&mut self) {
+        self.0.lock_blocking().clear();
+    }
+
+    /// Reverse in place
+    fn reverse(&mut self) {
+        self.0.lock_blocking().reverse();
+    }
+
+    /// __repr__ method to allow printing the StimulusList
+    fn __repr__(&self) -> String {
+        format!("<StimulusList with {} items>", self.0.lock_blocking().len())
+    }
+}
+
+py_wrap!(ExperimentManagerOld, unsendable);
+
+#[pymethods]
+impl PyExperimentManagerOld {
     #[new]
     fn __new__() -> Self {
-        PyExperimentManager(smol::block_on(ExperimentManager::new()))
+        PyExperimentManagerOld(smol::block_on(ExperimentManagerOld::new()))
     }
 
     fn __repr__(&self) -> String {
@@ -50,11 +103,19 @@ impl PyExperimentManager {
             .collect()
     }
 
+    /// Runs your experiment function in a new thread. This function will block the
+    /// calling thread until the experiment is finished and `experiment_fn`` returns.
+    ///
+    /// Parameters
+    /// ----------
+    /// experiment_fn : callable
+    ///    The function that runs your experiment. This function should take a single
+    ///   argument, an instance of `ExperimentManager`, and should not return nothing.
     fn run_experiment(&mut self, py: Python, experiment_fn: Py<PyAny>) {
         let rust_experiment_fn =
-            move |wm: WindowManager| -> Result<(), errors::PsychophysicsError> {
+            move |wm: ExperimentManager| -> Result<(), errors::PsychophysicsError> {
                 Python::with_gil(|py| -> PyResult<()> {
-                    let pywin = PyWindowManager(wm);
+                    let pywin = PyExperimentManager(wm);
                     experiment_fn
                         .call1(py, (pywin,))
                         .expect("Error calling experiment_fn");
@@ -93,10 +154,24 @@ py_wrap!(Window);
 
 #[pymethods]
 impl PyWindow {
+    /// Obtain the next frame from the window. Currently, this function will
+    /// not block, but this may change in the future.
+    ///
+    /// Returns
+    /// -------
+    /// frame : Frame
+    ///    The frame that was obtained from the window.
     fn get_frame(&self) -> PyFrame {
         PyFrame(self.0.get_frame())
     }
 
+    /// Submit a frame to the window. Might or might not block, depending on the
+    /// current state of the underlying GPU queue.
+    ///
+    /// Parameters
+    /// ----------
+    /// frame : Frame
+    ///   The frame to submit to the window.
     fn submit_frame(&mut self, frame: &PyFrame, py: Python<'_>) {
         let self_wrapper = SendWrapper::new(self);
         // submit the frame
@@ -114,6 +189,27 @@ impl PyWindow {
         self.0.close();
     }
 
+    /// List of stimuli that are currently attached to the `Window`.
+    /// These stimuli will be automatically added to each frame
+    /// that is obtained from the window.
+    ///
+    /// Returns
+    /// -------
+    /// stimuli : list
+    ///    The list of stimuli that are currently attached to the window.
+    #[getter]
+    fn stimuli(&mut self) -> PyStimulusList {
+        PyStimulusList(self.0.stimuli.clone())
+    }
+
+    /// Create a new EventReceiver for this window that can be used to poll for
+    /// events. You can create multiple EventReceivers that will all receive the
+    /// same events independently.
+    ///
+    /// Returns
+    /// -------
+    /// receiver : EventReceiver
+    ///    The EventReceiver that was created.
     fn create_event_receiver(&self) -> PyEventReceiver {
         PyEventReceiver(self.0.create_event_receiver())
     }
@@ -123,8 +219,8 @@ py_wrap!(EventVec);
 
 #[pymethods]
 impl PyEventReceiver {
-    fn events(&mut self) -> PyEventVec {
-        PyEventVec(self.0.events())
+    fn poll(&mut self) -> PyEventVec {
+        PyEventVec(self.0.poll())
     }
 }
 
@@ -159,8 +255,9 @@ impl PyFrame {
             ));
     }
 
-    fn add(&mut self, stim: &PyStimulus) {
-        self.0.add(dyn_clone::clone_box(&*stim.0));
+    #[getter]
+    fn stimuli(&mut self) -> PyStimulusList {
+        PyStimulusList(self.0.stimuli.clone())
     }
 }
 
@@ -205,11 +302,11 @@ impl PyWindowOptions {
     }
 }
 
-py_wrap!(WindowManager);
-py_forward!(WindowManager, fn prompt(&self, prompt: &str) -> String);
+py_wrap!(ExperimentManager);
+py_forward!(ExperimentManager, fn prompt(&self, prompt: &str) -> String);
 
 #[pymethods]
-impl PyWindowManager {
+impl PyExperimentManager {
     fn create_default_window(&self, py: Python<'_>) -> PyWindow {
         let self_wrapper = SendWrapper::new(self);
         py.allow_threads(move || PyWindow(self_wrapper.0.create_default_window()))
@@ -281,6 +378,12 @@ impl PyCircle {
 // Wrapper for the Stimulus trait
 #[pyclass(name = "Stimulus", subclass)]
 pub struct PyStimulus(Box<dyn Stimulus + 'static>);
+
+impl Clone for PyStimulus {
+    fn clone(&self) -> Self {
+        PyStimulus(dyn_clone::clone_box(&*self.0))
+    }
+}
 
 // The VideoStimulus
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
@@ -424,7 +527,34 @@ impl PySpriteStimulus {
     }
 }
 
-// GaborStimulus
+/// A GaborStimulus.
+///
+/// Consists of a Gabor patch, which is a sinusoidal grating enveloped by a Gaussian.
+///
+/// Parameters
+/// ----------
+/// window : Window
+///    The window that the stimulus will be presented on.
+/// shape : Shape
+///   The shape of the stimulus.
+/// phase : float
+///   The phase of the sinusoidal grating in radians.
+/// cycle_length : Size
+///   The length of a single cycle of the sinusoidal grating in pixels.
+/// std_x : Size
+///   The standard deviation of the Gaussian envelope in the x direction in pixels.
+/// std_y : Size
+///  The standard deviation of the Gaussian envelope in the y direction in pixels.
+/// orientation : float
+///  The orientation of the sinusoidal grating in radians.
+/// color : tuple
+///  The color of the stimulus as an RGB tuple.
+///
+/// Returns
+/// -------
+/// GaborStimulus :
+///  The GaborStimulus that was created.
+///
 #[pyclass(name = "GaborStimulus", extends = PyStimulus)]
 #[derive(Clone)]
 pub struct PyGaborStimulus();
@@ -598,6 +728,7 @@ impl PySineWaveStimulus {
     }
 }
 
+/// A file stimulus
 #[pyclass(name = "FileStimulus", extends = PyAudioStimulus)]
 #[derive(Clone)]
 pub struct PyFileStimulus();
@@ -785,7 +916,7 @@ fn psychophysics_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMonitor>()?;
     m.add_class::<PyWindowOptions>()?;
     m.add_class::<PyWindow>()?;
-    m.add_class::<PyWindowManager>()?;
+    m.add_class::<PyExperimentManagerOld>()?;
     m.add_class::<PyFrame>()?;
     m.add_class::<PyShape>()?;
     m.add_class::<PyRectangle>()?;

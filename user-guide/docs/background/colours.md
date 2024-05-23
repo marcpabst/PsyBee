@@ -1,6 +1,9 @@
-# Background on colour spaces
+# Colours and Gamma Correction
+
+___This article proides background information on colour spaces and gamma correction. *psychophysics* currently does not provide full colour management support, but you can specify the encoding used and you can perform gamma calibration yourself.___
 
 A colour space is a mathematical model that describes how colours can be represented as tuples of numbers. Since human vision is trichromatic (i.e. we have three types of colour receptors in our eyes), most colour spaces are tristimulus colour spaces, meaning that colours can be represented as a combination of three numbers.
+
 
 ## Useful colour spaces
 
@@ -8,7 +11,8 @@ A colour space is a mathematical model that describes how colours can be represe
 
 RGB colour spaces are tristimulus colour spaces that are based on defining values for red, green, and blue (so-called "primaries") and a white point. They are the most ubiquitous colour spaces in computer graphics and will probably be the most familiar to you.
 
-> It can be slightly confusing that the term "RGB colour space" is used to refer to both the concept of a colour space represented by red, green, and blue, and to a specific colour space that is defined by a set of specific red, green, and blue primaries and a white point (like sRGB or Adobe RGB). **For sake of clarity, you should always clearly state which RGB colour space you are referring to.**
+!!! Terminology
+    It can be slightly confusing that the term "RGB colour space" is used to refer to both the concept of a colour space represented by red, green, and blue, and to a specific colour space that is defined by a set of specific red, green, and blue primaries and a white point (like sRGB or Adobe RGB). **For sake of clarity, you should always clearly state which RGB colour space you are referring to.**
 
 The three most important concepts in RGB colour spaces are: the **primaries**, the **white point**, and the **encoding**.
 
@@ -22,7 +26,8 @@ The **white point** is the colour of a perfectly white surface, i.e. when all th
 
 The **encoding** is the transfer function that is used to convert the RGB values to light intensity (also called electro-optical transfer function, see [below](#converting-numbers-to-light-intensity)). The encoding can be linear or non-linear.
 
-> Confusingly, some definitions of certain RGB colour spaces include the encoding, while others do not. For example, the sRGB colour space is usually used with with so-called "sRGB transfer function" (a non-linear encoding), but you sometimes the sRGB primaries and white point are used with a linear encoding (often called "linear sRGB"). Even more confusingly, not all implementations of sRGB use the same transfer function. The sRGB transfer function is formally defined by an ICE standard, and it is a piecewise function that combines a linear segment with a power function with an exponent of 2.4\. However, some implementations of sRGB use a slightly different transfer function. For example, many displays approximate the sRGB transfer function using a power function with an exponent of 2.2\. Annoyingly, some (even professional) software packages have needlessly invented their own transfer functions for sRGB, which can cause confusion and compatibility issues.[^5]
+
+Confusingly, some definitions of certain RGB colour spaces include the encoding, while others do not. For example, the sRGB colour space is usually used with with so-called "sRGB transfer function" (a non-linear encoding), but you sometimes the sRGB primaries and white point are used with a linear encoding (often called "linear sRGB"). Even more confusingly, not all implementations of sRGB use the same transfer function. The sRGB transfer function is formally defined by an ICE standard, and it is a piecewise function that combines a linear segment with a power function with an exponent of 2.4\. However, some implementations of sRGB use a slightly different transfer function. For example, many displays approximate the sRGB transfer function using a power function with an exponent of 2.2\. Annoyingly, some (even professional) software packages have needlessly invented their own transfer functions for sRGB, which can cause confusion and compatibility issues.[^5]
 
 RGB colour spaces are extremely useful for computer graphics because they are very intuitive and easy to understand. Moreover, almost all modern display technologies are based on emitting red, green, and blue light, which makes RGB colour spaces a natural choice for representing colours that are to be displayed on a screen. Some common RGB colour spaces are:
 
@@ -91,9 +96,10 @@ where `c` is the RGB in the range [0.0, 1.0].
 
 As described above, this encoding method was initially tailored for the gamma characteristics of CRT displays. Coincidentally, it also mimics the response of the human visual system to light in daylight conditions, making linearly spaced RGB values correspond to perceived linear light intensity.
 
-# Gamma correction
+## Gamma correction
 
-> Note that the term "gamma correction" might be used slightly differently in other contexts.
+!!! Terminology
+    Note that the term "gamma correction" might be used slightly differently in other contexts.
 
 When vision scientists talk about "gamma correction", they are usually referring to the process of compensating for the non-linear transfer function of the display. The goal of gamma correction in this context is to ensure that the light intensity emitted by the display is proportional to the RGB values that are sent to the display. This is important because it means that the RGB values can be interpreted as light intensity.
 
@@ -105,9 +111,9 @@ If your goal is to present stimuli with a specific light intensity, you have a n
 
 2. You can perform the gamma correction yourself, either by transforming colours before you pass them to the rendering pipeline, by setting a LUT in the GPU set through your operating system, or by correcting it yourself before the framebuffer is sent to the display (either using a transfer function in a fragment shader or by using a LUT in the GPU).
 
-psychophysics allows you to combine these two approaches. By default, your operating system and GPU drivers will take care of the gamma correction, but you can also _correct for innacuracies_ in the display's gamma correction by performing the gamma correction yourself. This basically means that we provide a mapping from the theoretically expected light intensity to the actual light intensity emitted by the display. **Note that this approach is slightly different from the traditional approach to gamma correction, which is to provide a mapping from whatever colour space you are using to the actual light intensity emitted by the display.**
+*psychophysics* allows you to combine these two approaches. By default, your operating system and GPU drivers will take care of the gamma correction, but you can also _correct for innacuracies_ in the display's gamma correction by performing the gamma correction yourself. This basically means that we provide a mapping from the theoretically expected light intensity to the actual light intensity emitted by the display. **Note that this approach is slightly different from the traditional approach to gamma correction, which is to provide a mapping from whatever colour space you are using to the actual light intensity emitted by the display.**
 
-psychophysics provides a number of tools to help you calibrate your display, and to ensure that the gamma correction is performed correctly.
+*psychophysics* provides a number of tools to help you calibrate your display, and to ensure that the gamma correction is performed correctly.
 
 [^1]: Charles Poynton, A Technical Introduction to Digital Video. New York: Wiley, 1996.
 

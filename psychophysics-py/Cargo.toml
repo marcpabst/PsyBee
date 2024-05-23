@@ -16,5 +16,5 @@ smol = "2.0.0"
 derive-debug = "0.1.2"
 pyo3-log = "0.10.0"
 log = "0.4.21"
-pyo3 = { version = "0.21.2", features = ["multiple-pymethods", "abi3-py38", "extension-module"] }
+pyo3 = { version = "0.21.2", features = ["multiple-pymethods", "abi3-py38", "extension-module", "experimental-inspect"] }
 dyn-clone = "1.0.17"

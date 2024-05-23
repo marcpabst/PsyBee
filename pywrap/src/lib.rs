@@ -221,7 +221,7 @@ pub fn py_wrap(s: TokenStream) -> TokenStream {
         // }
 
         // create dummy trait that is only implemented by our type
-        pub trait #dumm_trait1_name { }
+        pub trait #dumm_trait1_name {}
 
         impl #dumm_trait1_name for #name {}
 

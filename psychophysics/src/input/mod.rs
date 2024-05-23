@@ -308,7 +308,7 @@ impl EventReceiver {
         }
     }
 
-    pub fn events(&mut self) -> EventVec {
+    pub fn poll(&mut self) -> EventVec {
         let mut inputs = Vec::new();
         while let Ok(input) = self.receiver.try_recv() {
             inputs.push(input);

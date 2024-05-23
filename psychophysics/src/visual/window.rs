@@ -44,7 +44,7 @@ pub struct WindowState {
 
 /// A Window represents a window on the screen. It is used to create stimuli and to submit them to the screen for rendering.
 /// Each window has a render task that is responsible for rendering stimuli to the screen.
-#[derive(Clone, Debug)]
+#[derive(Clone, Dbg)]
 pub struct Window {
     /// The window state. This contains the actual winit window, the wgpu device, the wgpu queue, etc.
     pub state: Arc<RwLock<WindowState>>,
@@ -83,6 +83,10 @@ pub struct Window {
     //pub cursor_position: Arc<Mutex<(Size, Size)>>,
     // /// event handlers
     //pub event_handlers: Vec<Box<dyn Fn(Event) -> () + Send + Sync>>,
+
+    /// Global renderables (will be added to every frame automatically)
+    #[dbg(placeholder = "...")]
+    pub stimuli: Arc<Mutex<Vec<Box<dyn Stimulus>>>>,
 }
 
 trait SyncTestTrait: Send + Sync {}
@@ -222,8 +226,8 @@ impl Window {
 
     // Create a new frame with a black background.
     pub fn get_frame(&self) -> Frame {
-        Frame {
-            renderables: Arc::new(Mutex::new(Vec::new())),
+        let mut frame = Frame {
+            stimuli: Arc::new(Mutex::new(Vec::new())),
             color_format: self.color_format,
             bg_color: super::color::RawRgba {
                 r: 0.0,
@@ -231,7 +235,14 @@ impl Window {
                 b: 0.0,
                 a: 1.0,
             },
+        };
+        
+        // TODO: is this efficient?
+        for stimulus in self.stimuli.lock_blocking().iter() {
+            frame.add(dyn_clone::clone_box(&**stimulus));
         }
+
+        return frame;
     }
 
     /// Returns the physical width of the window in millimeters.
@@ -474,12 +485,10 @@ pub async fn render_task(window: Window) {
 #[derive(Clone, Dbg)]
 pub struct Frame {
     #[dbg(placeholder = "...")]
-    renderables: Arc<Mutex<Vec<Box<dyn Stimulus>>>>,
+    pub stimuli: Arc<Mutex<Vec<Box<dyn Stimulus>>>>,
     color_format: ColorFormat,
     pub bg_color: super::color::RawRgba,
 }
-
-
 
 impl Frame {
     /// Set the background color of the frame.
@@ -505,7 +514,7 @@ impl Frame {
        
         // call prepare() on all renderables
         for renderable in
-            &mut self.renderables.lock().await.iter_mut()
+            &mut self.stimuli.lock().await.iter_mut()
         {
        
             renderable
@@ -523,7 +532,7 @@ impl Frame {
     ) -> () {
         // call render() on all renderables
         for renderable in
-            &mut self.renderables.lock_blocking().iter_mut()
+            &mut self.stimuli.lock_blocking().iter_mut()
         {
             renderable.render(enc, view);
         }
@@ -536,7 +545,7 @@ impl Frame {
         &mut self,
         stimulus: Box<dyn Stimulus>,
     ) -> () {
-        self.renderables.lock_blocking().push(stimulus);
+        self.stimuli.lock_blocking().push(stimulus);
     }
 
     pub fn add_many<E>(

@@ -258,7 +258,7 @@ pub struct GPUState {
 /// can be created using the `new` method. No more than one ExperimentManager
 /// can exist at any given time.
 #[derive(Debug)]
-pub struct ExperimentManager {
+pub struct ExperimentManagerOld {
     event_loop: Option<EventLoop<PsychophysicsEventLoopEvent>>,
     event_loop_proxy: winit::event_loop::EventLoopProxy<
         PsychophysicsEventLoopEvent,
@@ -287,7 +287,7 @@ pub struct ExperimentManager {
 
 /// The WindowManager is available as an argument to the experiment function. It can be used to create new windows.
 #[derive(Debug)]
-pub struct WindowManager {
+pub struct ExperimentManager {
     event_loop_proxy: winit::event_loop::EventLoopProxy<
         PsychophysicsEventLoopEvent,
     >,
@@ -295,7 +295,7 @@ pub struct WindowManager {
     render_taks_sender: Sender<Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>>,
 }
 
-impl WindowManager {
+impl ExperimentManager {
 
     /// Show a prompt to the user. This function will block until the user has entered a string and pressed enter.
     pub fn prompt(&self, message: &str) -> String {
@@ -366,7 +366,7 @@ impl WindowManager {
     }
 }
 
-impl ExperimentManager {
+impl ExperimentManagerOld {
     /// Create a new ExperimentManager.
     pub async fn new() -> Self {
         // create channel for sending tasks to the render thread
@@ -648,6 +648,7 @@ impl ExperimentManager {
              width_px: Arc::new(AtomicU32::new(300)),
              height_px: Arc::new(AtomicU32::new(300)),
              render_task_sender: self.render_task_sender.clone(),
+             stimuli: Arc::new(Mutex::new(vec![])),
              //event_handlers: vec![],
          };
      
@@ -757,7 +758,7 @@ impl ExperimentManager {
     /// * `experiment_fn` - The function that is your experiment. This function will be called with a `Window` object that you can use to create stimuli and submit frames to the window.
     pub fn run_experiment<F>(&mut self, experiment_fn: F) -> ()
     where
-        F: FnOnce(WindowManager) -> Result<(), errors::PsychophysicsError>
+        F: FnOnce(ExperimentManager) -> Result<(), errors::PsychophysicsError>
             + 'static
             + Send,
     {
@@ -815,7 +816,7 @@ impl ExperimentManager {
         event_loop: EventLoop<PsychophysicsEventLoopEvent>,
         experiment_fn: F,
     ) where
-        F: FnOnce(WindowManager) -> Result<(), errors::PsychophysicsError>
+        F: FnOnce(ExperimentManager) -> Result<(), errors::PsychophysicsError>
             + 'static
             + Send,
     {
@@ -832,7 +833,7 @@ impl ExperimentManager {
             })
             .collect();
 
-        let wm = WindowManager {
+        let wm = ExperimentManager {
             event_loop_proxy: event_loop.create_proxy(),
             render_taks_sender: self.render_task_sender.clone(),
             available_monitors: available_monitors,

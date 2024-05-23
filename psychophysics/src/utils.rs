@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-
 use bytemuck;
-
 
 pub(crate) trait AtomicExt<T> {
     fn load_relaxed(&self) -> T;
@@ -59,7 +57,6 @@ impl AtomicExt<bool> for std::sync::atomic::AtomicBool {
     }
 }
 
-
 pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};
@@ -82,8 +79,6 @@ macro_rules! log_nonblocking {
         }
     };
 }
-
-
 
 /// Includes an image as a reference to a byte array.
 /// This is useful for including images in the binary.

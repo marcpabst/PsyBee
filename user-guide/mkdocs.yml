@@ -4,6 +4,7 @@ theme:
   name: material
 
 markdown_extensions:
+  - footnotes
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -25,11 +26,13 @@ nav:
   - installation.md
   - getting-started.md
   - Concepts:
-    - concepts/frame/index.md
+    - concepts/frame.md
+    - concepts/colours.md
     - concepts/events.md
     - concepts/sizes.md
     - concepts/visual-stimuli/index.md
   - advanced/index.md
   - Background:
     - background/graphicspipeline.md
+    - background/colours.md
     

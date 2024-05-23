@@ -51,9 +51,6 @@ pub struct SineWaveStimulus {
     sink: Arc<Mutex<Sink>>,
 }
 
-unsafe impl Send for SineWaveStimulus {}
-unsafe impl Sync for SineWaveStimulus {}
-
 impl SineWaveStimulus {
     pub fn new(audio_device: &AudioDevice, frequency: f32, duration: f32) -> Self {
         let stream_handle = audio_device.stream_handle.clone();
@@ -124,9 +121,6 @@ pub struct FileStimulus {
     sink: Arc<Mutex<Sink>>,
 }
 
-unsafe impl Send for FileStimulus {}
-unsafe impl Sync for FileStimulus {}
-
 impl FileStimulus {
     pub fn new(audio_device: &AudioDevice, file_path: &str) -> Self {
         let stream_handle = audio_device.stream_handle.clone();
@@ -135,7 +129,7 @@ impl FileStimulus {
             .unwrap()
             .skip_duration(Duration::from_secs_f32(0.1));
 
-        let source = NeverStop::new(source);
+        let source = NeverStop::new(Cache::new(source));
 
         let sink = Sink::try_new(&stream_handle).unwrap();
 
@@ -253,5 +247,92 @@ where
 
     fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
         self.source.try_seek(pos)
+    }
+}
+
+/// A source that drains the underlying source into a buffer, then drops the underlying source amd keeps the buffer in memory.
+#[derive(Clone, Debug)]
+pub struct Cache<I>
+where
+    I: Source,
+    I::Item: Sample,
+{
+    buffer: Vec<I::Item>,
+    channels: u16,
+    sample_rate: u32,
+    total_duration: Option<std::time::Duration>,
+
+    current_sample: usize,
+}
+
+impl<I> Cache<I>
+where
+    I: Source,
+    I::Item: Sample,
+{
+    pub fn new(source: I) -> Self {
+        let channels = source.channels();
+        let sample_rate = source.sample_rate();
+        let total_duration = source.total_duration();
+
+        let buffer = source.collect();
+
+        Cache {
+            buffer,
+            channels,
+            sample_rate,
+            total_duration,
+            current_sample: 0,
+        }
+    }
+}
+
+impl<I> Iterator for Cache<I>
+where
+    I: Source,
+    I::Item: Sample,
+{
+    type Item = <I as Iterator>::Item;
+
+    fn next(&mut self) -> Option<<I as Iterator>::Item> {
+        let sample = self.buffer.get(self.current_sample).copied();
+        self.current_sample += 1;
+        sample
+    }
+}
+
+impl<I> Source for Cache<I>
+where
+    I: Source,
+    I::Item: Sample,
+{
+    fn current_frame_len(&self) -> Option<usize> {
+        None
+    }
+
+    fn channels(&self) -> u16 {
+        self.channels
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn total_duration(&self) -> Option<std::time::Duration> {
+        self.total_duration
+    }
+
+    fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
+        // work out the target sample index
+        let target_sample = (pos.as_secs_f32() * self.sample_rate as f32) as usize;
+
+        // check if the target sample is within the bounds of the buffer, if not move to the end of the buffer
+        if target_sample >= self.buffer.len() {
+            self.current_sample = self.buffer.len();
+        } else {
+            self.current_sample = target_sample;
+        }
+
+        Ok(())
     }
 }
