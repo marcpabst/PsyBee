@@ -5,14 +5,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use super::super::pattern_stimulus::FillPattern;
-use crate::{
-    utils::AtomicExt,
-    visual::{
-        color::{ColorFormat, IntoRawRgba, RawRgba},
-        geometry::{Size, ToPixels},
-        Window,
-    },
-};
+use crate::utils::AtomicExt;
+use crate::visual::color::{ColorFormat, IntoRawRgba, RawRgba};
+use crate::visual::geometry::{Size, ToPixels};
+use crate::visual::Window;
 
 /// A Sinosoidal grating pattern
 #[derive(Clone, Debug)]
@@ -26,28 +22,24 @@ pub struct Gabor {
 }
 
 impl Gabor {
-    pub fn new<L, C, M, N>(
-        phase: f32,
-        cycle_length: L,
-        std_x: M,
-        std_y: N,
-        orientation: f32,
-        color: C,
-    ) -> Self
-    where
-        L: Into<Size>,
-        M: Into<Size>,
-        N: Into<Size>,
-        C: IntoRawRgba,
+    pub fn new<L, C, M, N>(phase: f32,
+                           cycle_length: L,
+                           std_x: M,
+                           std_y: N,
+                           orientation: f32,
+                           color: C)
+                           -> Self
+        where L: Into<Size>,
+              M: Into<Size>,
+              N: Into<Size>,
+              C: IntoRawRgba
     {
-        Self {
-            phase,
-            cycle_length: cycle_length.into(),
-            std_x: std_x.into(),
-            std_y: std_y.into(),
-            orientation,
-            color: color.convert_to_raw_rgba(ColorFormat::SRGBA8),
-        }
+        Self { phase,
+               cycle_length: cycle_length.into(),
+               std_x: std_x.into(),
+               std_y: std_y.into(),
+               orientation,
+               color: color.convert_to_raw_rgba(ColorFormat::SRGBA8) }
     }
 
     pub fn set_phase(&mut self, phase: f32) -> () {
@@ -55,22 +47,19 @@ impl Gabor {
     }
 
     pub fn set_std_x<L>(&mut self, std_x: L) -> ()
-    where
-        L: Into<Size>,
+        where L: Into<Size>
     {
         self.std_x = std_x.into();
     }
 
     pub fn set_std_y<L>(&mut self, std_y: L) -> ()
-    where
-        L: Into<Size>,
+        where L: Into<Size>
     {
         self.std_y = std_y.into();
     }
 
     pub fn set_std<L>(&mut self, std: L) -> ()
-    where
-        L: Into<Size>,
+        where L: Into<Size>
     {
         let std = std.into();
         self.std_x = std.clone();
@@ -86,8 +75,7 @@ impl Gabor {
     }
 
     pub fn set_cycle_length<L>(&mut self, cycle_length: L) -> ()
-    where
-        L: Into<Size>,
+        where L: Into<Size>
     {
         self.cycle_length = cycle_length.into();
     }
@@ -101,38 +89,30 @@ impl FillPattern for Gabor {
         let screen_height_px = window.height_px.load_relaxed();
 
         // turn cycle_length into a float (in pixels)
-        let cycle_length: f32 = self.cycle_length.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        ) as f32;
+        let cycle_length: f32 = self.cycle_length.to_pixels(screen_width_mm,
+                                                            viewing_distance_mm,
+                                                            screen_width_px,
+                                                            screen_height_px)
+                                as f32;
 
         // turn std_x into a float (in pixels)
-        let std_x: f32 = self.std_x.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        ) as f32;
+        let std_x: f32 = self.std_x.to_pixels(screen_width_mm,
+                                              viewing_distance_mm,
+                                              screen_width_px,
+                                              screen_height_px) as f32;
 
         // turn std_y into a float (in pixels)
-        let std_y: f32 = self.std_y.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        ) as f32;
+        let std_y: f32 = self.std_y.to_pixels(screen_width_mm,
+                                              viewing_distance_mm,
+                                              screen_width_px,
+                                              screen_height_px) as f32;
 
         // return the uniform buffer data as a byte slice
-        let data1 = [
-            self.phase.to_ne_bytes(),
-            cycle_length.to_ne_bytes(),
-            std_x.to_ne_bytes(),
-            std_y.to_ne_bytes(),
-            self.orientation.to_ne_bytes(),
-        ]
-        .concat();
+        let data1 = [self.phase.to_ne_bytes(),
+                     cycle_length.to_ne_bytes(),
+                     std_x.to_ne_bytes(),
+                     std_y.to_ne_bytes(),
+                     self.orientation.to_ne_bytes()].concat();
 
         let data2 = self.color.to_ne_bytes().to_vec();
 

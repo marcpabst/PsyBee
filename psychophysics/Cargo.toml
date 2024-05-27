@@ -51,6 +51,9 @@ paste = "1.0.15"
 derive-debug = "0.1.2"
 downcast-rs = "1.2.1"
 dyn-clone = "1.0.17"
+enum-fields = "0.1.0"
+strum = { version = "0.26", features = ["derive"] }
+uuid = {version = "1.8.0", features = ["v4", "fast-rng"]}
 
 # MacOS dependencies
 [target.'cfg(target_os = "macos")'.dependencies]

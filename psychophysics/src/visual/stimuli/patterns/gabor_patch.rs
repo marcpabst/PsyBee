@@ -4,16 +4,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
 use super::super::pattern_stimulus::FillPattern;
-use crate::{
-    utils::AtomicExt,
-    visual::{
-        color::{ColorFormat, IntoRawRgba, RawRgba},
-        geometry::{Size, SizeVector2D, ToPixels},
-        Window,
-    },
-};
+use crate::utils::AtomicExt;
+use crate::visual::color::{ColorFormat, IntoRawRgba, RawRgba};
+use crate::visual::geometry::{Size, SizeVector2D, ToPixels};
+use crate::visual::Window;
 
 /// A Gabor patch pattern
 #[derive(Clone, Debug)]
@@ -27,19 +22,16 @@ pub struct GaborPatch {
 
 impl GaborPatch {
     pub fn new<L, C, M, S>(phase: f32, cycle_length: L, color: C, mu: M, sigma: S) -> Self
-    where
-        L: Into<Size>,
-        C: IntoRawRgba,
-        M: Into<SizeVector2D>,
-        S: Into<SizeVector2D>,
+        where L: Into<Size>,
+              C: IntoRawRgba,
+              M: Into<SizeVector2D>,
+              S: Into<SizeVector2D>
     {
-        Self {
-            phase,
-            cycle_length: cycle_length.into(),
-            color: color.convert_to_raw_rgba(ColorFormat::SRGBA8),
-            mu: mu.into(),
-            sigma: sigma.into(),
-        }
+        Self { phase,
+               cycle_length: cycle_length.into(),
+               color: color.convert_to_raw_rgba(ColorFormat::SRGBA8),
+               mu: mu.into(),
+               sigma: sigma.into() }
     }
 }
 
@@ -51,39 +43,31 @@ impl FillPattern for GaborPatch {
         let screen_height_px = window.height_px.load_relaxed();
 
         // turn cycle_length into a float (in pixels)
-        let cycle_length: f32 = self.cycle_length.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        ) as f32;
+        let cycle_length: f32 = self.cycle_length.to_pixels(screen_width_mm,
+                                                            viewing_distance_mm,
+                                                            screen_width_px,
+                                                            screen_height_px)
+                                as f32;
 
-        let mu = self.mu.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        );
+        let mu = self.mu.to_pixels(screen_width_mm,
+                                   viewing_distance_mm,
+                                   screen_width_px,
+                                   screen_height_px);
         let mu = (mu.0 as f32, mu.1 as f32);
 
-        let sigma = self.sigma.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        );
+        let sigma = self.sigma.to_pixels(screen_width_mm,
+                                         viewing_distance_mm,
+                                         screen_width_px,
+                                         screen_height_px);
         let sigma = (sigma.0 as f32, sigma.1 as f32);
 
         // return the uniform buffer data as a byte slice
-        let data1 = [
-            self.phase.to_ne_bytes(),
-            cycle_length.to_ne_bytes(),
-            mu.0.to_ne_bytes(),
-            mu.1.to_ne_bytes(),
-            sigma.0.to_ne_bytes(),
-            sigma.1.to_ne_bytes(),
-        ]
-        .concat();
+        let data1 = [self.phase.to_ne_bytes(),
+                     cycle_length.to_ne_bytes(),
+                     mu.0.to_ne_bytes(),
+                     mu.1.to_ne_bytes(),
+                     sigma.0.to_ne_bytes(),
+                     sigma.1.to_ne_bytes()].concat();
         let data2 = self.color.to_ne_bytes().to_vec();
         // 8 bytes of padding to align the data with 32 bytes
         let padding = vec![0; 8];

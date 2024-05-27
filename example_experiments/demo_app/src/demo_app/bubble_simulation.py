@@ -1,12 +1,11 @@
 # Copyright (c) 2024 Marc Pabst
-# 
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import rapier2d_py
 import numpy as np
-
 
 # def correct_velocity(velocity, speed):
 #     np_velocity = np.array([velocity.x(), velocity.y()])
@@ -17,6 +16,7 @@ import numpy as np
 
 # create an Iterator that simulates the movement of a stimulus
 class BubbleSimulation:
+
     def __init__(self, n_balls=4):
         # set up the simulation
         self.speed = 0.0
@@ -58,10 +58,8 @@ class BubbleSimulation:
             # calculate the initial position of the ball (in a grid)
             max_balls_per_row = int(np.sqrt(self.n_balls))
             initial_position = rapier2d_py.RealVector(
-                -800.0 + 1600.0 / (max_balls_per_row + 1) *
-                (i % max_balls_per_row + 1),
-                -400.0 + 800.0 / (max_balls_per_row + 1) *
-                (i // max_balls_per_row + 1),
+                -800.0 + 1600.0 / (max_balls_per_row + 1) * (i % max_balls_per_row + 1),
+                -400.0 + 800.0 / (max_balls_per_row + 1) * (i // max_balls_per_row + 1),
             )
 
             # build a rigid body
@@ -72,9 +70,7 @@ class BubbleSimulation:
             )
             # add rigid body to rigid body set
             rigid_body_handle = self.rigid_body_set.insert(ball_rigid_body)
-            self.collider_set.insert_with_parent(
-                ball, rigid_body_handle, self.rigid_body_set
-            )
+            self.collider_set.insert_with_parent(ball, rigid_body_handle, self.rigid_body_set)
 
             self.balls.append(rigid_body_handle)
 
@@ -117,10 +113,7 @@ class BubbleSimulation:
             )
 
             # print position of all balls
-            return [
-                (
-                    self.rigid_body_set.get(self.balls[i]).translation().x(),
-                    self.rigid_body_set.get(self.balls[i]).translation().y(),
-                )
-                for i in range(self.n_balls)
-            ]
+            return [(
+                self.rigid_body_set.get(self.balls[i]).translation().x(),
+                self.rigid_body_set.get(self.balls[i]).translation().y(),
+            ) for i in range(self.n_balls)]

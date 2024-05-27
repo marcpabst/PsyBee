@@ -1,39 +1,25 @@
-use std::any::Any;
 use std::sync::Arc;
 
-use psychophysics::audio::AudioStimulus;
-use psychophysics::input::Event;
-use psychophysics::input::EventData;
-use psychophysics::input::EventReceiver;
-use psychophysics::input::MouseButton;
-
-use psychophysics::{
-    audio::AudioDevice,
-    errors,
-    input::EventVec,
-    visual::{
-        geometry::{Circle, Rectangle, Size, ToVertices, Transformable},
-        stimuli::{GaborStimulus, ImageStimulus, SpriteStimulus, Stimulus},
-        window::{Frame, WindowState},
-        Window,
-    },
-    wgpu, ExperimentManager, ExperimentManagerOld, GPUState, Monitor, WindowOptions,
-};
-use pyo3::types::PyIterator;
-use pyo3::types::PyList;
-use pywrap::py_forward;
-use pywrap::py_wrap;
-use pywrap::transmute_ignore_size;
-
+use psychophysics::audio::{AudioDevice, AudioStimulus};
+use psychophysics::input::{Event, EventHandlingExt, EventKind, EventReceiver, EventVec, MouseButton};
+use psychophysics::visual::geometry::{Circle, Rectangle, Size, ToVertices, Transformable, Transformation2D};
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 use psychophysics::visual::stimuli::VideoStimulus;
-
-use pyo3::{prelude::*, Python};
+use psychophysics::visual::stimuli::{GaborStimulus, ImageStimulus, SpriteStimulus, Stimulus};
+use psychophysics::visual::window::Frame;
+use psychophysics::visual::Window;
+use psychophysics::{errors, ExperimentManager, MainLoop, Monitor, WindowOptions};
+use pyo3::prelude::*;
+use pyo3::Python;
+use pywrap::{py_forward, py_wrap, transmute_ignore_size};
 use send_wrapper::SendWrapper;
 use smol::lock::Mutex;
 
-/// A type that wraps an Arc<Mutex<Box<dyn Stimulus + 'static>>> so that it can be passed to Python
-#[pyclass(name = "StimulusList")]
+/// A type that wraps an
+/// Arc<Mutex<Box<dyn Stimulus
+/// + 'static>>> so that it
+/// can be passed to Python
+#[pyclass(frozen, name = "StimulusList")]
 #[derive(Clone)]
 pub struct PyStimulusList(Arc<Mutex<Vec<Box<dyn Stimulus + 'static>>>>);
 
@@ -43,92 +29,127 @@ impl PyStimulusList {
         self.0.lock_blocking().len()
     }
 
-    /// getitem method to allow indexing into the StimulusList
+    /// getitem method to
+    /// allow indexing into
+    /// the StimulusList
     fn __getitem__(&self, index: usize) -> PyStimulus {
         PyStimulus(dyn_clone::clone_box(&*self.0.lock_blocking()[index]))
     }
 
-    /// setitem method to allow setting items in the StimulusList
-    fn __setitem__(&mut self, index: usize, value: PyStimulus) {
+    /// setitem method to
+    /// allow setting items in
+    /// the StimulusList
+    fn __setitem__(&self, index: usize, value: PyStimulus) {
         self.0.lock_blocking()[index] = value.0;
     }
 
-    /// push method to allow appending to the StimulusList
-    fn append(&mut self, value: PyStimulus) {
+    /// push method to allow
+    /// appending to the
+    /// StimulusList
+    fn append(&self, value: PyStimulus) {
         self.0.lock_blocking().push(value.0);
     }
 
-    /// extend method to allow extending the StimulusList
-    fn extend(&mut self, other: Vec<PyStimulus>) {
-        self.0
-            .lock_blocking()
-            .extend(other.into_iter().map(|s| s.0));
+    /// extend method to allow
+    /// extending the
+    /// StimulusList
+    fn extend(&self, other: Vec<PyStimulus>) {
+        self.0.lock_blocking().extend(other.into_iter().map(|s| s.0));
     }
 
-    /// clear method to allow clearing the StimulusList
-    fn clear(&mut self) {
+    /// clear method to allow
+    /// clearing the
+    /// StimulusList
+    fn clear(&self) {
         self.0.lock_blocking().clear();
     }
 
     /// Reverse in place
-    fn reverse(&mut self) {
+    fn reverse(&self) {
         self.0.lock_blocking().reverse();
     }
 
-    /// __repr__ method to allow printing the StimulusList
+    /// __repr__ method to
+    /// allow printing the
+    /// StimulusList
     fn __repr__(&self) -> String {
         format!("<StimulusList with {} items>", self.0.lock_blocking().len())
     }
+
+    /// Removes the the first
+    /// matching element from
+    /// the list
+    fn remove(&self, value: PyStimulus) {
+        let mut list = self.0.lock_blocking();
+        let index = list.iter().position(|s| s.equal(&*value.0));
+        if let Some(index) = index {
+            list.remove(index);
+        }
+    }
 }
 
-py_wrap!(ExperimentManagerOld, unsendable);
+py_wrap!(MainLoop, unsendable);
 
 #[pymethods]
-impl PyExperimentManagerOld {
+impl PyMainLoop {
     #[new]
     fn __new__() -> Self {
-        PyExperimentManagerOld(smol::block_on(ExperimentManagerOld::new()))
+        PyMainLoop(smol::block_on(MainLoop::new()))
     }
 
     fn __repr__(&self) -> String {
-        // return the Debug representation of the ExperimentManager
+        // return the Debug
+        // representation of
+        // the ExperimentManager
         format!("{:?}", self.0)
     }
 
     fn get_available_monitors(&mut self) -> Vec<PyMonitor> {
-        self.0
-            .get_available_monitors()
-            .iter()
-            .map(|m| PyMonitor(m.clone()))
-            .collect()
+        self.0.get_available_monitors().iter().map(|m| PyMonitor(m.clone())).collect()
     }
 
-    /// Runs your experiment function in a new thread. This function will block the
-    /// calling thread until the experiment is finished and `experiment_fn`` returns.
+    /// Runs your experiment
+    /// function in a new
+    /// thread. This function
+    /// will block
+    /// the calling thread
+    /// until the experiment
+    /// is finished and
+    /// `experiment_fn``
+    /// returns.
     ///
     /// Parameters
     /// ----------
-    /// experiment_fn : callable
-    ///    The function that runs your experiment. This function should take a single
-    ///   argument, an instance of `ExperimentManager`, and should not return nothing.
+    /// experiment_fn :
+    /// callable
+    ///    The function that
+    /// runs your experiment.
+    /// This function should
+    /// take a
+    /// single   argument, an
+    /// instance of
+    /// `ExperimentManager`,
+    /// and should
+    /// not return nothing.
     fn run_experiment(&mut self, py: Python, experiment_fn: Py<PyAny>) {
-        let rust_experiment_fn =
-            move |wm: ExperimentManager| -> Result<(), errors::PsychophysicsError> {
-                Python::with_gil(|py| -> PyResult<()> {
-                    let pywin = PyExperimentManager(wm);
-                    experiment_fn
-                        .call1(py, (pywin,))
-                        .expect("Error calling experiment_fn");
-                    Ok(())
-                })
-                .unwrap();
+        let rust_experiment_fn = move |wm: ExperimentManager| -> Result<(), errors::PsychophysicsError> {
+            Python::with_gil(|py| -> PyResult<()> {
+                let pywin = PyExperimentManager(wm);
+                experiment_fn.call1(py, (pywin,)).expect("Error calling experiment_fn");
                 Ok(())
-            };
+            }).unwrap();
+            Ok(())
+        };
 
-        // wrap self in a SendWrapper so that it can be sent through the magic barrier
+        // wrap self in a
+        // SendWrapper so that
+        // it can be sent
+        // through the magic
+        // barrier
         let mut self_wrapper = SendWrapper::new(self);
 
-        // give up the GIL and run the experiment
+        // give up the GIL and
+        // run the experiment
         py.allow_threads(move || self_wrapper.0.run_experiment(rust_experiment_fn));
     }
 
@@ -145,102 +166,171 @@ py_wrap!(Monitor);
 #[pymethods]
 impl PyMonitor {
     fn __repr__(&self) -> String {
-        // return the Debug representation of the Monitor
+        // return the Debug
+        // representation of
+        // the Monitor
         format!("{:?}", self.0)
     }
 }
 
-py_wrap!(Window);
+py_wrap!(Window, module = "psychophysics_py.psychophysics_py");
 
 #[pymethods]
 impl PyWindow {
-    /// Obtain the next frame from the window. Currently, this function will
-    /// not block, but this may change in the future.
+    /// Obtain the next frame
+    /// from the window.
+    /// Currently, this
+    /// function will
+    /// not block, but this
+    /// may change in the
+    /// future.
     ///
     /// Returns
     /// -------
     /// frame : Frame
-    ///    The frame that was obtained from the window.
+    ///    The frame that was
+    /// obtained from the
+    /// window.
     fn get_frame(&self) -> PyFrame {
-        PyFrame(self.0.get_frame())
+        let self_wrapper = SendWrapper::new(self);
+        PyFrame(self_wrapper.0.get_frame())
     }
 
-    /// Submit a frame to the window. Might or might not block, depending on the
-    /// current state of the underlying GPU queue.
+    /// Submit a frame to the
+    /// window. Might or might
+    /// not block, depending
+    /// on the
+    /// current state of the
+    /// underlying GPU queue.
     ///
     /// Parameters
     /// ----------
     /// frame : Frame
-    ///   The frame to submit to the window.
-    fn submit_frame(&mut self, frame: &PyFrame, py: Python<'_>) {
+    ///   The frame to submit
+    /// to the window.
+    fn submit_frame(&self, frame: &PyFrame, py: Python<'_>) {
         let self_wrapper = SendWrapper::new(self);
-        // submit the frame
         py.allow_threads(move || {
-            self_wrapper.0.submit_frame(frame.0.clone());
-        });
+              self_wrapper.0.submit_frame(frame.0.clone());
+          });
     }
 
     fn __repr__(&self) -> String {
-        // return the Debug representation of the Window
+        // return the Debug
+        // representation of
+        // the Window
         format!("{:?}", self.0)
     }
 
-    fn close(&mut self) {
+    fn close(&self) {
         self.0.close();
     }
 
-    /// List of stimuli that are currently attached to the `Window`.
-    /// These stimuli will be automatically added to each frame
-    /// that is obtained from the window.
-    ///
-    /// Returns
-    /// -------
-    /// stimuli : list
-    ///    The list of stimuli that are currently attached to the window.
+    fn add_event_handler(&self, kind: PyEventKind, callback: Py<PyAny>, py: Python<'_>) {
+        let rust_callback_fn = move |event: Event| -> bool {
+            Python::with_gil(|py| -> PyResult<()> {
+                let pyevent = PyEvent(event);
+                callback.call1(py, (pyevent,))
+                        .expect("Error calling callback in event handler. Make sure the callback takes a single argument of type Event. Error");
+                Ok(())
+            }).unwrap();
+            false
+        };
+
+        let self_wrapper = SendWrapper::new(self);
+
+        // give up the GIL and
+        // run the experiment
+        py.allow_threads(move || self_wrapper.0.add_event_handler(kind.into(), rust_callback_fn));
+    }
+
+    /// List of stimuli that
+    /// are currently attached
+    /// to the `Window`.
+    /// These stimuli will be
+    /// automatically added to
+    /// each frame that is
+    /// obtained from the
+    /// window.
     #[getter]
-    fn stimuli(&mut self) -> PyStimulusList {
+    fn stimuli(&self) -> PyStimulusList {
         PyStimulusList(self.0.stimuli.clone())
     }
 
-    /// Create a new EventReceiver for this window that can be used to poll for
-    /// events. You can create multiple EventReceivers that will all receive the
-    /// same events independently.
+    /// Create a new
+    /// EventReceiver for this
+    /// window that can be
+    /// used to poll for
+    /// events. You can create
+    /// multiple EventReceivers
+    /// that will all receive
+    /// the same events
+    /// independently.
     ///
     /// Returns
     /// -------
-    /// receiver : EventReceiver
-    ///    The EventReceiver that was created.
+    /// receiver :
+    /// EventReceiver
+    ///    The EventReceiver
+    /// that was created.
     fn create_event_receiver(&self) -> PyEventReceiver {
         PyEventReceiver(self.0.create_event_receiver())
     }
 }
 py_wrap!(EventReceiver);
-py_wrap!(EventVec);
 
 #[pymethods]
 impl PyEventReceiver {
     fn poll(&mut self) -> PyEventVec {
-        PyEventVec(self.0.poll())
+        PyEventVec { vec: self.0.poll(),
+                     i: Arc::new(Mutex::new(0)) }
     }
+}
+
+#[pyclass(name = "EventVec")]
+#[derive(Clone)]
+pub struct PyEventVec {
+    vec: EventVec,
+    i: Arc<Mutex<usize>>,
 }
 
 #[pymethods]
 impl PyEventVec {
     fn key_pressed(&self, key: &str) -> bool {
-        self.0.iter().any(|key_event| key_event.key_pressed(key))
+        self.vec.iter().any(|key_event| key_event.key_pressed(key))
     }
 
     fn key_released(&self, key: &str) -> bool {
-        self.0.iter().any(|key_event| key_event.key_released(key))
+        self.vec.iter().any(|key_event| key_event.key_released(key))
     }
 
     fn __len__(&self) -> usize {
-        self.0.len()
+        self.vec.len()
     }
 
-    // allow indexing into the EventVec
+    // allow indexing into the
+    // EventVec
     fn __getitem__(&self, index: usize) -> PyEvent {
-        PyEvent(self.0[index].clone())
+        PyEvent(self.vec[index].clone())
+    }
+
+    // allow iterating over
+    // the EventVec
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        return slf;
+    }
+
+    // allow iterating over
+    // the EventVec
+    fn __next__(slf: PyRef<'_, Self>) -> Option<PyEvent> {
+        let mut i = slf.i.lock_blocking();
+        if *i < slf.vec.len() {
+            let event = PyEvent(slf.vec[*i].clone());
+            *i += 1;
+            Some(event)
+        } else {
+            None
+        }
     }
 }
 
@@ -249,14 +339,11 @@ py_wrap!(Frame);
 #[pymethods]
 impl PyFrame {
     fn set_bg_color(&mut self, color: (f32, f32, f32)) {
-        self.0
-            .set_bg_color(psychophysics::visual::color::SRGBA::new(
-                color.0, color.1, color.2, 1.0,
-            ));
+        self.0.set_bg_color(psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0));
     }
 
     #[getter]
-    fn stimuli(&mut self) -> PyStimulusList {
+    fn stimuli(&self) -> PyStimulusList {
         PyStimulusList(self.0.stimuli.clone())
     }
 }
@@ -265,34 +352,20 @@ py_wrap!(WindowOptions);
 
 #[pymethods]
 impl PyWindowOptions {
-    /// Create a new WindowOptions object.
+    /// Create a new
+    /// WindowOptions object.
     #[new]
     #[pyo3(signature = (mode = "windowed", resolution = None, monitor = None, refresh_rate = None))]
-    fn __new__(
-        mode: &str,
-        resolution: Option<(u32, u32)>,
-        monitor: Option<&PyMonitor>,
-        refresh_rate: Option<f64>,
-    ) -> Self {
+    fn __new__(mode: &str, resolution: Option<(u32, u32)>, monitor: Option<&PyMonitor>, refresh_rate: Option<f64>) -> Self {
         match mode {
             "windowed" => PyWindowOptions(WindowOptions::Windowed { resolution: None }),
-            "fullscreen_exact" => PyWindowOptions(WindowOptions::FullscreenExact {
-                resolution: resolution,
-                monitor: monitor.map(|m| m.0.clone()),
-                refresh_rate: refresh_rate,
-            }),
-            "fullscreen_highest_resolution" => {
-                PyWindowOptions(WindowOptions::FullscreenHighestResolution {
-                    monitor: monitor.map(|m| m.0.clone()),
-                    refresh_rate: refresh_rate,
-                })
-            }
-            "fullscreen_highest_refresh_rate" => {
-                PyWindowOptions(WindowOptions::FullscreenHighestRefreshRate {
-                    monitor: monitor.map(|m| m.0.clone()),
-                    resolution: resolution,
-                })
-            }
+            "fullscreen_exact" => PyWindowOptions(WindowOptions::FullscreenExact { resolution: resolution,
+                                                                                   monitor: monitor.map(|m| m.0.clone()),
+                                                                                   refresh_rate: refresh_rate }),
+            "fullscreen_highest_resolution" => PyWindowOptions(WindowOptions::FullscreenHighestResolution { monitor: monitor.map(|m| m.0.clone()),
+                                                                                                            refresh_rate: refresh_rate }),
+            "fullscreen_highest_refresh_rate" => PyWindowOptions(WindowOptions::FullscreenHighestRefreshRate { monitor: monitor.map(|m| m.0.clone()),
+                                                                                                               resolution: resolution }),
             _ => panic!("Unknown mode: {}", mode),
         }
     }
@@ -314,8 +387,10 @@ impl PyExperimentManager {
 }
 
 // STIMULI
-// A generic shape that wrap anything that implements the ToVertices trait
-#[pyclass(subclass, name = "Shape")]
+// A generic shape that wrap
+// anything that implements
+// the ToVertices trait
+#[pyclass(subclass, name = "Shape", module = "psychophysics_py.psychophysics_py")]
 pub struct PyShape(Box<dyn psychophysics::visual::geometry::ToVertices>);
 
 impl PyShape {
@@ -325,42 +400,48 @@ impl PyShape {
 }
 
 impl ToVertices for PyShape {
-    fn to_vertices_px(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> Vec<psychophysics::visual::geometry::Vertex> {
-        self.0
-            .to_vertices_px(screenwidth_mm, viewing_distance_mm, width_px, height_px)
+    fn to_vertices_px(&self, screenwidth_mm: f64, viewing_distance_mm: f64, width_px: u32, height_px: u32) -> Vec<psychophysics::visual::geometry::Vertex> {
+        self.0.to_vertices_px(screenwidth_mm, viewing_distance_mm, width_px, height_px)
     }
 
     fn clone_box(&self) -> Box<dyn ToVertices> {
         self.0.clone_box()
     }
+
+    fn contains(&self, window: &Window, transform: &Transformation2D, x: Size, y: Size) -> bool {
+        self.0.contains(window, transform, x, y)
+    }
 }
 
-// A Rectangle (a type of shape)
-#[pyclass(name = "Rectangle", extends = PyShape)]
+// A Rectangle (a type of
+// shape)
+#[pyclass(name = "Rectangle", extends = PyShape, module = "psychophysics_py.psychophysics_py")]
 pub struct PyRectangle();
 
 #[pymethods]
 impl PyRectangle {
     #[new]
     fn __new__(x: PySize, y: PySize, width: PySize, height: PySize) -> (Self, PyShape) {
-        (
-            PyRectangle(),
-            PyShape::new(Box::new(Rectangle::new(x.0, y.0, width.0, height.0))),
-        )
+        (PyRectangle(), PyShape::new(Box::new(Rectangle::new(x.0, y.0, width.0, height.0))))
     }
 
+    /// Create a fullscreen rectangle
+    ///
+    /// Returns
+    /// -------
+    /// Rectangle :
+    ///   The fullscreen rectangle that was created.
     #[staticmethod]
-    fn fullscreen() -> PyShape {
-        PyShape::new(Box::new(Rectangle::FULLSCREEN))
+    fn fullscreen(py: Python<'_>) -> PyObject {
+        // (PyRectangle(),
+        // PyShape::new(Box::new(Rectangle::FULLSCREEN)))
+        let o = PyClassInitializer::from(PyShape::new(Box::new(Rectangle::FULLSCREEN))).add_subclass(PyRectangle());
+
+        Py::new(py, o).unwrap().to_object(py)
     }
 }
 
+/// A Circle shape defined by a center (x, y) and a radius.
 #[pyclass(name = "Circle", extends = PyShape)]
 pub struct PyCircle();
 
@@ -368,16 +449,41 @@ pub struct PyCircle();
 impl PyCircle {
     #[new]
     fn __new__(x: PySize, y: PySize, radius: PySize) -> (Self, PyShape) {
-        (
-            PyCircle(),
-            PyShape::new(Box::new(Circle::new(x.0, y.0, radius.0))),
-        )
+        (PyCircle(), PyShape::new(Box::new(Circle::new(x.0, y.0, radius.0))))
     }
 }
 
-// Wrapper for the Stimulus trait
-#[pyclass(name = "Stimulus", subclass)]
+/// Represents a Stimulus. This class is used either as a base class for other
+/// stimulus classes or as a standalone class, when no specific runtume type
+/// information is available.
+#[pyclass(name = "Stimulus", subclass, frozen, module = "psychophysics_py.psychophysics_py")]
 pub struct PyStimulus(Box<dyn Stimulus + 'static>);
+
+#[pymethods]
+impl PyStimulus {
+    fn contains(&self, x: PySize, y: PySize, py: Python<'_>) -> bool {
+        let self_wrapper = SendWrapper::new(self);
+        py.allow_threads(move || self_wrapper.0.contains(x.0, y.0))
+    }
+
+    #[setter]
+    fn set_visible(&self, is_visible: bool) {
+        self.0.set_visible(is_visible);
+    }
+
+    #[getter]
+    fn visible(&self) -> bool {
+        self.0.visible()
+    }
+
+    fn toggle_visibility(&self) {
+        self.0.toggle_visibility();
+    }
+
+    fn hide(&self) {
+        self.0.hide();
+    }
+}
 
 impl Clone for PyStimulus {
     fn clone(&self) -> Self {
@@ -385,7 +491,7 @@ impl Clone for PyStimulus {
     }
 }
 
-// The VideoStimulus
+/// A VideoStimulus.
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 #[pyclass(name = "VideoStimulus", extends = PyStimulus)]
 #[derive(Clone)]
@@ -395,55 +501,33 @@ pub struct PyVideoStimulus();
 #[pymethods]
 impl PyVideoStimulus {
     #[new]
-    fn __new__(
-        window: &PyWindow,
-        shape: &PyShape,
-        path: &str,
-        width: u32,
-        height: u32,
-        thumbnail: Option<f32>,
-        init: Option<bool>,
-    ) -> (Self, PyStimulus) {
-        let stim = psychophysics::visual::stimuli::VideoStimulus::new(
-            &window.0,
-            shape.0.clone_box(),
-            path,
-            width,
-            height,
-            thumbnail,
-            init,
-        );
+    fn __new__(window: &PyWindow, shape: &PyShape, path: &str, width: u32, height: u32, thumbnail: Option<f32>, init: Option<bool>) -> (Self, PyStimulus) {
+        let stim = psychophysics::visual::stimuli::VideoStimulus::new(&window.0, shape.0.clone_box(), path, width, height, thumbnail, init);
         (PyVideoStimulus(), PyStimulus(Box::new(stim)))
     }
 
-    // insteaf of self, we take a mutable reference to the PyVideoStimulus
+    // insteaf of self, we
+    // take a mutable
+    // reference to the
+    // PyVideoStimulus
     fn init(slf: PyRef<'_, Self>) {
-        // downcast the TraibObject: Stmulus to a VideoStimulus
-        slf.into_super()
-            .0
-            .downcast_ref::<VideoStimulus>()
-            .expect("Failed to downcast to VideoStimulus")
-            .init();
+        // downcast the
+        // TraibObject:
+        // Stmulus to a
+        // VideoStimulus
+        slf.into_super().0.downcast_ref::<VideoStimulus>().expect("Failed to downcast to VideoStimulus").init();
     }
 
     fn play(slf: PyRef<'_, Self>) {
-        slf.into_super()
-            .0
-            .downcast_ref::<VideoStimulus>()
-            .expect("Failed to downcast to VideoStimulus")
-            .play();
+        slf.into_super().0.downcast_ref::<VideoStimulus>().expect("Failed to downcast to VideoStimulus").play();
     }
 
     fn pause(slf: PyRef<'_, Self>) {
-        slf.into_super()
-            .0
-            .downcast_ref::<VideoStimulus>()
-            .expect("Failed to downcast to VideoStimulus")
-            .pause();
+        slf.into_super().0.downcast_ref::<VideoStimulus>().expect("Failed to downcast to VideoStimulus").pause();
     }
 }
 
-// ImageStimulus
+/// An ImageStimulus.
 #[pyclass(name = "ImageStimulus", extends = PyStimulus)]
 #[derive(Clone)]
 pub struct PyImageStimulus();
@@ -451,29 +535,24 @@ pub struct PyImageStimulus();
 #[pymethods]
 impl PyImageStimulus {
     #[new]
-    fn __new__(
-        window: &PyWindow,
-        shape: &PyShape,
-        path: &str,
-        py: Python<'_>,
-    ) -> (Self, PyStimulus) {
+    fn __new__(window: &PyWindow, shape: &PyShape, path: &str, py: Python<'_>) -> (Self, PyStimulus) {
         let _self_wrapper = SendWrapper::new(window);
         py.allow_threads(move || {
-            let stim = ImageStimulus::new(&window.0, shape.0.clone_box(), path);
-            (PyImageStimulus(), PyStimulus(Box::new(stim)))
-        })
+              let stim = ImageStimulus::new(&window.0, shape.0.clone_box(), path);
+              (PyImageStimulus(), PyStimulus(Box::new(stim)))
+          })
     }
 
     fn set_translation(slf: PyRef<'_, Self>, x: PySize, y: PySize) {
         slf.into_super()
-            .0
-            .downcast_ref::<ImageStimulus>()
-            .expect("Failed to downcast to ImageStimulus")
-            .set_translation(x.0, y.0);
+           .0
+           .downcast_ref::<ImageStimulus>()
+           .expect("Failed to downcast to ImageStimulus")
+           .set_translation(x.0, y.0);
     }
 }
 
-// SpriteStimulus
+/// A SpriteStimulus that can be used to display an animated sprite.
 #[pyclass(name = "SpriteStimulus", extends = PyStimulus)]
 #[derive(Clone)]
 pub struct PySpriteStimulus();
@@ -481,72 +560,53 @@ pub struct PySpriteStimulus();
 #[pymethods]
 impl PySpriteStimulus {
     #[new]
-    fn __new__(
-        window: &PyWindow,
-        shape: &PyShape,
-        sprite_path: &str,
-        num_sprites_x: u32,
-        num_sprites_y: u32,
-        fps: Option<f64>,
-        repeat: Option<u64>,
-    ) -> (Self, PyStimulus) {
-        let stim = SpriteStimulus::new_from_spritesheet(
-            &window.0,
-            shape.0.clone_box(),
-            sprite_path,
-            num_sprites_x,
-            num_sprites_y,
-            fps,
-            repeat,
-        );
+    fn __new__(window: &PyWindow, shape: &PyShape, sprite_path: &str, num_sprites_x: u32, num_sprites_y: u32, fps: Option<f64>, repeat: Option<u64>) -> (Self, PyStimulus) {
+        let stim = SpriteStimulus::new_from_spritesheet(&window.0, shape.0.clone_box(), sprite_path, num_sprites_x, num_sprites_y, fps, repeat);
         (PySpriteStimulus(), PyStimulus(Box::new(stim)))
     }
 
-    fn advance_image_index(slf: PyRefMut<'_, Self>) {
+    fn advance_image_index(slf: PyRef<'_, Self>) {
         slf.into_super()
-            .0
-            .downcast_mut::<SpriteStimulus>()
-            .expect("Failed to downcast to SpriteStimulus")
-            .advance_image_index();
+           .0
+           .downcast_ref::<SpriteStimulus>()
+           .expect("Failed to downcast to SpriteStimulus")
+           .advance_image_index();
     }
 
-    fn reset(slf: PyRefMut<'_, Self>) {
-        slf.into_super()
-            .0
-            .downcast_mut::<SpriteStimulus>()
-            .expect("Failed to downcast to SpriteStimulus")
-            .reset();
+    fn reset(slf: PyRef<'_, Self>) {
+        slf.into_super().0.downcast_ref::<SpriteStimulus>().expect("Failed to downcast to SpriteStimulus").reset();
     }
 
     fn set_translation(slf: PyRef<'_, Self>, x: PySize, y: PySize) {
         slf.into_super()
-            .0
-            .downcast_ref::<SpriteStimulus>()
-            .expect("Failed to downcast to SpriteStimulus")
-            .set_translation(x.0, y.0);
+           .0
+           .downcast_ref::<SpriteStimulus>()
+           .expect("Failed to downcast to SpriteStimulus")
+           .set_translation(x.0, y.0);
     }
 }
 
 /// A GaborStimulus.
 ///
-/// Consists of a Gabor patch, which is a sinusoidal grating enveloped by a Gaussian.
+/// Consists of a Gabor patch, which is a sinusoidal grating enveloped by a
+/// Gaussian envelope.
 ///
 /// Parameters
 /// ----------
 /// window : Window
-///    The window that the stimulus will be presented on.
+///     The window that the stimulus will be presented on.
 /// shape : Shape
-///   The shape of the stimulus.
+///     The shape of the stimulus.
 /// phase : float
-///   The phase of the sinusoidal grating in radians.
-/// cycle_length : Size
-///   The length of a single cycle of the sinusoidal grating in pixels.
+///     The phase of the sinusoidal grating in radians.
+/// cycle_length : Size   
+///     The length of a single cycle of the sinusoidal grating.
 /// std_x : Size
-///   The standard deviation of the Gaussian envelope in the x direction in pixels.
+///     The standard deviation of the Gaussian envelope in the x direction.
 /// std_y : Size
-///  The standard deviation of the Gaussian envelope in the y direction in pixels.
+///     The standard deviation of the Gaussian envelope in the y direction in pixels.
 /// orientation : float
-///  The orientation of the sinusoidal grating in radians.
+///     The orientation of the sinusoidal grating in adians.
 /// color : tuple
 ///  The color of the stimulus as an RGB tuple.
 ///
@@ -554,7 +614,6 @@ impl PySpriteStimulus {
 /// -------
 /// GaborStimulus :
 ///  The GaborStimulus that was created.
-///
 #[pyclass(name = "GaborStimulus", extends = PyStimulus)]
 #[derive(Clone)]
 pub struct PyGaborStimulus();
@@ -562,124 +621,108 @@ pub struct PyGaborStimulus();
 #[pymethods]
 impl PyGaborStimulus {
     #[new]
-    fn __new__(
-        window: &PyWindow,
-        shape: &PyShape,
-        phase: f32,
-        cycle_length: PySize,
-        std_x: PySize,
-        std_y: PySize,
-        orientation: f32,
-        color: (f32, f32, f32),
-        py: Python<'_>,
-    ) -> (Self, PyStimulus) {
+    fn __new__(window: &PyWindow,
+               shape: &PyShape,
+               phase: f32,
+               cycle_length: PySize,
+               std_x: PySize,
+               std_y: PySize,
+               orientation: f32,
+               color: (f32, f32, f32),
+               py: Python<'_>)
+               -> (Self, PyStimulus) {
         let _self_wrapper = SendWrapper::new(window);
         py.allow_threads(move || {
-            let stim = GaborStimulus::new(
-                &window.0,
-                shape.0.clone_box(),
-                phase,
-                cycle_length.0.clone(),
-                std_x.0.clone(),
-                std_y.0.clone(),
-                orientation,
-                psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0),
-            );
-            (PyGaborStimulus(), PyStimulus(Box::new(stim)))
-        })
+              let stim = GaborStimulus::new(&window.0,
+                                            shape.0.clone_box(),
+                                            phase,
+                                            cycle_length.0.clone(),
+                                            std_x.0.clone(),
+                                            std_y.0.clone(),
+                                            orientation,
+                                            psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0));
+              (PyGaborStimulus(), PyStimulus(Box::new(stim)))
+          })
     }
 
-    fn set_phase(slf: PyRefMut<'_, Self>, phase: f32) {
+    fn set_phase(slf: PyRef<'_, Self>, phase: f32) {
         slf.into_super()
-            .0
-            .downcast_mut::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .set_phase(phase);
+           .0
+           .downcast_ref::<GaborStimulus>()
+           .expect("Failed to downcast to GaborStimulus")
+           .set_phase(phase);
     }
 
     fn phase(slf: PyRef<'_, Self>) -> f32 {
-        slf.into_super()
-            .0
-            .downcast_ref::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .phase()
+        slf.into_super().0.downcast_ref::<GaborStimulus>().expect("Failed to downcast to GaborStimulus").phase()
     }
 
-    fn set_cycle_length(slf: PyRefMut<'_, Self>, cycle_length: PySize) {
+    fn set_cycle_length(slf: PyRef<'_, Self>, cycle_length: PySize) {
         slf.into_super()
-            .0
-            .downcast_mut::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .set_cycle_length(cycle_length.0);
+           .0
+           .downcast_ref::<GaborStimulus>()
+           .expect("Failed to downcast to GaborStimulus")
+           .set_cycle_length(cycle_length.0);
     }
 
     fn cycle_length(slf: PyRef<'_, Self>) -> PySize {
-        PySize(
-            slf.into_super()
-                .0
-                .downcast_ref::<GaborStimulus>()
-                .expect("Failed to downcast to GaborStimulus")
-                .cycle_length(),
-        )
+        PySize(slf.into_super()
+                  .0
+                  .downcast_ref::<GaborStimulus>()
+                  .expect("Failed to downcast to GaborStimulus")
+                  .cycle_length())
     }
 
-    fn set_color(slf: PyRefMut<'_, Self>, color: (f32, f32, f32)) {
+    fn set_color(slf: PyRef<'_, Self>, color: (f32, f32, f32)) {
         slf.into_super()
-            .0
-            .downcast_mut::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .set_color(psychophysics::visual::color::SRGBA::new(
-                color.0, color.1, color.2, 1.0,
-            ));
+           .0
+           .downcast_ref::<GaborStimulus>()
+           .expect("Failed to downcast to GaborStimulus")
+           .set_color(psychophysics::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0));
     }
 
     fn color(slf: PyRef<'_, Self>) -> (f32, f32, f32) {
-        let color = slf
-            .into_super()
-            .0
-            .downcast_ref::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .color();
+        let color = slf.into_super().0.downcast_ref::<GaborStimulus>().expect("Failed to downcast to GaborStimulus").color();
         (color.r, color.g, color.b)
     }
 
-    fn set_orientation(slf: PyRefMut<'_, Self>, orientation: f32) {
+    fn set_orientation(slf: PyRef<'_, Self>, orientation: f32) {
         slf.into_super()
-            .0
-            .downcast_mut::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .set_orientation(orientation);
+           .0
+           .downcast_ref::<GaborStimulus>()
+           .expect("Failed to downcast to GaborStimulus")
+           .set_orientation(orientation);
     }
 
     fn orientation(slf: PyRef<'_, Self>) -> f32 {
         slf.into_super()
-            .0
-            .downcast_ref::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .orientation()
+           .0
+           .downcast_ref::<GaborStimulus>()
+           .expect("Failed to downcast to GaborStimulus")
+           .orientation()
     }
 
     fn translate(slf: PyRef<'_, Self>, x: PySize, y: PySize) {
         slf.into_super()
-            .0
-            .downcast_ref::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .translate(x.0, y.0);
+           .0
+           .downcast_ref::<GaborStimulus>()
+           .expect("Failed to downcast to GaborStimulus")
+           .translate(x.0, y.0);
     }
 
     fn set_translation(slf: PyRef<'_, Self>, x: PySize, y: PySize) {
         slf.into_super()
-            .0
-            .downcast_ref::<GaborStimulus>()
-            .expect("Failed to downcast to GaborStimulus")
-            .set_translation(x.0, y.0);
+           .0
+           .downcast_ref::<GaborStimulus>()
+           .expect("Failed to downcast to GaborStimulus")
+           .set_translation(x.0, y.0);
     }
 }
 
 py_wrap!(AudioDevice, unsendable);
 py_forward!(AudioDevice, fn new() -> AudioDevice);
 
-// Wrapper for the Stimulus trait
+/// An AudioStimulus.
 #[pyclass(name = "AudioStimulus", subclass)]
 pub struct PyAudioStimulus(Box<dyn AudioStimulus + 'static>);
 
@@ -704,9 +747,22 @@ impl PyAudioStimulus {
     fn seek(&mut self, time: f32) {
         self.0.seek(time);
     }
+
+    fn restart(&mut self) {
+        self.0.restart();
+    }
 }
 
-// The SineWaveStimulus
+/// A SineWaveStimulus.
+///
+/// Parameters
+/// ----------
+/// audio_device : AudioDevice
+///    The audio device that the stimulus will be played on.
+/// frequency : float
+///   The frequency of the sine wave in Hz.
+/// duration : float
+///  The duration of the stimulus in seconds.
 #[pyclass(name = "SineWaveStimulus", extends = PyAudioStimulus)]
 #[derive(Clone)]
 pub struct PySineWaveStimulus();
@@ -714,21 +770,21 @@ pub struct PySineWaveStimulus();
 #[pymethods]
 impl PySineWaveStimulus {
     #[new]
-    fn __new__(
-        audio_device: &PyAudioDevice,
-        frequency: f32,
-        duration: f32,
-    ) -> (Self, PyAudioStimulus) {
-        let stim = psychophysics::audio::SineWaveStimulus::new(
-            &audio_device.0,
-            frequency,
-            duration,
-        );
+    fn __new__(audio_device: &PyAudioDevice, frequency: f32, duration: f32) -> (Self, PyAudioStimulus) {
+        let stim = psychophysics::audio::SineWaveStimulus::new(&audio_device.0, frequency, duration);
         (PySineWaveStimulus(), PyAudioStimulus(Box::new(stim)))
     }
 }
 
-/// A file stimulus
+/// An audio stimulus that plays a sound from a file. See the `rodio` crate for
+/// supported file formats.
+///
+/// Parameters
+/// ----------
+/// audio_device : AudioDevice
+///   The audio device that the stimulus will be played on.
+/// file_path : str
+///  The path to the audio file that will be played.
 #[pyclass(name = "FileStimulus", extends = PyAudioStimulus)]
 #[derive(Clone)]
 pub struct PyFileStimulus();
@@ -742,25 +798,28 @@ impl PyFileStimulus {
     }
 }
 
-// // The TextStimulus
-// #[pyclass(name = "TextStimulus", extends = PyStimulus)]
-// #[derive(Clone)]
-// pub struct PyTextStimulus(TextStimulus);
+// /// The TextStimulus
+// ///
+// /// Parameters
+// /// ----------
+// /// window : PyWindow
+// ///     The window that the stimulus will be presented on.
+// /// text : str
+// ///     The text to be displayed.
+// ///
+// /// Returns
+// /// -------
+// /// TextStimulus :
+// ///     The TextStimulus that was created.
+// ///
+// /// Examples
+// /// --------
+// /// >>> window = PyWindow()
+// /// >>> text_stimulus = PyTextStimulus(window, "Hello, World!")
 
-// #[pymethods]
-// impl PyTextStimulus {
-//     #[new]
-//     fn __new__(window: &PyWindow, text: &str) -> (Self, PyStimulus) {
-//         let stim = TextStimulus::new(&window.0, text, rect.0);
-//         (PyTextStimulus(stim), PyStimulus())
-//     }
-// }
-
-// Sizes
-// #[pyclass(name = "Size", subclass)]
-// pub struct PySize(Size);
-
-py_wrap!(Size, subclass);
+/// A generic size.
+#[pyo3::prelude::pyclass(name = "Size", subclass)]
+pub struct PySize(pub Size);
 
 impl Clone for PySize {
     fn clone(&self) -> Self {
@@ -768,14 +827,35 @@ impl Clone for PySize {
     }
 }
 
-// // implement Into<Size> for PySize
-// impl Into<Size> for PySize {
-//     fn into(self) -> Size {
-//         self.0
-//     }
-// }
+#[pymethods]
+impl PySize {
+    fn __repr__(&self) -> String {
+        format!("{:?}", self.0)
+    }
 
-// Pixels
+    fn __add__(&self, other: PySize) -> PySize {
+        PySize(self.0.clone() + other.0.clone())
+    }
+
+    fn __sub__(&self, other: PySize) -> PySize {
+        PySize(self.0.clone() - other.0.clone())
+    }
+
+    fn __mul__(&self, other: f64) -> PySize {
+        PySize(self.0.clone() * other)
+    }
+
+    fn __div__(&self, other: f64) -> PySize {
+        PySize(self.0.clone() / other)
+    }
+}
+
+/// A `Size` in pixels.
+///
+/// Parameters
+/// ----------
+/// value : float
+///    The value of the size in pixels.
 #[pyclass(name = "Pixels", extends = PySize)]
 pub struct PyPixels();
 
@@ -814,6 +894,67 @@ impl PyScreenHeight {
 #[pyclass(name = "Event")]
 pub struct PyEvent(Event);
 
+#[pyclass(name = "EventKind", rename_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Debug, Clone)]
+pub enum PyEventKind {
+    KeyPress,
+    KeyRelease,
+    MouseButtonPress,
+    MouseButtonRelease,
+    TouchPress,
+    TouchRelease,
+    FocusGained,
+    FocusLost,
+    CursorMoved,
+    CursorEntered,
+    CursorExited,
+    TouchpadPress,
+    MouseWheel,
+    Other,
+}
+
+impl From<EventKind> for PyEventKind {
+    fn from(kind: EventKind) -> Self {
+        match kind {
+            EventKind::KeyPress => PyEventKind::KeyPress,
+            EventKind::KeyRelease => PyEventKind::KeyRelease,
+            EventKind::MouseButtonPress => PyEventKind::MouseButtonPress,
+            EventKind::MouseButtonRelease => PyEventKind::MouseButtonRelease,
+            EventKind::TouchPress => PyEventKind::TouchPress,
+            EventKind::TouchRelease => PyEventKind::TouchRelease,
+            EventKind::FocusGained => PyEventKind::FocusGained,
+            EventKind::FocusLost => PyEventKind::FocusLost,
+            EventKind::CursorMoved => PyEventKind::CursorMoved,
+            EventKind::CursorEntered => PyEventKind::CursorEntered,
+            EventKind::CursorExited => PyEventKind::CursorExited,
+            EventKind::TouchpadPress => PyEventKind::TouchpadPress,
+            EventKind::MouseWheel => PyEventKind::MouseWheel,
+            EventKind::Other => PyEventKind::Other,
+        }
+    }
+}
+
+impl From<PyEventKind> for EventKind {
+    fn from(kind: PyEventKind) -> Self {
+        match kind {
+            PyEventKind::KeyPress => EventKind::KeyPress,
+            PyEventKind::KeyRelease => EventKind::KeyRelease,
+            PyEventKind::MouseButtonPress => EventKind::MouseButtonPress,
+            PyEventKind::MouseButtonRelease => EventKind::MouseButtonRelease,
+            PyEventKind::TouchPress => EventKind::TouchPress,
+            PyEventKind::TouchRelease => EventKind::TouchRelease,
+            PyEventKind::FocusGained => EventKind::FocusGained,
+            PyEventKind::FocusLost => EventKind::FocusLost,
+            PyEventKind::CursorMoved => EventKind::CursorMoved,
+            PyEventKind::CursorEntered => EventKind::CursorEntered,
+            PyEventKind::CursorExited => EventKind::CursorExited,
+            PyEventKind::TouchpadPress => EventKind::TouchpadPress,
+            PyEventKind::MouseWheel => EventKind::MouseWheel,
+            PyEventKind::Other => EventKind::Other,
+        }
+    }
+}
+
 #[pymethods]
 impl PyEvent {
     fn __repr__(&self) -> String {
@@ -822,42 +963,28 @@ impl PyEvent {
 
     #[getter]
     fn timestamp(&self) -> f64 {
-        // timestamo is an Instant, convert to f64 (seconds since epoch)
-        self.0
-            .timestamp
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs_f64()
+        // convert to f64
+        // (seconds since
+        // epoch)
+        self.0.timestamp().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs_f64()
     }
 
     #[getter]
-    fn data(&self) -> PyEventData {
-        let event = self.0.data.clone();
-        match event {
-            EventData::KeyPress { key, code } => PyEventData::KeyPress { key, code },
-            EventData::KeyRelease { key, code } => PyEventData::KeyRelease { key, code },
-            EventData::MouseButtonPress { button, position } => {
-                PyEventData::MouseButtonPress {
-                    button: PyMouseButton::from(button),
-                    position: (PySize(position.0), PySize(position.1)),
-                }
-            }
-            EventData::CursorMoved { position } => PyEventData::CursorMoved {
-                position: (PySize(position.0), PySize(position.1)),
-            },
-            EventData::Other(desc) => PyEventData::Other { desc },
-            // this should never happen
-            _ => PyEventData::Other {
-                desc: "Invalid event data encountered when converting to PyEventData"
-                    .to_string(),
-            },
-        }
+    fn kind(&self) -> PyEventKind {
+        return self.0.kind().into();
+    }
+
+    #[getter]
+    fn position(&self) -> Option<(PySize, PySize)> {
+        self.0.position().map(|p| (PySize(p.0.clone()), PySize(p.1.clone())))
     }
 }
 
 // #[pyo3::prelude::pyclass(name = "MouseButton")]
 // #[derive(Debug, Clone)]
-// pub struct PyMouseButton(pub MouseButton);
+// pub struct
+// PyMouseButton(pub
+// MouseButton);
 
 #[pyclass(name = "MouseButton", get_all)]
 #[derive(Debug, Clone)]
@@ -885,24 +1012,11 @@ impl From<MouseButton> for PyMouseButton {
 
 #[pyclass(name = "EventData", get_all)]
 pub enum PyEventData {
-    KeyPress {
-        key: String,
-        code: u32,
-    },
-    KeyRelease {
-        key: String,
-        code: u32,
-    },
-    MouseButtonPress {
-        button: PyMouseButton,
-        position: (PySize, PySize),
-    },
-    CursorMoved {
-        position: (PySize, PySize),
-    },
-    Other {
-        desc: String,
-    },
+    KeyPress { key: String, code: u32 },
+    KeyRelease { key: String, code: u32 },
+    MouseButtonPress { button: PyMouseButton, position: (PySize, PySize) },
+    CursorMoved { position: (PySize, PySize) },
+    Other { desc: String },
 }
 
 // Handling for user input
@@ -910,13 +1024,13 @@ pub enum PyEventData {
 #[pymodule]
 fn psychophysics_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyo3_log::init();
-    //pyo3::prepare_freethreaded_python();
+    // pyo3::prepare_freethreaded_python();
 
     m.add_class::<PyExperimentManager>()?;
     m.add_class::<PyMonitor>()?;
     m.add_class::<PyWindowOptions>()?;
     m.add_class::<PyWindow>()?;
-    m.add_class::<PyExperimentManagerOld>()?;
+    m.add_class::<PyMainLoop>()?;
     m.add_class::<PyFrame>()?;
     m.add_class::<PyShape>()?;
     m.add_class::<PyRectangle>()?;
@@ -935,7 +1049,7 @@ fn psychophysics_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEventReceiver>()?;
     m.add_class::<PyEventVec>()?;
     m.add_class::<PyEvent>()?;
-    m.add_class::<PyEventData>()?;
+    m.add_class::<PyEventKind>()?;
 
     m.add_class::<PyAudioDevice>()?;
     m.add_class::<PyAudioStimulus>()?;

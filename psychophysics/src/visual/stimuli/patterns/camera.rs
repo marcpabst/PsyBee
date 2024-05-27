@@ -1,18 +1,14 @@
 use std::sync::{Arc, Mutex};
 
 use byte_slice_cast::AsSliceOf;
+use gst::element_error;
+use gst::prelude::*;
 use gst_app::AppSink;
-
-use image::{GenericImageView};
+use image::GenericImageView;
 
 use super::super::pattern_stimulus::FillPattern;
-use crate::{
-    prelude::PsychophysicsError,
-    visual::{
-        Window,
-    },
-};
-use gst::{element_error, prelude::*};
+use crate::prelude::PsychophysicsError;
+use crate::visual::Window;
 
 #[derive(Clone, Debug)]
 pub struct Camera {
@@ -31,11 +27,9 @@ impl Camera {
         let buffer_vec = vec![0; (width * height * 4) as usize];
         let buffer = Arc::new(Mutex::new(buffer_vec));
 
-        let mut out = Camera {
-            buffer,
-            dimensions: (width, height),
-            pipeline: None,
-        };
+        let mut out = Camera { buffer,
+                               dimensions: (width, height),
+                               pipeline: None };
 
         if init {
             out.init();
@@ -54,20 +48,18 @@ impl Camera {
         let (width, height) = self.dimensions;
 
         // use gst_parse_launch to create the pipeline
-        let pipeline = gst::parse::launch(
-            "queue name=q0 ! videoconvert ! videoscale name=converter",
-        )
-        .unwrap();
+        let pipeline =
+            gst::parse::launch("queue name=q0 ! videoconvert ! videoscale name=converter").unwrap();
 
         let pipeline = pipeline.dynamic_cast::<gst::Pipeline>().unwrap();
 
         // create the camera source
 
         // for Mac OS, use avfvideosrc
-        let src = gst::ElementFactory::make("avfvideosrc")
-            .property("device-index", &1)
-            .build()
-            .expect("Failed to create source element");
+        let src =
+            gst::ElementFactory::make("avfvideosrc").property("device-index", &1)
+                                                    .build()
+                                                    .expect("Failed to create source element");
 
         // add the source to the pipeline
         pipeline.add(&src).unwrap();
@@ -90,17 +82,14 @@ impl Camera {
             .build();
 
         // add the appsink to the pipeline
-        pipeline
-            .add(&appsink.upcast_ref() as &gst::Element)
-            .unwrap();
+        pipeline.add(&appsink.upcast_ref() as &gst::Element)
+                .unwrap();
 
-        let converter = pipeline
-            .by_name("converter")
-            .expect("Failed to get converter element");
+        let converter = pipeline.by_name("converter")
+                                .expect("Failed to get converter element");
 
-        converter
-            .link(&appsink)
-            .expect("Failed to link converter to appsink");
+        converter.link(&appsink)
+                 .expect("Failed to link converter to appsink");
 
         // add a callback to the appsink to get the frame and write it to the image
         appsink.set_callbacks(
@@ -140,14 +129,12 @@ impl Camera {
                 .build(),
         );
 
-        let bus = pipeline
-            .bus()
-            .expect("Pipeline without bus. Shouldn't happen!");
+        let bus = pipeline.bus()
+                          .expect("Pipeline without bus. Shouldn't happen!");
 
         // start the pipeline
-        pipeline
-            .set_state(gst::State::Paused)
-            .expect("Unable to set the pipeline to the `Paused` state");
+        pipeline.set_state(gst::State::Paused)
+                .expect("Unable to set the pipeline to the `Paused` state");
 
         // run the pipeline in a separate thread
         let pipeline_clone = pipeline.clone();
@@ -168,13 +155,11 @@ impl Camera {
                         println!("Error: {:?}", err);
                     }
                     MessageView::StateChanged(s) => {
-                        println!(
-                            "State changed from {:?}: {:?} -> {:?} ({:?})",
-                            s.src().map(|s| s.path_string()),
-                            s.old(),
-                            s.current(),
-                            s.pending()
-                        );
+                        println!("State changed from {:?}: {:?} -> {:?} ({:?})",
+                                 s.src().map(|s| s.path_string()),
+                                 s.old(),
+                                 s.current(),
+                                 s.pending());
                     }
                     _ => {
                         println!("Other message: {:?}", msg);
@@ -210,11 +195,9 @@ impl Camera {
 impl FillPattern for Camera {
     fn texture_extent(&self, _window: &Window) -> Option<wgpu::Extent3d> {
         let (width, height) = self.dimensions;
-        Some(wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        })
+        Some(wgpu::Extent3d { width,
+                              height,
+                              depth_or_array_layers: 1 })
     }
 
     fn texture_data(&self, _window: &Window) -> Option<Vec<u8>> {
@@ -247,7 +230,6 @@ impl FillPattern for Camera {
             return vec4<f32>(textureSample(texture, texture_sampler, in.tex_coords).xyz, 0.5);
             //return textureSample(texture, texture_sampler, in.tex_coords);
         }
-        "
-        .to_string()
+        ".to_string()
     }
 }

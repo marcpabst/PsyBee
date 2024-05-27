@@ -1,18 +1,14 @@
 use std::sync::{Arc, Mutex};
 
 use byte_slice_cast::AsSliceOf;
+use gst::element_error;
+use gst::prelude::*;
 use gst_app::AppSink;
-
-use image::{GenericImageView};
+use image::GenericImageView;
 
 use super::super::pattern_stimulus::FillPattern;
-use crate::{
-    prelude::PsychophysicsError,
-    visual::{
-        Window,
-    },
-};
-use gst::{element_error, prelude::*};
+use crate::prelude::PsychophysicsError;
+use crate::visual::Window;
 
 #[derive(Clone, Debug)]
 pub struct Video {
@@ -24,13 +20,12 @@ pub struct Video {
 }
 
 impl Video {
-    pub fn new_from_path(
-        file_path: &str,
-        width: u32,
-        height: u32,
-        thumbnail: Option<f32>,
-        init: Option<bool>,
-    ) -> Self {
+    pub fn new_from_path(file_path: &str,
+                         width: u32,
+                         height: u32,
+                         thumbnail: Option<f32>,
+                         init: Option<bool>)
+                         -> Self {
         // start new thread to run the GStreamer pipeline
 
         gst::init().expect("Failed to initialize GStreamer");
@@ -38,21 +33,18 @@ impl Video {
         let buffer_vec = vec![0; (width * height * 4) as usize];
         let buffer = Arc::new(Mutex::new(buffer_vec));
 
-        let mut out = Video {
-            buffer,
-            dimensions: (width, height),
-            pipeline: None,
-            file_path: file_path.to_string(),
-        };
+        let mut out = Video { buffer,
+                              dimensions: (width, height),
+                              pipeline: None,
+                              file_path: file_path.to_string() };
 
         if init.unwrap_or(true) {
             out.init().expect("Failed to initialize video");
         }
 
         if thumbnail.is_some() {
-            let img = out
-                .create_thumbnail(thumbnail.unwrap())
-                .expect("Failed to create thumbnail");
+            let img = out.create_thumbnail(thumbnail.unwrap())
+                         .expect("Failed to create thumbnail");
 
             *out.buffer.lock().unwrap() = img;
         }
@@ -79,9 +71,8 @@ impl Video {
 
         let pipeline = pipeline.dynamic_cast::<gst::Pipeline>().unwrap();
 
-        let src = pipeline
-            .by_name("src")
-            .expect("Failed to get source element");
+        let src = pipeline.by_name("src")
+                          .expect("Failed to get source element");
 
         // set the file to play
         src.set_property("location", &file_path);
@@ -98,17 +89,14 @@ impl Video {
             .build();
 
         // add the appsink to the pipeline
-        pipeline
-            .add(&appsink.upcast_ref() as &gst::Element)
-            .unwrap();
+        pipeline.add(&appsink.upcast_ref() as &gst::Element)
+                .unwrap();
 
-        let converter = pipeline
-            .by_name("converter")
-            .expect("Failed to get converter element");
+        let converter = pipeline.by_name("converter")
+                                .expect("Failed to get converter element");
 
-        converter
-            .link(&appsink)
-            .expect("Failed to link converter to appsink");
+        converter.link(&appsink)
+                 .expect("Failed to link converter to appsink");
 
         // add a callback to the appsink to get the frame and write it to the image
         appsink.set_callbacks(
@@ -148,14 +136,12 @@ impl Video {
                 .build(),
         );
 
-        let bus = pipeline
-            .bus()
-            .expect("Pipeline without bus. Shouldn't happen!");
+        let bus = pipeline.bus()
+                          .expect("Pipeline without bus. Shouldn't happen!");
 
         // start the pipeline
-        pipeline
-            .set_state(gst::State::Paused)
-            .expect("Unable to set the pipeline to the `Paused` state");
+        pipeline.set_state(gst::State::Paused)
+                .expect("Unable to set the pipeline to the `Paused` state");
 
         // run the pipeline in a separate thread
         let pipeline_clone = pipeline.clone();
@@ -176,13 +162,11 @@ impl Video {
                         println!("Error: {:?}", err);
                     }
                     MessageView::StateChanged(s) => {
-                        println!(
-                            "State changed from {:?}: {:?} -> {:?} ({:?})",
-                            s.src().map(|s| s.path_string()),
-                            s.old(),
-                            s.current(),
-                            s.pending()
-                        );
+                        println!("State changed from {:?}: {:?} -> {:?} ({:?})",
+                                 s.src().map(|s| s.path_string()),
+                                 s.old(),
+                                 s.current(),
+                                 s.pending());
                     }
                     _ => {
                         println!("Other message: {:?}", msg);
@@ -229,49 +213,43 @@ impl Video {
         let pipeline = pipeline.dynamic_cast::<gst::Pipeline>().unwrap();
 
         // extract the frame
-        let caps = gst::Caps::builder("video/x-raw")
-            .field("format", &gst_video::VideoFormat::Bgra.to_string())
-            .field("width", &(width as i32))
-            .field("height", &(height as i32))
-            .build();
+        let caps =
+            gst::Caps::builder("video/x-raw").field("format",
+                                                    &gst_video::VideoFormat::Bgra.to_string())
+                                             .field("width", &(width as i32))
+                                             .field("height", &(height as i32))
+                                             .build();
 
-        let src = pipeline
-            .by_name("src")
-            .expect("Failed to get source element");
+        let src = pipeline.by_name("src")
+                          .expect("Failed to get source element");
 
         // set the file to play
         src.set_property("location", &self.file_path);
 
-        let appsink = pipeline
-            .by_name("sink")
-            .expect("Failed to get sink element")
-            .dynamic_cast::<AppSink>()
-            .expect("Failed to cast sink to AppSink");
+        let appsink = pipeline.by_name("sink")
+                              .expect("Failed to get sink element")
+                              .dynamic_cast::<AppSink>()
+                              .expect("Failed to cast sink to AppSink");
 
         appsink.set_caps(Some(&caps));
 
         // set pipeline to paused
-        pipeline
-            .set_state(gst::State::Playing)
-            .expect("Unable to set the thumbnail pipeline to the `Paused` state");
+        pipeline.set_state(gst::State::Playing)
+                .expect("Unable to set the thumbnail pipeline to the `Paused` state");
 
         // wait for the pipeline to reach the thumbnail position
-        pipeline
-            .state(gst::ClockTime::from_seconds(2))
-            .0
-            .expect("Failed to get state");
+        pipeline.state(gst::ClockTime::from_seconds(2))
+                .0
+                .expect("Failed to get state");
 
         // seek to the thumbnail position
-        let _ = pipeline.seek_simple(
-            gst::SeekFlags::FLUSH,
-            gst::ClockTime::from_seconds(thumbnail as u64),
-        );
+        let _ = pipeline.seek_simple(gst::SeekFlags::FLUSH,
+                                     gst::ClockTime::from_seconds(thumbnail as u64));
 
         // wait for the pipeline to reach the thumbnail position
-        pipeline
-            .state(gst::ClockTime::from_seconds(2))
-            .0
-            .expect("Failed to get state");
+        pipeline.state(gst::ClockTime::from_seconds(2))
+                .0
+                .expect("Failed to get state");
 
         // get the frame
         appsink.set_property("emit-signals", &true);
@@ -282,9 +260,8 @@ impl Video {
         let data = buffer.as_slice_of::<u8>().unwrap().to_vec();
 
         // set pipeline to null
-        pipeline
-            .set_state(gst::State::Null)
-            .expect("Unable to set the pipeline to the `Null` state");
+        pipeline.set_state(gst::State::Null)
+                .expect("Unable to set the pipeline to the `Null` state");
 
         Ok(data)
     }
@@ -293,11 +270,9 @@ impl Video {
 impl FillPattern for Video {
     fn texture_extent(&self, _window: &Window) -> Option<wgpu::Extent3d> {
         let (width, height) = self.dimensions;
-        Some(wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        })
+        Some(wgpu::Extent3d { width,
+                              height,
+                              depth_or_array_layers: 1 })
     }
 
     fn texture_data(&self, _window: &Window) -> Option<Vec<u8>> {
@@ -329,7 +304,6 @@ impl FillPattern for Video {
         fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             return vec4<f32>(textureSample(texture, texture_sampler, in.tex_coords).xyz, 1.0);
         }
-        "
-        .to_string()
+        ".to_string()
     }
 }

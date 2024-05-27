@@ -25,6 +25,5 @@ pub use gabor_patch::GaborPatch;
 pub use image::Image;
 pub use sprite::Sprite;
 pub use uniform::Uniform;
-
 #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 pub use video::Video;

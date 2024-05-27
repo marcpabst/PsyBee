@@ -3,35 +3,17 @@ use core::panic;
 
 use itertools::izip;
 use proc_macro::{TokenStream, TokenTree};
-use quote::format_ident;
-use quote::quote;
-
-use quote::ToTokens;
+use quote::{format_ident, quote, ToTokens};
 use syn::parse::Parse;
-use syn::Expr;
-use syn::Path;
-use syn::{
-    parse_macro_input, punctuated::Punctuated, FnArg, Ident, ItemFn, Signature, Token,
-    Type,
-};
+use syn::punctuated::Punctuated;
+use syn::{parse_macro_input, Expr, FnArg, Ident, ItemFn, Path, Signature, Token, Type};
 
-static NEVER_WRAP: &[&str] = &[
-    "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "f32", "f64",
-    "bool", "char", "String", "str",
-];
+static NEVER_WRAP: &[&str] = &["i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64",
+                               "u128", "f32", "f64", "bool", "char", "String", "str"];
 
 fn parse_sigature(
-    input: Signature,
-) -> (
-    Ident,
-    Vec<Ident>,
-    Vec<Ident>,
-    Vec<bool>,
-    Vec<bool>,
-    proc_macro2::TokenStream,
-    bool,
-    bool,
-) {
+    input: Signature)
+    -> (Ident, Vec<Ident>, Vec<Ident>, Vec<bool>, Vec<bool>, proc_macro2::TokenStream, bool, bool) {
     let fn_name = &input.ident;
     let fn_receiver = &input.receiver();
 
@@ -60,22 +42,23 @@ fn parse_sigature(
                 match &*pat_type.ty {
                     Type::Reference(type_ref) => {
                         fn_args_types.push(match &*type_ref.elem {
-                            Type::Path(type_path) => {
-                                fn_args_refs.push(true);
-                                // if the argument is a mutable reference, we need to unwrap it
-                                match type_ref.mutability {
-                                    Some(_) => {
-                                        fn_args_mut.push(true);
-                                        type_path.path.segments[0].ident.clone()
-                                    }
-                                    None => {
-                                        fn_args_mut.push(false);
-                                        type_path.path.segments[0].ident.clone()
-                                    }
-                                }
-                            }
-                            _ => panic!("Expected path"),
-                        });
+                                               Type::Path(type_path) => {
+                                                   fn_args_refs.push(true);
+                                                   // if the argument is a mutable reference, we
+                                                   // need to unwrap it
+                                                   match type_ref.mutability {
+                                                       Some(_) => {
+                                                           fn_args_mut.push(true);
+                                                           type_path.path.segments[0].ident.clone()
+                                                       }
+                                                       None => {
+                                                           fn_args_mut.push(false);
+                                                           type_path.path.segments[0].ident.clone()
+                                                       }
+                                                   }
+                                               }
+                                               _ => panic!("Expected path"),
+                                           });
                     }
                     Type::Path(type_path) => {
                         fn_args_types.push(type_path.path.segments[0].ident.clone());
@@ -106,16 +89,14 @@ fn parse_sigature(
     // remove the first token
     let return_type = return_type.clone().into_iter().skip(2).collect();
 
-    return (
-        fn_name.clone(),
-        fn_args_names,
-        fn_args_types,
-        fn_args_mut,
-        fn_args_refs,
-        return_type,
-        is_void,
-        is_static,
-    );
+    return (fn_name.clone(),
+            fn_args_names,
+            fn_args_types,
+            fn_args_mut,
+            fn_args_refs,
+            return_type,
+            is_void,
+            is_static);
 }
 
 /// usage:
@@ -173,10 +154,9 @@ pub fn py_wrap(s: TokenStream) -> TokenStream {
     let split = split_token_stream_by_comma(s);
 
     // get the struct name as an ident
-    let name = split
-        .get(0)
-        .expect("Expected struct name as first argument")
-        .clone();
+    let name = split.get(0)
+                    .expect("Expected struct name as first argument")
+                    .clone();
 
     let name: Ident = syn::parse2(name).unwrap();
 
@@ -192,9 +172,6 @@ pub fn py_wrap(s: TokenStream) -> TokenStream {
     let exported_name = format!("{}", name);
 
     let expanded = quote::quote! {
-        // make sure transmute_ignore_size! is in scope
-
-
         #[pyo3::prelude::pyclass(name= #exported_name #additional_args)]
         pub struct #py_name(pub #name);
 
@@ -244,23 +221,22 @@ pub fn py_wrap(s: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-/// Register a trait for a specific type. This is used to allow the extraction of trait objects from PyAny objects.
+/// Register a trait for a specific type. This is used to allow the extraction
+/// of trait objects from PyAny objects.
 #[proc_macro]
 pub fn py_register_trait(input: TokenStream) -> TokenStream {
     let input = proc_macro2::TokenStream::from(input);
     let split = split_token_stream_by_comma(input);
 
-    let trait_name = split
-        .get(0)
-        .expect("Expected trait name as first argument")
-        .clone();
+    let trait_name = split.get(0)
+                          .expect("Expected trait name as first argument")
+                          .clone();
 
     let trait_name: Ident = syn::parse2(trait_name).unwrap();
 
-    let type_name = split
-        .get(1)
-        .expect("Expected type name as second argument")
-        .clone();
+    let type_name = split.get(1)
+                         .expect("Expected type name as second argument")
+                         .clone();
 
     let type_name: Ident = syn::parse2(type_name).unwrap();
 
@@ -281,10 +257,9 @@ pub fn py_register_trait(input: TokenStream) -> TokenStream {
 }
 
 // Method to add a prefix to the first token in a proc_macro2::TokenStream
-fn add_prefix_to_first_token(
-    prefix: &str,
-    input: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
+fn add_prefix_to_first_token(prefix: &str,
+                             input: proc_macro2::TokenStream)
+                             -> proc_macro2::TokenStream {
     // we need to split the input into tokens
     let mut tokens = input.into_iter();
     // the first token must be an ident
@@ -301,15 +276,16 @@ fn add_prefix_to_first_token(
     result
 }
 
-// This macro takes a struct (for wich it assumes a wrapping struct PyName exists)
-// and a method name, and implements the method for PyName, forwarding the call to the inner struct.
-// It then scans the method signature for any arguments that are not supported by pyo3 and assumes that
-// a wrapper exists for them. It then forwards the call to the inner struct, unwrapping the arguments
-// and wrapping the return value.
+// This macro takes a struct (for wich it assumes a wrapping struct PyName
+// exists) and a method name, and implements the method for PyName, forwarding
+// the call to the inner struct. It then scans the method signature for any
+// arguments that are not supported by pyo3 and assumes that a wrapper exists
+// for them. It then forwards the call to the inner struct, unwrapping the
+// arguments and wrapping the return value.
 //
-// This macro supports methods with multiple arguments and return values. It also supports methods that
-// need to be annotated with #[staticmethod]. If the provided method is a field, it will generate a getter
-// and setter for it.
+// This macro supports methods with multiple arguments and return values. It
+// also supports methods that need to be annotated with #[staticmethod]. If the
+// provided method is a field, it will generate a getter and setter for it.
 //
 // It does not support methods with lifetimes or generics.
 //
@@ -332,18 +308,17 @@ pub fn py_forward(input: TokenStream) -> TokenStream {
     // convert the input to a token stream
     let input = proc_macro2::TokenStream::from(input);
 
-    // we first split the input into the receiver and the method signature (separated by the first comma)
+    // we first split the input into the receiver and the method signature
+    // (separated by the first comma)
     let splitted = split_token_stream_by_comma(input);
 
-    let receiver = splitted
-        .get(0)
-        .expect("Expected receiver as first argument")
-        .clone();
+    let receiver = splitted.get(0)
+                           .expect("Expected receiver as first argument")
+                           .clone();
 
-    let method = splitted
-        .get(1)
-        .expect("Expected method as second argument")
-        .clone();
+    let method = splitted.get(1)
+                         .expect("Expected method as second argument")
+                         .clone();
 
     // we add the prefix "Py" to the receiver
     let py_receiver = add_prefix_to_first_token("Py", receiver.clone());
@@ -351,49 +326,46 @@ pub fn py_forward(input: TokenStream) -> TokenStream {
     // we parse the method signature
     let method: Signature = syn::parse2(method).unwrap();
 
-    let (
-        fn_name,
-        fn_args_names,
-        fn_args_types,
-        fn_args_mut,
-        fn_args_refs,
-        return_type,
-        is_void,
-        is_static,
-    ) = parse_sigature(method);
+    let (fn_name,
+         fn_args_names,
+         fn_args_types,
+         fn_args_mut,
+         fn_args_refs,
+         return_type,
+         is_void,
+         is_static) = parse_sigature(method);
 
     let is_option = return_type.to_string().starts_with("Option");
     let is_constructor = fn_name.to_string() == "new";
 
     let py_return_type = if NEVER_WRAP.contains(&return_type.to_string().as_str()) {
-        // if the return type is one of the types that should never be wrapped, we just return it as is
+        // if the return type is one of the types that should never be wrapped, we just
+        // return it as is
         return_type.clone()
     } else if return_type.to_string() == "Self" {
         // if return type is "Self", we need to replace it with the struct name (PyName)
         add_prefix_to_first_token("Py", receiver.clone())
     } else if return_type.to_string().starts_with("Option") {
         // if it's an Option<> we need to treat it differently
-        let inner_type = return_type
-            .to_string()
-            .replace("Option <", "")
-            .replace(">", "");
-        let inner_type =
-            add_prefix_to_first_token("Py", syn::parse_str(&inner_type).unwrap());
+        let inner_type = return_type.to_string()
+                                    .replace("Option <", "")
+                                    .replace(">", "");
+        let inner_type = add_prefix_to_first_token("Py", syn::parse_str(&inner_type).unwrap());
         quote!(#inner_type)
     } else {
         // otherwise we just prepend "Py" to the return type
         add_prefix_to_first_token("Py", return_type)
     };
 
-    // iterate over the arguments and generate the final argument list, taking care of references and mutability
+    // iterate over the arguments and generate the final argument list, taking care
+    // of references and mutability
     let mut args_list = Vec::new();
 
-    for (name, ty, is_mut, is_ref) in izip!(
-        fn_args_names.iter(),
-        fn_args_types.iter(),
-        fn_args_mut.iter(),
-        fn_args_refs.iter()
-    ) {
+    for (name, ty, is_mut, is_ref) in izip!(fn_args_names.iter(),
+                                            fn_args_types.iter(),
+                                            fn_args_mut.iter(),
+                                            fn_args_refs.iter())
+    {
         let py_ty = if NEVER_WRAP.contains(&ty.to_string().as_str()) {
             ty.clone()
         } else {
@@ -412,12 +384,11 @@ pub fn py_forward(input: TokenStream) -> TokenStream {
     // let's do the same for calling the method on the inner struct
     let mut inner_args_list = Vec::new();
 
-    for (name, ty, is_mut, is_ref) in izip!(
-        fn_args_names.iter(),
-        fn_args_types.iter(),
-        fn_args_mut.iter(),
-        fn_args_refs.iter()
-    ) {
+    for (name, ty, is_mut, is_ref) in izip!(fn_args_names.iter(),
+                                            fn_args_types.iter(),
+                                            fn_args_mut.iter(),
+                                            fn_args_refs.iter())
+    {
         if NEVER_WRAP.contains(&ty.to_string().as_str()) {
             inner_args_list.push(quote::quote! {#name});
         } else if *is_mut && *is_ref {
@@ -483,9 +454,7 @@ pub fn py_forward(input: TokenStream) -> TokenStream {
     proc_macro::TokenStream::from(method_signature)
 }
 
-fn split_token_stream_by_comma(
-    input: proc_macro2::TokenStream,
-) -> Vec<proc_macro2::TokenStream> {
+fn split_token_stream_by_comma(input: proc_macro2::TokenStream) -> Vec<proc_macro2::TokenStream> {
     let mut result = Vec::new();
     let mut current = proc_macro2::TokenStream::new();
     for token in input {
@@ -530,18 +499,15 @@ pub fn py_getter(input: TokenStream) -> TokenStream {
     let input = proc_macro2::TokenStream::from(input);
 
     let splitted = split_token_stream_by_comma(input);
-    let receiver = splitted
-        .get(0)
-        .expect("Expected receiver as first argument")
-        .clone();
-    let field = splitted
-        .get(1)
-        .expect("Expected field as second argument")
-        .clone();
-    let field_type = splitted
-        .get(2)
-        .expect("Expected field type as third argument")
-        .clone();
+    let receiver = splitted.get(0)
+                           .expect("Expected receiver as first argument")
+                           .clone();
+    let field = splitted.get(1)
+                        .expect("Expected field as second argument")
+                        .clone();
+    let field_type = splitted.get(2)
+                             .expect("Expected field type as third argument")
+                             .clone();
 
     let py_receiver = add_prefix_to_first_token("Py", receiver.clone());
 

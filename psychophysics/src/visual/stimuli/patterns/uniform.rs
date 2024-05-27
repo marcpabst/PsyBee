@@ -4,14 +4,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
 use super::super::pattern_stimulus::FillPattern;
-use crate::{
-    visual::{
-        color::{ColorFormat, IntoRawRgba, RawRgba},
-        Window,
-    },
-};
+use crate::visual::color::{ColorFormat, IntoRawRgba, RawRgba};
+use crate::visual::Window;
 
 #[derive(Clone, Debug)]
 pub struct Uniform {
@@ -20,9 +15,7 @@ pub struct Uniform {
 
 impl Uniform {
     pub fn new(color: impl IntoRawRgba) -> Self {
-        Self {
-            color: color.convert_to_raw_rgba(ColorFormat::SRGBA8),
-        }
+        Self { color: color.convert_to_raw_rgba(ColorFormat::SRGBA8) }
     }
 
     pub fn set_color(&mut self, color: impl IntoRawRgba) {
@@ -54,7 +47,6 @@ impl FillPattern for Uniform {
         fn fs_main(in: VertexOutput) -> @location(0) vec4f {
             return uniforms.color;
         }
-        "
-        .to_string()
+        ".to_string()
     }
 }

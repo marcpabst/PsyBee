@@ -1,24 +1,20 @@
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
 use async_lock::Mutex;
 use async_trait::async_trait;
 use glyphon::cosmic_text::Align;
 use glyphon::{
-    Attrs, Buffer, Family, FontSystem, Metrics, Resolution, Shaping, Stretch, Style,
-    SwashCache, TextArea, TextAtlas, TextBounds, TextRenderer, Weight,
+    Attrs, Buffer, Family, FontSystem, Metrics, Resolution, Shaping, Stretch, Style, SwashCache,
+    TextArea, TextAtlas, TextBounds, TextRenderer, Weight,
 };
 use palette::white_point::D65;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-
-use crate::visual::color::RawRgba;
-
-use crate::visual::window::Window;
-
 use wgpu::{Device, MultisampleState, Queue, SurfaceConfiguration};
 
+use crate::visual::color::{ColorFormat, RawRgba};
 use crate::visual::geometry::{Rectangle, Size, ToPixels};
+use crate::visual::window::Window;
 use crate::visual::Renderable;
-
-use crate::visual::color::ColorFormat;
 
 /// A text stimulus.
 pub struct TextStimulus {
@@ -53,65 +49,54 @@ pub struct TextStimulusConfig {
 // default values for the text stimulus
 impl Default for TextStimulusConfig {
     fn default() -> Self {
-        Self {
-            text: String::from(""),
-            font_size: Size::Points(62.0),
-            line_height: Size::Points(62.0),
-            bounds: Rectangle::new(0.0, 0.0, 500.0, 500.0),
-            font_weight: Weight::NORMAL,
-            font_style: Style::Normal,
-            font_width: Stretch::Normal,
-            color: RawRgba {
-                r: 1.0,
-                g: 1.0,
-                b: 1.0,
-                a: 1.0,
-            }
-            .into(),
-        }
+        Self { text: String::from(""),
+               font_size: Size::Points(62.0),
+               line_height: Size::Points(62.0),
+               bounds: Rectangle::new(0.0, 0.0, 500.0, 500.0),
+               font_weight: Weight::NORMAL,
+               font_style: Style::Normal,
+               font_width: Stretch::Normal,
+               color: RawRgba { r: 1.0,
+                                g: 1.0,
+                                b: 1.0,
+                                a: 1.0 }.into() }
     }
 }
 
 impl Clone for TextStimulus {
     fn clone(&self) -> Self {
-        Self {
-            config: self.config.clone(),
-            text_atlas: self.text_atlas.clone(),
-            text_renderer: self.text_renderer.clone(),
-            font_system: self.font_system.clone(),
-            text_buffer: self.text_buffer.clone(),
-            text_cache: self.text_cache.clone(),
-            color_format: self.color_format.clone(),
-        }
+        Self { config: self.config.clone(),
+               text_atlas: self.text_atlas.clone(),
+               text_renderer: self.text_renderer.clone(),
+               font_system: self.font_system.clone(),
+               text_buffer: self.text_buffer.clone(),
+               text_cache: self.text_cache.clone(),
+               color_format: self.color_format.clone() }
     }
 }
 
 #[async_trait(?Send)]
 impl Renderable for TextStimulus {
-    async fn prepare(
-        &mut self,
-        device: &Device,
-        queue: &Queue,
-        _view: &wgpu::TextureView,
-        config: &SurfaceConfiguration,
-        window_handle: &Window,
-    ) -> () {
+    async fn prepare(&mut self,
+                     device: &Device,
+                     queue: &Queue,
+                     _view: &wgpu::TextureView,
+                     config: &SurfaceConfiguration,
+                     window_handle: &Window)
+                     -> () {
         let conf = self.config.lock_blocking();
 
         {
             // update the text buffer
             let mut buffer = self.text_buffer.lock_blocking();
             let mut font_system = self.font_system.lock_blocking();
-            buffer.set_text(
-                &mut font_system,
-                &conf.text,
-                Attrs::new()
-                    .family(Family::SansSerif)
-                    .weight(conf.font_weight)
-                    .style(conf.font_style)
-                    .stretch(conf.font_width),
-                Shaping::Advanced,
-            );
+            buffer.set_text(&mut font_system,
+                            &conf.text,
+                            Attrs::new().family(Family::SansSerif)
+                                        .weight(conf.font_weight)
+                                        .style(conf.font_style)
+                                        .stretch(conf.font_width),
+                            Shaping::Advanced);
             buffer.lines[0].set_align(Some(Align::Center));
             buffer.shape_until_scroll(&mut font_system);
         }
@@ -121,39 +106,29 @@ impl Renderable for TextStimulus {
         let viewing_distance_mm = window_handle.viewing_distance.load(Ordering::Relaxed);
         let screen_width_px = config.width;
         let screen_height_px = config.height;
-        let bounds_px = conf.bounds.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        );
+        let bounds_px = conf.bounds.to_pixels(screen_width_mm,
+                                              viewing_distance_mm,
+                                              screen_width_px,
+                                              screen_height_px);
 
         self.text_renderer
             .lock_blocking()
-            .prepare(
-                device,
-                queue,
-                &mut self.font_system.lock_blocking(),
-                &mut self.text_atlas.lock_blocking(),
-                Resolution {
-                    width: screen_width_px,
-                    height: screen_height_px,
-                },
-                [TextArea {
-                    buffer: &self.text_buffer.lock_blocking(),
-                    left: (bounds_px[0] + config.width as f64 / 2.0) as f32,
-                    top: (bounds_px[1] + config.height as f64 / 2.0) as f32,
-                    scale: 1.0,
-                    bounds: TextBounds {
-                        left: 0,
-                        top: 0,
-                        right: config.width as i32,
-                        bottom: config.height as i32,
-                    },
-                    default_color: conf.color.into(),
-                }],
-                &mut self.text_cache.lock_blocking(),
-            )
+            .prepare(device,
+                     queue,
+                     &mut self.font_system.lock_blocking(),
+                     &mut self.text_atlas.lock_blocking(),
+                     Resolution { width: screen_width_px,
+                                  height: screen_height_px },
+                     [TextArea { buffer: &self.text_buffer.lock_blocking(),
+                                 left: (bounds_px[0] + config.width as f64 / 2.0) as f32,
+                                 top: (bounds_px[1] + config.height as f64 / 2.0) as f32,
+                                 scale: 1.0,
+                                 bounds: TextBounds { left: 0,
+                                                      top: 0,
+                                                      right: config.width as i32,
+                                                      bottom: config.height as i32 },
+                                 default_color: conf.color.into() }],
+                     &mut self.text_cache.lock_blocking())
             .unwrap();
     }
 
@@ -185,14 +160,12 @@ impl TextStimulus {
     pub fn new(window: &Window, text: impl Into<String>, rect: Rectangle) -> Self {
         let window = window.clone();
 
-        let config = TextStimulusConfig {
-            text: text.into(),
-            line_height: rect.height.clone(),
-            bounds: rect,
-            ..Default::default()
-        };
+        let config = TextStimulusConfig { text: text.into(),
+                                          line_height: rect.height.clone(),
+                                          bounds: rect,
+                                          ..Default::default() };
 
-        //window.clone().run_on_render_thread(|| async move {
+        // window.clone().run_on_render_thread(|| async move {
         log::info!("Creating text stimulus");
         let gpu_state = window.gpu_state.read_blocking();
         let window_state = window.state.read_blocking();
@@ -208,26 +181,20 @@ impl TextStimulus {
         let screen_width_px = sconfig.width;
         let screen_height_px = sconfig.height;
 
-        let bounds_px = config.bounds.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        );
+        let bounds_px = config.bounds.to_pixels(screen_width_mm,
+                                                viewing_distance_mm,
+                                                screen_width_px,
+                                                screen_height_px);
 
-        let font_size_px = config.font_size.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        );
+        let font_size_px = config.font_size.to_pixels(screen_width_mm,
+                                                      viewing_distance_mm,
+                                                      screen_width_px,
+                                                      screen_height_px);
 
-        let line_height_px = config.line_height.to_pixels(
-            screen_width_mm,
-            viewing_distance_mm,
-            screen_width_px,
-            screen_height_px,
-        );
+        let line_height_px = config.line_height.to_pixels(screen_width_mm,
+                                                          viewing_distance_mm,
+                                                          screen_width_px,
+                                                          screen_height_px);
 
         let width: f64 = bounds_px[2] as f64;
         let height: f64 = bounds_px[3] as f64;
@@ -236,12 +203,10 @@ impl TextStimulus {
 
         // Set up text renderer
         // load fonts
-        let plex_fonts = vec![
-            include_bytes!("./assets/IBMPlexSans-Regular.ttf").to_vec(),
-            include_bytes!("./assets/IBMPlexSans-Bold.ttf").to_vec(),
-            include_bytes!("./assets/IBMPlexSans-Italic.ttf").to_vec(),
-            include_bytes!("./assets/IBMPlexSans-BoldItalic.ttf").to_vec(),
-        ];
+        let plex_fonts = vec![include_bytes!("./assets/IBMPlexSans-Regular.ttf").to_vec(),
+                              include_bytes!("./assets/IBMPlexSans-Bold.ttf").to_vec(),
+                              include_bytes!("./assets/IBMPlexSans-Italic.ttf").to_vec(),
+                              include_bytes!("./assets/IBMPlexSans-BoldItalic.ttf").to_vec(),];
 
         let mut font_system = FontSystem::new();
 
@@ -254,34 +219,28 @@ impl TextStimulus {
         let text_renderer =
             TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
 
-        let mut buffer = Buffer::new(
-            &mut font_system,
-            Metrics::new(font_size_px as f32, line_height_px as f32),
-        );
+        let mut buffer = Buffer::new(&mut font_system,
+                                     Metrics::new(font_size_px as f32, line_height_px as f32));
 
         let physical_width = (width as f64 * scale_factor) as f32;
         let physical_height = (height as f64 * scale_factor) as f32;
 
         buffer.set_size(&mut font_system, physical_width, physical_height);
 
-        buffer.set_text(
-            &mut font_system,
-            &config.text,
-            Attrs::new().family(Family::Name("IBM Plex Sans")),
-            Shaping::Advanced,
-        );
+        buffer.set_text(&mut font_system,
+                        &config.text,
+                        Attrs::new().family(Family::Name("IBM Plex Sans")),
+                        Shaping::Advanced);
         buffer.lines[0].set_align(Some(Align::Center));
         buffer.shape_until_scroll(&mut font_system);
 
-        Self {
-            config: Arc::new(Mutex::new(config)),
-            text_atlas: Arc::new(Mutex::new(atlas)),
-            text_renderer: Arc::new(Mutex::new(text_renderer)),
-            font_system: Arc::new(Mutex::new(font_system)),
-            text_buffer: Arc::new(Mutex::new(buffer)),
-            text_cache: Arc::new(Mutex::new(cache)),
-            color_format: window.color_format,
-        }
+        Self { config: Arc::new(Mutex::new(config)),
+               text_atlas: Arc::new(Mutex::new(atlas)),
+               text_renderer: Arc::new(Mutex::new(text_renderer)),
+               font_system: Arc::new(Mutex::new(font_system)),
+               text_buffer: Arc::new(Mutex::new(buffer)),
+               text_cache: Arc::new(Mutex::new(cache)),
+               color_format: window.color_format }
 
         // })
     }

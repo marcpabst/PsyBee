@@ -6,15 +6,11 @@
 use image::{DynamicImage, GenericImageView};
 
 use super::super::pattern_stimulus::FillPattern;
-use crate::{
-    prelude::PsychophysicsError,
-    visual::{
-        Window,
-    },
-};
+use crate::prelude::PsychophysicsError;
+use crate::visual::Window;
 
-/// A Sprite is like an image, but it can hold multiple images of the same size on the GPU and switch between them
-/// by changing the texture index.
+/// A Sprite is like an image, but it can hold multiple images of the same size
+/// on the GPU and switch between them by changing the texture index.
 #[derive(Clone, Debug)]
 pub struct Sprite {
     // The images that the sprite holds
@@ -36,12 +32,12 @@ impl std::fmt::Display for Sprite {
 }
 
 impl Sprite {
-    /// Create a new sprite from a list of images. All images must have the same dimensions, otherwise this function will return an error.
-    pub fn new(
-        images: Vec<image::DynamicImage>,
-        fps: Option<f64>,
-        repeat: Option<u64>,
-    ) -> Result<Self, PsychophysicsError> {
+    /// Create a new sprite from a list of images. All images must have the same
+    /// dimensions, otherwise this function will return an error.
+    pub fn new(images: Vec<image::DynamicImage>,
+               fps: Option<f64>,
+               repeat: Option<u64>)
+               -> Result<Self, PsychophysicsError> {
         // check that the vector is not empty
         if images.is_empty() {
             return Err(PsychophysicsError::EmptyVectorError);
@@ -53,53 +49,45 @@ impl Sprite {
         // check that all images have the same dimensions
         let dimensions = images[0].dimensions();
         if images.iter().all(|image| image.dimensions() == dimensions) {
-            Ok(Self {
-                images,
-                current_index: 0,
-                fps: fps,
-                repeat: repeat,
-                init_time: std::time::Instant::now(),
-            })
+            Ok(Self { images,
+                      current_index: 0,
+                      fps: fps,
+                      repeat: repeat,
+                      init_time: std::time::Instant::now() })
         } else {
-            Err(PsychophysicsError::NonIdenticalDimensionsError(
-                dimensions.0,
-                dimensions.1,
-            ))
+            Err(PsychophysicsError::NonIdenticalDimensionsError(dimensions.0, dimensions.1))
         }
     }
 
-    /// Create a new sprite from a list of image paths. All images must have the same dimensions, otherwise this function will return an error.
-    pub fn new_from_paths(
-        paths: Vec<&str>,
-        fps: Option<f64>,
-        repeat: Option<u64>,
-    ) -> Result<Self, PsychophysicsError> {
-        let images = paths
-            .iter()
-            .map(|path| image::open(path))
-            .collect::<Result<Vec<_>, _>>()?;
+    /// Create a new sprite from a list of image paths. All images must have the
+    /// same dimensions, otherwise this function will return an error.
+    pub fn new_from_paths(paths: Vec<&str>,
+                          fps: Option<f64>,
+                          repeat: Option<u64>)
+                          -> Result<Self, PsychophysicsError> {
+        let images = paths.iter()
+                          .map(|path| image::open(path))
+                          .collect::<Result<Vec<_>, _>>()?;
         Self::new(images, fps, repeat)
     }
 
-    /// Create a new sprite from a spritesheet. The sprite sheet must contain images of the same size.
-    pub fn new_from_spritesheet(
-        path: &str,
-        num_sprites_x: u32,
-        num_sprites_y: u32,
-        fps: Option<f64>,
-        repeat: Option<u64>,
-    ) -> Result<Self, PsychophysicsError> {
+    /// Create a new sprite from a spritesheet. The sprite sheet must contain
+    /// images of the same size.
+    pub fn new_from_spritesheet(path: &str,
+                                num_sprites_x: u32,
+                                num_sprites_y: u32,
+                                fps: Option<f64>,
+                                repeat: Option<u64>)
+                                -> Result<Self, PsychophysicsError> {
         let image = image::open(path)?;
         let (width, height) = image.dimensions();
 
         // check that the sprite sheet is divisible by the sprite size
         if width % num_sprites_x != 0 || height % num_sprites_y != 0 {
-            return Err(PsychophysicsError::WrongDimensionsError(
-                num_sprites_x,
-                num_sprites_y,
-                width,
-                height,
-            ));
+            return Err(PsychophysicsError::WrongDimensionsError(num_sprites_x,
+                                                                num_sprites_y,
+                                                                width,
+                                                                height));
         }
 
         // calculate the sprite size
@@ -138,11 +126,9 @@ impl Sprite {
 impl FillPattern for Sprite {
     fn texture_extent(&self, _window: &Window) -> Option<wgpu::Extent3d> {
         let (width, height) = self.images[0].dimensions();
-        Some(wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: self.images.len() as u32,
-        })
+        Some(wgpu::Extent3d { width,
+                              height,
+                              depth_or_array_layers: self.images.len() as u32 })
     }
 
     fn texture_data(&self, _window: &Window) -> Option<Vec<u8>> {

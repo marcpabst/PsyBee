@@ -2,17 +2,18 @@
 
 import logging
 import os
+import time
 
 from bubble_simulation import BubbleSimulation
 from psychophysics_py import (
     AudioDevice,
     Circle,
-    EventData,
+    EventKind,
     ExperimentManager,
-    ExperimentManagerOld,
     FileStimulus,
     GaborStimulus,
     ImageStimulus,
+    MainLoop,
     Pixels,
     Rectangle,
     ScreenWidth,
@@ -38,31 +39,24 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
 
     default_audio_device = AudioDevice()
 
-    audio_stim1 = FileStimulus(default_audio_device, "./resources/bubles.mp3")
+    audio_miss = FileStimulus(default_audio_device, "./resources/bubles.mp3")
+    audio_hit = FileStimulus(default_audio_device, "./resources/collect.mp3")
 
     ball_stims = []
 
     for _ in range(n_balls):
-        stim = GaborStimulus(
-            window,
-            Circle(Pixels(0), Pixels(0), ScreenWidth(0.05)),
-            0,
-            Pixels(20),
-            ScreenWidth(0.01),
-            ScreenWidth(0.01),
-            0,
-            (0.0, 0.0, 0.0),
-        )
+        stim = GaborStimulus(window, Circle(Pixels(0), Pixels(0), ScreenWidth(0.05)), 0, Pixels(20), ScreenWidth(0.01),
+                             ScreenWidth(0.01), 0, (0.0, 0.0, 0.0))
 
         ball_stims.append(stim)
 
-    stim2 = ImageStimulus(
+    crosshair = ImageStimulus(
         window,
         Rectangle(Pixels(-50), Pixels(-50), Pixels(100), Pixels(100)),
         os.path.join(resources, "crosshair.png"),  # noqa: PTH118
     )
 
-    stim3 = SpriteStimulus(
+    bubbles = SpriteStimulus(
         window,
         Rectangle(ScreenWidth(-0.05), ScreenWidth(-0.05), ScreenWidth(0.1), ScreenWidth(0.1)),
         "resources/buble_pop_two_spritesheet_512px_by512px_per_frame.png",
@@ -72,17 +66,49 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
         repeat=1,
     )
 
+    sparkle = SpriteStimulus(
+        window,
+        Rectangle(ScreenWidth(-0.05), ScreenWidth(-0.05), ScreenWidth(0.1), ScreenWidth(0.1)),
+        "resources/sparkle_spritesheet_256px_by_256px_per_frame.png",
+        3,
+        3,
+        fps=20,
+        repeat=1,
+    )
+
     subject_id = exp_manager.prompt("Press any key to start the experiment")
 
     print(f"Subject ID: {subject_id}")  # noqa: T201
 
     window.stimuli.extend(ball_stims)
-    window.stimuli.append(stim2)
-    window.stimuli.append(stim3)
+    window.stimuli.append(crosshair)
+    window.stimuli.append(bubbles)
+    window.stimuli.append(sparkle)
 
-    stim3.reset()
+    def click_handler(event):
+        hit = False
 
-    last_mouse_pos = (Pixels(0), Pixels(0))
+        for stim in ball_stims:
+            if stim.visible and stim.contains(*event.position):
+                stim.hide()
+                hit = True
+
+        if hit:
+            audio_hit.restart()
+            sparkle.set_translation(*event.position)
+            sparkle.reset()
+
+        else:
+            audio_miss.restart()
+            bubbles.set_translation(*event.position)
+            bubbles.reset()
+
+    def mouse_move_handler(event):
+        crosshair.set_translation(*event.position)
+
+    # add event handlers
+    window.add_event_handler(EventKind.CURSOR_MOVED, mouse_move_handler)
+    window.add_event_handler(EventKind.MOUSE_BUTTON_PRESS, click_handler)
 
     while True:
         frame = window.get_frame()
@@ -92,34 +118,9 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
         new_pos = next(sim)
 
         for i, stim in enumerate(ball_stims):
-            # move the stimulufs
             stim.set_translation(Pixels(new_pos[i][0]), Pixels(new_pos[i][1]))
 
         window.submit_frame(frame)
-
-        # check for new events
-        events = kb.poll()
-        for i in range(len(events)):
-            event = events[i]
-            data = event.data
-
-            if isinstance(data, EventData.CursorMoved):
-                # update the position of the image stimulus
-                stim2.set_translation(data.position[0], data.position[1])
-
-                # update the position of the mouse
-                last_mouse_pos = data.position
-
-            if isinstance(data, EventData.MouseButtonPress):
-                # play the audio stimulus
-                audio_stim1.reset()
-                audio_stim1.play()
-
-                # move stimulus 3 to the position of the mouse
-                stim3.set_translation(last_mouse_pos[0], last_mouse_pos[1])
-
-                # reset the sprite
-                stim3.reset()
 
 
 if __name__ == "__main__":
@@ -130,7 +131,7 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(logging.INFO)
 
     # Create an experiment manager
-    em = ExperimentManagerOld()
+    em = MainLoop()
 
     # Get a monitor (0 is usually the internal screen, 1 the first external monitor, etc.)
     monitor = em.get_available_monitors()[-1]

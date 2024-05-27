@@ -1,17 +1,23 @@
-//! This module contains structs and traits that are used to specify the geometry of a stimulus.
-//! This includes rectangles, circles, and transformations.
+//! This module contains structs and traits that are used to specify the
+//! geometry of a stimulus. This includes rectangles, circles, and
+//! transformations.
 
 use nalgebra::{Matrix2, Matrix3};
 
-/// This enum is used to specify the size and position of a stimulus. The unit can be specified in different ways,
-/// which will be evaluated just before the object is rendered. This allows for the size of the object to
-/// be specified in a flexible way, e.g. as a fraction of the screen size or in degrees of visual angle.
+use super::Window;
+
+/// This enum is used to specify the size and position of a stimulus. The unit
+/// can be specified in different ways, which will be evaluated just before the
+/// object is rendered. This allows for the size of the object to be specified
+/// in a flexible way, e.g. as a fraction of the screen size or in degrees of
+/// visual angle.
 ///
-/// Important: The unit is specified in the constructor of the object, but its actual size in pixels
-/// is only calculated when the object is rendered. This is because the size of the object depends on the
-/// size of the window, the distance of the observer to the screen, and the physical size of the screen. As
-/// some of these parameters may change during the experiment, the size and position of the object in pixels
-/// can only be known at the time of rendering.
+/// Important: The unit is specified in the constructor of the object, but its
+/// actual size in pixels is only calculated when the object is rendered. This
+/// is because the size of the object depends on the size of the window, the
+/// distance of the observer to the screen, and the physical size of the screen.
+/// As some of these parameters may change during the experiment, the size and
+/// position of the object in pixels can only be known at the time of rendering.
 ///
 /// # Examples
 ///
@@ -45,7 +51,8 @@ pub enum Size {
     Inches(f64),
     /// Points.
     Points(f64),
-    /// Defaults to the default unit set in the window (pixels if not specified otherwise).
+    /// Defaults to the default unit set in the window (pixels if not specified
+    /// otherwise).
     Default(f64),
     /// Qutioent of a unit and a float (the Unit divided by the float).
     Quotient(Box<Size>, f64),
@@ -63,22 +70,17 @@ pub struct SizeVector2D {
     pub y: Size,
 }
 
-
 impl From<(f64, f64)> for SizeVector2D {
     fn from((x, y): (f64, f64)) -> Self {
-        SizeVector2D {
-            x: Size::Default(x),
-            y: Size::Default(y),
-        }
+        SizeVector2D { x: Size::Default(x),
+                       y: Size::Default(y) }
     }
 }
 
 impl From<(f32, f32)> for SizeVector2D {
     fn from((x, y): (f32, f32)) -> Self {
-        SizeVector2D {
-            x: Size::Default(x as f64),
-            y: Size::Default(y as f64),
-        }
+        SizeVector2D { x: Size::Default(x as f64),
+                       y: Size::Default(y as f64) }
     }
 }
 
@@ -88,26 +90,25 @@ impl From<(Size, Size)> for SizeVector2D {
     }
 }
 
-
-
 impl From<f32> for Size {
-    /// Convert from a float to a unit. The float is interpreted as a number of `Default` units.
+    /// Convert from a float to a unit. The float is interpreted as a number of
+    /// `Default` units.
     fn from(f: f32) -> Self {
         Size::Default(f as f64)
     }
 }
 
 impl From<i64> for Size {
-    /// Convert from an integer to a unit. The integer is interpreted as a number of `Default` units.
+    /// Convert from an integer to a unit. The integer is interpreted as a
+    /// number of `Default` units.
     fn from(i: i64) -> Self {
         Size::Default(i as f64)
     }
 }
 
-
-
 impl From<f64> for Size {
-    /// Convert from a float to a unit. The float is interpreted as a number of `Default` units.
+    /// Convert from a float to a unit. The float is interpreted as a number of
+    /// `Default` units.
     fn from(f: f64) -> Self {
         Size::Default(f)
     }
@@ -115,6 +116,7 @@ impl From<f64> for Size {
 
 impl std::ops::Add for Size {
     type Output = Size;
+
     /// Add two units together. The results is a `Unit::Sum`.
     fn add(self, rhs: Self) -> Self::Output {
         Size::Sum(Box::new(self), Box::new(rhs))
@@ -123,6 +125,7 @@ impl std::ops::Add for Size {
 
 impl std::ops::Sub for Size {
     type Output = Size;
+
     /// Subtract two units. The results is a `Unit::Difference`.
     fn sub(self, rhs: Self) -> Self::Output {
         Size::Difference(Box::new(self), Box::new(rhs))
@@ -131,6 +134,7 @@ impl std::ops::Sub for Size {
 
 impl std::ops::Mul<f64> for Size {
     type Output = Size;
+
     /// Multiply two units. The results is a `Unit::Product`.
     fn mul(self, rhs: f64) -> Self::Output {
         Size::Product(Box::new(self), rhs)
@@ -139,6 +143,7 @@ impl std::ops::Mul<f64> for Size {
 
 impl std::ops::Div<f64> for Size {
     type Output = Size;
+
     /// Divide two units. The results is a `Unit::Quotient`.
     fn div(self, rhs: f64) -> Self::Output {
         Self::Quotient(Box::new(self), rhs)
@@ -148,6 +153,7 @@ impl std::ops::Div<f64> for Size {
 // implements the minus operator for a single size
 impl std::ops::Neg for Size {
     type Output = Size;
+
     /// Negate a unit. The results is a `Unit::Product` with a factor of -1.0.
     fn neg(self) -> Self::Output {
         Size::Product(Box::new(self), -1.0)
@@ -157,17 +163,17 @@ impl std::ops::Neg for Size {
 pub trait ToPixels {
     type Output;
 
-     fn to_pixels(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> Self::Output;
+    fn to_pixels(&self,
+                 screenwidth_mm: f64,
+                 viewing_distance_mm: f64,
+                 width_px: u32,
+                 height_px: u32)
+                 -> Self::Output;
 }
 
 impl Size {
-    /// Convert the given angle of visual angle to millimeters, taking the viewing distance into account.
+    /// Convert the given angle of visual angle to millimeters, taking the
+    /// viewing distance into account.
     ///
     /// # Arguments
     ///
@@ -177,20 +183,16 @@ impl Size {
     /// # Returns
     ///
     /// The distance in millimeters.
-    fn angle_to_milimeter(
-        angle: f64,
-        viewing_distance_mm: f64,
-    ) -> Size {
-        Size::Millimeters(
-            2.0 * viewing_distance_mm
-                * (angle.to_radians() / 2.0).tan(),
-        )
+    fn angle_to_milimeter(angle: f64, viewing_distance_mm: f64) -> Size {
+        Size::Millimeters(2.0 * viewing_distance_mm * (angle.to_radians() / 2.0).tan())
     }
 }
 
 impl ToPixels for Size {
     type Output = f64;
-    /// Convert the given unit to pixels, taking the physical size of the screen and the viewing distance into account.
+
+    /// Convert the given unit to pixels, taking the physical size of the screen
+    /// and the viewing distance into account.
     ///
     /// # Arguments
     ///
@@ -202,109 +204,70 @@ impl ToPixels for Size {
     /// # Returns
     ///
     /// The unit converted to pixels (as a float).
-    fn to_pixels(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> f64 {
+    fn to_pixels(&self,
+                 screenwidth_mm: f64,
+                 viewing_distance_mm: f64,
+                 width_px: u32,
+                 height_px: u32)
+                 -> f64 {
         let window_width_mm = screenwidth_mm;
         let window_width_pixels = width_px as f64;
         let window_height_pixels = height_px as f64;
 
         match self {
             Size::Pixels(pixels) => *pixels,
-            Size::ScreenWidth(normalised) => {
-                *normalised * window_width_pixels
-            }
-            Size::ScreenHeight(normalised) => {
-                *normalised * window_height_pixels
-            }
-            Size::Degrees(degrees) => Size::angle_to_milimeter(
-                *degrees,
-                viewing_distance_mm,
-            )
-            .to_pixels(
-                screenwidth_mm,
-                viewing_distance_mm,
-                width_px,
-                height_px,
-            ),
-            Size::Millimeters(millimeters) => {
-                *millimeters * window_width_pixels / window_width_mm
-            }
-            Size::Centimeters(centimeters) => {
-                Size::Millimeters(*centimeters * 10.0).to_pixels(
+            Size::ScreenWidth(normalised) => *normalised * window_width_pixels,
+            Size::ScreenHeight(normalised) => *normalised * window_height_pixels,
+            Size::Degrees(degrees) => {
+                Size::angle_to_milimeter(*degrees, viewing_distance_mm).to_pixels(
                     screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 )
             }
-            Size::Inches(inches) => Size::Millimeters(*inches * 25.4)
-                .to_pixels(
-                    screenwidth_mm,
-                    viewing_distance_mm,
-                    width_px,
-                    height_px,
-                ),
-            Size::Points(points) => Size::Inches(*points / 72.0)
-                .to_pixels(
-                    screenwidth_mm,
-                    viewing_distance_mm,
-                    width_px,
-                    height_px,
-                ),
+            Size::Millimeters(millimeters) => {
+                *millimeters * window_width_pixels / window_width_mm
+            }
+            Size::Centimeters(centimeters) => Size::Millimeters(*centimeters * 10.0)
+                .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px),
+            Size::Inches(inches) => Size::Millimeters(*inches * 25.4).to_pixels(
+                screenwidth_mm,
+                viewing_distance_mm,
+                width_px,
+                height_px,
+            ),
+            Size::Points(points) => Size::Inches(*points / 72.0).to_pixels(
+                screenwidth_mm,
+                viewing_distance_mm,
+                width_px,
+                height_px,
+            ),
             Size::Default(default) => *default,
             Size::Quotient(a, b) => {
                 // first, we resolve `a` to pixels, the we divide by b
-                let a = a.to_pixels(
-                    screenwidth_mm,
-                    viewing_distance_mm,
-                    width_px,
-                    height_px,
-                );
+                let a =
+                    a.to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
                 a / b
             }
             Size::Product(a, b) => {
                 // first, we resolve `a` to pixels, the we multiply with b
-                let a = a.to_pixels(
-                    screenwidth_mm,
-                    viewing_distance_mm,
-                    width_px,
-                    height_px,
-                );
+                let a =
+                    a.to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
                 a * b
             }
             Size::Sum(a, b) => {
-                let a = a.to_pixels(
-                    screenwidth_mm,
-                    viewing_distance_mm,
-                    width_px,
-                    height_px,
-                );
-                let b = b.to_pixels(
-                    screenwidth_mm,
-                    viewing_distance_mm,
-                    width_px,
-                    height_px,
-                );
+                let a =
+                    a.to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
+                let b =
+                    b.to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
                 a + b
             }
             Size::Difference(a, b) => {
-                let a = a.to_pixels(
-                    screenwidth_mm,
-                    viewing_distance_mm,
-                    width_px,
-                    height_px,
-                );
-                let b = b.to_pixels(
-                    screenwidth_mm,
-                    viewing_distance_mm,
-                    width_px,
-                    height_px,
-                );
+                let a =
+                    a.to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
+                let b =
+                    b.to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
                 a - b
             }
         }
@@ -313,7 +276,9 @@ impl ToPixels for Size {
 
 impl ToPixels for SizeVector2D {
     type Output = (f64, f64);
-    /// Convert the point to pixels, taking the physical size of the screen and the viewing distance into account.
+
+    /// Convert the point to pixels, taking the physical size of the screen and
+    /// the viewing distance into account.
     ///
     /// # Arguments
     ///
@@ -325,66 +290,64 @@ impl ToPixels for SizeVector2D {
     /// # Returns
     ///
     /// The point converted to pixels.
-     fn to_pixels(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> (f64, f64) {
-        (
-            self.x.to_pixels(
-                screenwidth_mm,
-                viewing_distance_mm,
-                width_px,
-                height_px,
-            ),
-            self.y.to_pixels(
-                screenwidth_mm,
-                viewing_distance_mm,
-                width_px,
-                height_px,
-            ),
-        )
+    fn to_pixels(&self,
+                 screenwidth_mm: f64,
+                 viewing_distance_mm: f64,
+                 width_px: u32,
+                 height_px: u32)
+                 -> (f64, f64) {
+        (self.x
+             .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px),
+         self.y
+             .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px))
     }
 }
 
-
-
 /// Types that can be triangulated, i.e. converted to a list of vertices.
 pub trait ToVertices: Send + Sync {
-    /// Convert the shape to a list of vertices in pixels. The vertices are given as a list of floats,
-    /// where each three floats represent the x, y, and z coordinate of a vertex. The z coordinate is
-    /// always 0.0. X and y coordinates are given in NDC (Normalized Device Coordinates) space, i.e. between -1
-    /// and 1 with the origin in the center of the screen and the point (-1, -1) in the top left corner.
-    fn to_vertices_px(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> Vec<Vertex>;
+    /// Convert the shape to a list of vertices in pixels. The vertices are
+    /// given as a list of floats, where each three floats represent the x,
+    /// y, and z coordinate of a vertex. The z coordinate is always 0.0. X
+    /// and y coordinates are given in NDC (Normalized Device Coordinates)
+    /// space, i.e. between -1 and 1 with the origin in the center of the
+    /// screen and the point (-1, -1) in the top left corner.
+    fn to_vertices_px(&self,
+                      screenwidth_mm: f64,
+                      viewing_distance_mm: f64,
+                      width_px: u32,
+                      height_px: u32)
+                      -> Vec<Vertex>;
 
     fn clone_box(&self) -> Box<dyn ToVertices>;
 
     fn n_vertices(&self) -> usize {
         self.to_vertices_px(1.0, 1.0, 1, 1).len()
     }
+
+    fn contains(&self, window: &Window, trans: &Transformation2D, x: Size, y: Size) -> bool;
 }
 
 impl ToVertices for Box<dyn ToVertices> {
-    fn to_vertices_px(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> Vec<Vertex> {
-        self.as_ref().to_vertices_px(screenwidth_mm, viewing_distance_mm, width_px, height_px)
+    fn to_vertices_px(&self,
+                      screenwidth_mm: f64,
+                      viewing_distance_mm: f64,
+                      width_px: u32,
+                      height_px: u32)
+                      -> Vec<Vertex> {
+        self.as_ref()
+            .to_vertices_px(screenwidth_mm, viewing_distance_mm, width_px, height_px)
     }
 
     fn clone_box(&self) -> Box<dyn ToVertices> {
         self.as_ref().clone_box()
+    }
+
+    fn n_vertices(&self) -> usize {
+        self.as_ref().n_vertices()
+    }
+
+    fn contains(&self, window: &Window, trans: &Transformation2D, x: Size, y: Size) -> bool {
+        self.as_ref().contains(window, trans, x, y)
     }
 }
 
@@ -406,6 +369,11 @@ pub struct Circle {
 }
 
 impl Rectangle {
+    pub const FULLSCREEN: Rectangle = Rectangle { left: Size::ScreenWidth(-0.5),
+                                                  top: Size::ScreenHeight(-0.5),
+                                                  width: Size::ScreenWidth(1.0),
+                                                  height: Size::ScreenHeight(1.0) };
+
     /// Create a new rectangle.
     ///
     /// # Arguments
@@ -427,64 +395,38 @@ impl Rectangle {
     ///
     /// let rect = Rectangle::new(Size::Pixels(0.0), Size::Pixels(0.0), Size::Pixels(100.0), Size::Pixels(100.0));
     /// ```
-    pub fn new(
-        left: impl Into<Size>,
-        top: impl Into<Size>,
-        width: impl Into<Size>,
-        height: impl Into<Size>,
-    ) -> Self {
-        Self {
-            left: left.into(),
-            top: top.into(),
-            width: width.into(),
-            height: height.into(),
-        }
+    pub fn new(left: impl Into<Size>,
+               top: impl Into<Size>,
+               width: impl Into<Size>,
+               height: impl Into<Size>)
+               -> Self {
+        Self { left: left.into(),
+               top: top.into(),
+               width: width.into(),
+               height: height.into() }
     }
 
-    /// Convert the rectangle to a list of vertices in pixels. The vertices are given as a list of floats,
-    /// where each three floats represent the x, y, and z coordinate of a vertex. The z coordinate is
-    /// always 0.0. X and y coordinates are given in pixels.
-    pub fn to_pixels(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> [f64; 4] {
-        let left = self.left.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        );
-        let top = self.top.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        );
-        let width = self.width.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        );
-        let height = self.height.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        );
+    /// Convert the rectangle to a list of vertices in pixels. The vertices are
+    /// given as a list of floats, where each three floats represent the x,
+    /// y, and z coordinate of a vertex. The z coordinate is always 0.0. X
+    /// and y coordinates are given in pixels.
+    pub fn to_pixels(&self,
+                     screenwidth_mm: f64,
+                     viewing_distance_mm: f64,
+                     width_px: u32,
+                     height_px: u32)
+                     -> [f64; 4] {
+        let left = self.left
+                       .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
+        let top = self.top
+                      .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
+        let width = self.width
+                        .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
+        let height = self.height
+                         .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
 
         [left, top, width, height]
     }
-
-    pub const FULLSCREEN: Rectangle = Rectangle {
-        left: Size::ScreenWidth(-0.5),
-        top: Size::ScreenHeight(-0.5),
-        width: Size::ScreenWidth(1.0),
-        height: Size::ScreenHeight(1.0),
-    };
 }
 
 impl Circle {
@@ -499,84 +441,54 @@ impl Circle {
     /// # Returns
     ///
     /// A new circle.
-    pub fn new(
-        center_x: impl Into<Size>,
-        center_y: impl Into<Size>,
-        radius: impl Into<Size>,
-    ) -> Self {
-        Self {
-            center_x: center_x.into(),
-            center_y: center_y.into(),
-            radius: radius.into(),
-        }
+    pub fn new(center_x: impl Into<Size>,
+               center_y: impl Into<Size>,
+               radius: impl Into<Size>)
+               -> Self {
+        Self { center_x: center_x.into(),
+               center_y: center_y.into(),
+               radius: radius.into() }
     }
 }
 
 impl ToVertices for Rectangle {
-    fn to_vertices_px(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> Vec<Vertex> {
-        let left = self.left.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        ) as f32;
-        let top = self.top.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        ) as f32;
-        let width = self.width.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        ) as f32;
-        let height = self.height.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        ) as f32;
+    fn to_vertices_px(&self,
+                      screenwidth_mm: f64,
+                      viewing_distance_mm: f64,
+                      width_px: u32,
+                      height_px: u32)
+                      -> Vec<Vertex> {
+        let left = self.left
+                       .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px)
+                   as f32;
+        let top = self.top
+                      .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px)
+                  as f32;
+        let width = self.width
+                        .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px)
+                    as f32;
+        let height = self.height
+                         .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px)
+                     as f32;
 
-        let vertices = vec![
-            Vertex {
-                position: [left, top, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [0.0, 1.0],
-            },
-            Vertex {
-                position: [left + width, top, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [1.0, 1.0],
-            },
-            Vertex {
-                position: [left + width, top + height, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [1.0, 0.0],
-            },
-            Vertex {
-                position: [left, top, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [0.0, 1.0],
-            },
-            Vertex {
-                position: [left + width, top + height, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [1.0, 0.0],
-            },
-            Vertex {
-                position: [left, top + height, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [0.0, 0.0],
-            },
-        ];
+        let vertices = vec![Vertex { position: [left, top, 0.0],
+                                     color: [1.0, 1.0, 1.0],
+                                     tex_coords: [0.0, 1.0] },
+                            Vertex { position: [left + width, top, 0.0],
+                                     color: [1.0, 1.0, 1.0],
+                                     tex_coords: [1.0, 1.0] },
+                            Vertex { position: [left + width, top + height, 0.0],
+                                     color: [1.0, 1.0, 1.0],
+                                     tex_coords: [1.0, 0.0] },
+                            Vertex { position: [left, top, 0.0],
+                                     color: [1.0, 1.0, 1.0],
+                                     tex_coords: [0.0, 1.0] },
+                            Vertex { position: [left + width, top + height, 0.0],
+                                     color: [1.0, 1.0, 1.0],
+                                     tex_coords: [1.0, 0.0] },
+                            Vertex { position: [left, top + height, 0.0],
+                                     color: [1.0, 1.0, 1.0],
+                                     tex_coords: [0.0, 0.0] },];
 
         vertices
     }
@@ -584,48 +496,79 @@ impl ToVertices for Rectangle {
     fn clone_box(&self) -> Box<dyn ToVertices> {
         Box::new(self.clone())
     }
+
+    fn contains(&self, window: &Window, trans: &Transformation2D, x: Size, y: Size) -> bool {
+        log::info!("Checking if rectangle contains point");
+        let px = x.to_pixels(window.physical_width(),
+                             window.viewing_distance(),
+                             window.width_px(),
+                             window.height_px());
+
+        let py = y.to_pixels(window.physical_width(),
+                             window.viewing_distance(),
+                             window.width_px(),
+                             window.height_px());
+
+        // apply the transformation to left, top, width, and height
+        let trans_mat = trans.to_transformation_matrix(window.physical_width(),
+                                                       window.viewing_distance(),
+                                                       window.width_px(),
+                                                       window.height_px());
+
+        let x1 = self.left.to_pixels(window.physical_width(),
+                                     window.viewing_distance(),
+                                     window.width_px(),
+                                     window.height_px()) as f32;
+        let y1 = self.top.to_pixels(window.physical_width(),
+                                    window.viewing_distance(),
+                                    window.width_px(),
+                                    window.height_px()) as f32;
+        let x2 = x1
+                 + self.width.to_pixels(window.physical_width(),
+                                        window.viewing_distance(),
+                                        window.width_px(),
+                                        window.height_px()) as f32;
+        let y2 = y1
+                 + self.height.to_pixels(window.physical_width(),
+                                         window.viewing_distance(),
+                                         window.width_px(),
+                                         window.height_px()) as f32;
+
+        // apply the transformation matrix to the rectangle
+        let a = (trans_mat * nalgebra::Vector3::new(x1, y1, 1.0)).xy();
+        let b = (trans_mat * nalgebra::Vector3::new(x2, y1, 1.0)).xy();
+
+        let p = nalgebra::Vector2::new(px as f32, py as f32);
+
+        // check if the point is inside the transformed rectangle
+        a.x <= p.x && p.x <= b.x && a.y <= p.y && p.y <= b.y
+    }
 }
 
 impl ToVertices for Circle {
-    fn to_vertices_px(
-        &self,
-        screenwidth_mm: f64,
-        viewing_distance_mm: f64,
-        width_px: u32,
-        height_px: u32,
-    ) -> Vec<Vertex> {
-        let center_x = self.center_x.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        );
-        let center_y = self.center_y.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        );
-        let radius = self.radius.to_pixels(
-            screenwidth_mm,
-            viewing_distance_mm,
-            width_px,
-            height_px,
-        );
+    fn to_vertices_px(&self,
+                      screenwidth_mm: f64,
+                      viewing_distance_mm: f64,
+                      width_px: u32,
+                      height_px: u32)
+                      -> Vec<Vertex> {
+        let center_x = self.center_x
+                           .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
+        let center_y = self.center_y
+                           .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
+        let radius = self.radius
+                         .to_pixels(screenwidth_mm, viewing_distance_mm, width_px, height_px);
 
         let mut vertices = Vec::new();
 
         let n_segments = 500;
 
-        // note that texture coordinates are based on the rectangle that contains the circle
+        // note that texture coordinates are based on the rectangle that contains the
+        // circle
 
         for i in 0..n_segments {
-            let theta = 2.0
-                * std::f64::consts::PI
-                * (i as f64 / n_segments as f64);
-            let next_theta = 2.0
-                * std::f64::consts::PI
-                * ((i + 1) as f64 / n_segments as f64);
+            let theta = 2.0 * std::f64::consts::PI * (i as f64 / n_segments as f64);
+            let next_theta = 2.0 * std::f64::consts::PI * ((i + 1) as f64 / n_segments as f64);
 
             let x = center_x + radius * theta.cos();
             let y = center_y + radius * theta.sin();
@@ -633,21 +576,17 @@ impl ToVertices for Circle {
             let next_x = center_x + radius * next_theta.cos();
             let next_y = center_y + radius * next_theta.sin();
 
-            vertices.push(Vertex {
-                position: [center_x as f32, center_y as f32, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [0.5, 0.5],
-            });
-            vertices.push(Vertex {
-                position: [x as f32, y as f32, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [0.5 + 0.5 * theta.cos() as f32, 0.5 - 0.5 * theta.sin() as f32],
-            });
-            vertices.push(Vertex {
-                position: [next_x as f32, next_y as f32, 0.0],
-                color: [1.0, 1.0, 1.0],
-                tex_coords: [0.5 + 0.5 * next_theta.cos() as f32, 0.5 - 0.5 * next_theta.sin() as f32],
-            });
+            vertices.push(Vertex { position: [center_x as f32, center_y as f32, 0.0],
+                                   color: [1.0, 1.0, 1.0],
+                                   tex_coords: [0.5, 0.5] });
+            vertices.push(Vertex { position: [x as f32, y as f32, 0.0],
+                                   color: [1.0, 1.0, 1.0],
+                                   tex_coords: [0.5 + 0.5 * theta.cos() as f32,
+                                                0.5 - 0.5 * theta.sin() as f32] });
+            vertices.push(Vertex { position: [next_x as f32, next_y as f32, 0.0],
+                                   color: [1.0, 1.0, 1.0],
+                                   tex_coords: [0.5 + 0.5 * next_theta.cos() as f32,
+                                                0.5 - 0.5 * next_theta.sin() as f32] });
         }
 
         vertices
@@ -656,16 +595,66 @@ impl ToVertices for Circle {
     fn clone_box(&self) -> Box<dyn ToVertices> {
         Box::new(self.clone())
     }
+
+    fn contains(&self, window: &Window, trans: &Transformation2D, x: Size, y: Size) -> bool {
+        log::info!("Checking if circle contains point");
+
+        let physical_width = window.physical_width();
+        let viewing_distance = window.viewing_distance();
+        let width_px = window.width_px();
+        let height_px = window.height_px();
+
+        let trans_mat =
+            trans.to_transformation_matrix(physical_width, viewing_distance, width_px, height_px)
+                 .transpose();
+
+        let inv_mat = trans_mat.try_inverse()
+                               .expect("Could not invert transformation matrix");
+
+        let p = nalgebra::Point2::new(x.to_pixels(physical_width,
+                                                  viewing_distance,
+                                                  width_px,
+                                                  height_px)
+                                      as f32,
+                                      y.to_pixels(physical_width,
+                                                  viewing_distance,
+                                                  width_px,
+                                                  height_px)
+                                      as f32);
+
+        let center = (trans_mat
+                      * nalgebra::Vector3::new(self.center_x.to_pixels(physical_width,
+                                                                       viewing_distance,
+                                                                       width_px,
+                                                                       height_px)
+                                               as f32,
+                                               self.center_y.to_pixels(physical_width,
+                                                                       viewing_distance,
+                                                                       width_px,
+                                                                       height_px)
+                                               as f32,
+                                               1.0)).xy()
+                                                    .into();
+
+        let radius = self.radius
+                         .to_pixels(physical_width, viewing_distance, width_px, height_px)
+                     as f32;
+
+        nalgebra::distance(&center, &p) <= radius
+    }
 }
 
 /// 2D transformations that can be applied to a stimulus.
-/// This enum is used to specify the transformation of a stimulus. The transformation is applied to the object
-/// just before it is rendered.
+/// This enum is used to specify the transformation of a stimulus. The
+/// transformation is applied to the object just before it is rendered.
 ///
-/// Important: The transformation is specified in the constructor of the object, but its actual transformation
-/// matrix is only calculated when the object is rendered. This is because the transformation of the object depends on the
-/// size of the window, the distance of the observer to the screen, and the physical size of the screen. As
-/// some of these parameters may change during the experiment, the transformation matrix of the object can only be known at the time of rendering.
+/// Important: The transformation is specified in the constructor of the object,
+/// but its actual transformation matrix is only calculated when the object is
+/// rendered. This is because the transformation of the object depends on the
+/// size of the window, the distance of the observer to the screen, and the
+/// physical size of the screen. As some of these parameters may change during
+/// the experiment, the transformation matrix of the object can only be known at
+/// the time of rendering.
 #[derive(Debug, Clone)]
 pub enum Transformation2D {
     /// Identity transformation (no transformation).
@@ -686,13 +675,17 @@ pub enum Transformation2D {
     Translation(Size, Size),
     /// Arbitrary 2D transformation matrix.
     Matrix(Matrix2<f32>),
-    /// Homogeneous 2D transformation matrix. This 4x4 matrix will be applied to the coordinates in NDC (Normalized
-    /// Device Coordinates) space, but please note that the specific coordinate system this matrix will be applied to is
-    /// considered an implementation detail and may change in the future. It is recommended to use the other variants
-    /// instead or to combine a 2D transformation matrix with a `Translation` transformation, which will take care of
-    /// the coordinate system for you.
+    /// Homogeneous 2D transformation matrix. This 4x4 matrix will be applied to
+    /// the coordinates in NDC (Normalized Device Coordinates) space, but
+    /// please note that the specific coordinate system this matrix will be
+    /// applied to is considered an implementation detail and may change in
+    /// the future. It is recommended to use the other variants instead or
+    /// to combine a 2D transformation matrix with a `Translation`
+    /// transformation, which will take care of the coordinate system for
+    /// you.
     Homogeneous(Matrix3<f32>),
-    /// Product of two transformations. This variant is used to combine multiple transformations in a lazy way.
+    /// Product of two transformations. This variant is used to combine multiple
+    /// transformations in a lazy way.
     Product(Box<Transformation2D>, Box<Transformation2D>),
 }
 
@@ -701,9 +694,7 @@ impl Transformation2D {
     pub fn translation(x: impl Into<Size>, y: impl Into<Size>) -> Transformation2D {
         Transformation2D::Translation(x.into(), y.into())
     }
-}
 
-impl Transformation2D {
     /// Convert to the corresponding (homogeneous) 2D transformation matrix.
     #[rustfmt::skip]
     pub fn to_transformation_matrix(&self, screenwidth_mm: f64, viewing_distance_mm: f64, width_px: u32, height_px: u32) -> Matrix3<f32> {
@@ -726,7 +717,7 @@ impl Transformation2D {
                     width_px,
                     height_px,
                 ) as f32;
-                
+
                 Matrix3::new(
                     angle.cos(), -angle.sin(), 0.0,
                     angle.sin(), angle.cos(), 0.0,
@@ -788,13 +779,14 @@ impl Transformation2D {
                     width_px,
                     height_px,
                 ) as f32;
+
                 let y = y.to_pixels(
                     screenwidth_mm,
                     viewing_distance_mm,
                     width_px,
                     height_px,
                 ) as f32;
-                
+
                 Matrix3::new(
                     1.0, 0.0, 0.0,
                     0.0, 1.0, 0.0,
@@ -815,7 +807,8 @@ impl Transformation2D {
     }
 }
 
-/// A struct that represents a vertex in a 3D space. A vertex consists of a position, a color, and texture coordinates.
+/// A struct that represents a vertex in a 3D space. A vertex consists of a
+/// position, a color, and texture coordinates.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
@@ -826,45 +819,41 @@ pub struct Vertex {
 
 impl Vertex {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>()
-                as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>()
-                        as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 6]>()
-                        as wgpu::BufferAddress,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-            ],
-        }
+        wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<Vertex>()
+                                                 as wgpu::BufferAddress,
+                                   step_mode: wgpu::VertexStepMode::Vertex,
+                                   attributes:
+                                       &[wgpu::VertexAttribute { offset: 0,
+                                                                 shader_location: 0,
+                                                                 format:
+                                                                     wgpu::VertexFormat::Float32x3 },
+                                         wgpu::VertexAttribute { offset: std::mem::size_of::<[f32; 3]>()
+                                                                         as wgpu::BufferAddress,
+                                                                 shader_location: 1,
+                                                                 format:
+                                                                     wgpu::VertexFormat::Float32x3 },
+                                         wgpu::VertexAttribute { offset: std::mem::size_of::<[f32; 6]>()
+                                                                         as wgpu::BufferAddress,
+                                                                 shader_location: 2,
+                                                                 format:
+                                                                     wgpu::VertexFormat::Float32x2 }] }
     }
 }
 
 // implement the multiplication operator for two transformations
 impl std::ops::Mul for Transformation2D {
     type Output = Transformation2D;
-    /// Multiply two transformations. The results is a `Transformation2D::Product`.
+
+    /// Multiply two transformations. The results is a
+    /// `Transformation2D::Product`.
     fn mul(self, rhs: Self) -> Self::Output {
         Transformation2D::Product(Box::new(self), Box::new(rhs))
     }
 }
 
 pub trait GetCenter {
-    /// Get the x and y coordinates of the center of the object. This is used to calculate the
-    /// transformations of the object, such `RotationCenter`.
+    /// Get the x and y coordinates of the center of the object. This is used to
+    /// calculate the transformations of the object, such `RotationCenter`.
     ///
     /// # Returns
     /// A tuple containing the x and y coordinates of the center of the object.
@@ -881,7 +870,6 @@ pub trait GetCenter {
 //         (left + width / 2.0, top + height / 2.0)
 //     }
 
-
 pub trait Transformable {
     /// Set the transformation.
     fn set_transformation(&self, transformation: Transformation2D);
@@ -889,54 +877,49 @@ pub trait Transformable {
     fn add_transformation(&self, transformation: Transformation2D);
 
     /// Translate the object by the given x and y coordinates.
-    fn translate(&self, x: impl Into<Size>, y: impl Into<Size>)
-    {
+    fn translate(&self, x: impl Into<Size>, y: impl Into<Size>) {
         let (x, y) = (x.into(), y.into());
         self.add_transformation(Transformation2D::Translation(x, y));
     }
 
-    /// Set the translation of the object to the given x and y coordinates. This overwrites any previously applied transformations.
-    fn set_translation(&self, x: impl Into<Size>, y: impl Into<Size>)
-    {
+    /// Set the translation of the object to the given x and y coordinates. This
+    /// overwrites any previously applied transformations.
+    fn set_translation(&self, x: impl Into<Size>, y: impl Into<Size>) {
         let (x, y) = (x.into(), y.into());
         self.set_transformation(Transformation2D::Translation(x, y));
     }
 
     /// Rotate the object around the center of the object by the given angle.
-    fn rotate_center(&self, angle: f32)
-    {
+    fn rotate_center(&self, angle: f32) {
         self.set_transformation(Transformation2D::RotationCenter(angle));
-    }  
+    }
 
     /// Rotate the object around the given point by the given angle.
-    fn rotate_point(&self, angle: f32, x: impl Into<Size>, y: impl Into<Size>)
-    {
+    fn rotate_point(&self, angle: f32, x: impl Into<Size>, y: impl Into<Size>) {
         let (x, y) = (x.into(), y.into());
         self.set_transformation(Transformation2D::RotationPoint(angle, x, y));
     }
 
-    /// Scale the object around the center of the object by the given x and y factors.
-    fn scale_center(&self, x: f32, y: f32)
-    {
+    /// Scale the object around the center of the object by the given x and y
+    /// factors.
+    fn scale_center(&self, x: f32, y: f32) {
         self.set_transformation(Transformation2D::ScaleCenter(x, y));
     }
 
     /// Scale the object around the given point by the given x and y factors.
-    fn scale_point(&self, x: f32, y: f32, x0: impl Into<Size>, y0: impl Into<Size>)
-    {
+    fn scale_point(&self, x: f32, y: f32, x0: impl Into<Size>, y0: impl Into<Size>) {
         let (x0, y0) = (x0.into(), y0.into());
         self.set_transformation(Transformation2D::ScalePoint(x, y, x0, y0));
     }
 
-    /// Shear the object around the center of the object by the given x and y factors.
-    fn shear_center(&self, x: f32, y: f32)
-    {
+    /// Shear the object around the center of the object by the given x and y
+    /// factors.
+    fn shear_center(&self, x: f32, y: f32) {
         self.set_transformation(Transformation2D::ShearCenter(x, y));
     }
 
     /// Shear the object around the given point by the given x and y factors.
-    fn shear_point(&self, x: f32, y: f32, x0: impl Into<Size>, y0: impl Into<Size>)
-    {
+    fn shear_point(&self, x: f32, y: f32, x0: impl Into<Size>, y0: impl Into<Size>) {
         let (x0, y0) = (x0.into(), y0.into());
         self.set_transformation(Transformation2D::ShearPoint(x, y, x0, y0));
     }

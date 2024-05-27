@@ -12,25 +12,20 @@
 
 use super::pattern_stimulus::PatternStimulus;
 use super::patterns::Sprite;
-
-
-
-use crate::visual::{
-    geometry::ToVertices, Window,
-};
+use crate::visual::geometry::ToVertices;
+use crate::visual::Window;
 
 pub type SpriteStimulus = PatternStimulus<Sprite>;
 
 impl SpriteStimulus {
-    pub fn new_from_spritesheet(
-        window: &Window,
-        shape: impl ToVertices + 'static,
-        sprite_path: &str,
-        num_sprites_x: u32,
-        num_sprites_y: u32,
-        fps: Option<f64>,
-        repeat: Option<u64>,
-    ) -> Self {
+    pub fn new_from_spritesheet(window: &Window,
+                                shape: impl ToVertices + 'static,
+                                sprite_path: &str,
+                                num_sprites_x: u32,
+                                num_sprites_y: u32,
+                                fps: Option<f64>,
+                                repeat: Option<u64>)
+                                -> Self {
         PatternStimulus::new_from_pattern(
             window,
             shape,
@@ -45,11 +40,11 @@ impl SpriteStimulus {
         )
     }
 
-    pub fn advance_image_index(&mut self) -> () {
+    pub fn advance_image_index(&self) -> () {
         self.pattern.lock().unwrap().advance_image_index()
     }
 
-    pub fn reset(&mut self) -> () {
+    pub fn reset(&self) -> () {
         self.pattern.lock().unwrap().reset()
     }
 }

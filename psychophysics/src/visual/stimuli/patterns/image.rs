@@ -17,21 +17,17 @@ pub struct Image {
 
 impl Image {
     pub fn new(image: image::DynamicImage) -> Self {
-        Self {
-            buffer: image.to_rgba8().to_vec(),
-            dimensions: image.dimensions(),
-            dirty: false,
-        }
+        Self { buffer: image.to_rgba8().to_vec(),
+               dimensions: image.dimensions(),
+               dirty: false }
     }
 
     pub fn new_from_path(path: &str) -> Result<Self, image::ImageError> {
         log::debug!("Loading image from path: {}", path);
         let image = image::open(path)?;
-        Ok(Self {
-            buffer: image.to_rgba8().to_vec(),
-            dimensions: image.dimensions(),
-            dirty: true,
-        })
+        Ok(Self { buffer: image.to_rgba8().to_vec(),
+                  dimensions: image.dimensions(),
+                  dirty: true })
     }
 
     pub fn set_image(&mut self, image: DynamicImage) {
@@ -48,11 +44,9 @@ impl Image {
 impl FillPattern for Image {
     fn texture_extent(&self, _window: &Window) -> Option<wgpu::Extent3d> {
         let (width, height) = self.dimensions;
-        Some(wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        })
+        Some(wgpu::Extent3d { width,
+                              height,
+                              depth_or_array_layers: 1 })
     }
 
     fn texture_data(&self, _window: &Window) -> Option<Vec<u8>> {
@@ -90,7 +84,6 @@ impl FillPattern for Image {
             // fom rgba to bgra
             return vec4<f32>(o.b, o.g, o.r, o.a);
         }
-        "
-        .to_string()
+        ".to_string()
     }
 }

@@ -35,8 +35,9 @@
 // the white point. The white point is the color of a perfectly white surface
 // under a given illumination, i.e. when all three primary colors are present
 // in equal amounts. The most commonly used white point is the CIE standard
-// illuminant D65, which is characterized by a color temperature of approximately
-// 6500 K (wich apparently is the colour of daylight in western/central Europe).
+// illuminant D65, which is characterized by a color temperature of
+// approximately 6500 K (wich apparently is the colour of daylight in
+// western/central Europe).
 //
 // ### The electro-optical transfer function (EOTF)
 //
@@ -121,11 +122,8 @@
 // converting a color from one color space to another and back will not
 // necessarily give you the same color.
 
-use bytemuck::Pod;
-use bytemuck::Zeroable;
-use palette::IntoColor;
-use palette::Srgba;
-use palette::Xyza;
+use bytemuck::{Pod, Zeroable};
+use palette::{IntoColor, Srgba, Xyza};
 use wgpu::TextureFormat;
 
 /// Macro that creates an sRGB color from a given hex value.
@@ -140,83 +138,95 @@ use wgpu::TextureFormat;
 macro_rules! srgb_hex {
     ($hex:expr) => {{
         use $crate::visual::color::SRGBA;
-        SRGBA::new(
-            (($hex >> 16) & 0xff) as f32 / 255.0,
-            (($hex >> 8) & 0xff) as f32 / 255.0,
-            ($hex & 0xff) as f32 / 255.0,
-            1.0,
-        )
+        SRGBA::new((($hex >> 16) & 0xff) as f32 / 255.0,
+                   (($hex >> 8) & 0xff) as f32 / 255.0,
+                   ($hex & 0xff) as f32 / 255.0,
+                   1.0)
     }};
 }
 
-/// Represents an RGBA color value in the sRGB color space with each channel having 32 bits of
-/// floating point precision.
+/// Represents an RGBA color value in the sRGB color space with each channel
+/// having 32 bits of floating point precision.
 ///
-/// The expected value range for each channel is [0.0, 1.0], with values encoded using the sRGB
-/// transfer function.
+/// The expected value range for each channel is [0.0, 1.0], with values encoded
+/// using the sRGB transfer function.
 ///
-/// sRGB, the standard color space for numerous consumer applications, was developed by HP and
-/// Microsoft in 1996. It later gained formal recognition by the International Electrotechnical
-/// Commission (IEC) under the standard IEC 61966-2-1:1999. sRGB incorporates the Rec. 709 primaries,
-/// which originated in 1990 for HDTV systems under the ITU-R Recommendation BT.709. The white point
-/// in sRGB is the CIE standard illuminant D65, characterized by a color temperature of approximately
-/// 6500 K[1].
+/// sRGB, the standard color space for numerous consumer applications, was
+/// developed by HP and Microsoft in 1996. It later gained formal recognition by
+/// the International Electrotechnical Commission (IEC) under the standard IEC
+/// 61966-2-1:1999. sRGB incorporates the Rec. 709 primaries, which originated
+/// in 1990 for HDTV systems under the ITU-R Recommendation BT.709. The white
+/// point in sRGB is the CIE standard illuminant D65, characterized by a color
+/// temperature of approximately 6500 K[1].
 ///
-/// The transfer function of sRGB is non-linear and piecewise linear, approximating a gamma of 2.2.
-/// This encoding method was initially tailored for the gamma characteristics of CRT displays.
-/// Coincidentally, it also mimics the human visual system's response to light in daylight conditions,
-/// making linearly spaced RGB values correspond to perceived linear light intensity.
+/// The transfer function of sRGB is non-linear and piecewise linear,
+/// approximating a gamma of 2.2. This encoding method was initially tailored
+/// for the gamma characteristics of CRT displays. Coincidentally, it also
+/// mimics the human visual system's response to light in daylight conditions,
+/// making linearly spaced RGB values correspond to perceived linear light
+/// intensity.
 ///
-/// sRGB color space with an 8-bit color depth per channel is universally supported, including in all
-/// major web browsers. It's important to note that, owing to the widespread hardware support for the
-/// sRGB transfer function, using this color format does not incur a performance penalty, while still
+/// sRGB color space with an 8-bit color depth per channel is universally
+/// supported, including in all major web browsers. It's important to note that,
+/// owing to the widespread hardware support for the sRGB transfer function,
+/// using this color format does not incur a performance penalty, while still
 /// enabling accurate alpha blending.
 ///
 /// [1]: Following the re-definition of several physical constants in 1968 by the International
-/// Committee for Weights and Measures (CIPM), there was a minor shift in the Planckian locus. As
-/// a result, the CIE standard illuminant D65 is not precisely at 6500 K, but rather at 6504 K.
+/// Committee for Weights and Measures (CIPM), there was a minor shift in the
+/// Planckian locus. As a result, the CIE standard illuminant D65 is not
+/// precisely at 6500 K, but rather at 6504 K.
 pub type SRGBA = palette::rgb::Srgba<f32>;
 
-/// Represents an RGBA color value in the linear sRGB color space with each channel having 32 bits of
-/// floating point precision. The expected value range for each channel is [0.0, 1.0]. The primary
-/// distinction between this color format and the `EncodedSRGBA` format lies in the use of a linear
-/// transfer function in place of the sRGB transfer function. For further details, refer to the
-/// documentation of `EncodedSRGBA`.
+/// Represents an RGBA color value in the linear sRGB color space with each
+/// channel having 32 bits of floating point precision. The expected value range
+/// for each channel is [0.0, 1.0]. The primary distinction between this color
+/// format and the `EncodedSRGBA` format lies in the use of a linear
+/// transfer function in place of the sRGB transfer function. For further
+/// details, refer to the documentation of `EncodedSRGBA`.
 pub type LinearSRGBA = palette::rgb::LinSrgba<f32>;
 
-/// Represents a color value in the CIE 1931 XYZ color space with an XYZA format.
+/// Represents a color value in the CIE 1931 XYZ color space with an XYZA
+/// format.
 ///
-/// Each channel (X, Y, Z, A) uses 32-bit floating-point precision for high accuracy.
+/// Each channel (X, Y, Z, A) uses 32-bit floating-point precision for high
+/// accuracy.
 ///
-/// The CIE 1931 XYZ color space, established by the International Commission on Illumination (CIE)
-/// in 1931, is a linear and device-independent color model. Its foundations lie in the human visual
-/// perception, as defined by the CIE 1931 color matching functions. These functions were developed
-/// from psychophysical experiments conducted in the 1920s. In this color space, the XYZ values
-/// directly correlate with the light perceived by the human eye. Specifically, the Y channel
-/// corresponds to the color's luminance, while the X and Z channels relate to the perceived red
-/// and blue light components, respectively.
+/// The CIE 1931 XYZ color space, established by the International Commission on
+/// Illumination (CIE) in 1931, is a linear and device-independent color model.
+/// Its foundations lie in the human visual perception, as defined by the CIE
+/// 1931 color matching functions. These functions were developed
+/// from psychophysical experiments conducted in the 1920s. In this color space,
+/// the XYZ values directly correlate with the light perceived by the human eye.
+/// Specifically, the Y channel corresponds to the color's luminance, while the
+/// X and Z channels relate to the perceived red and blue light components,
+/// respectively.
 pub type XYZA = palette::Xyza<palette::white_point::D65, f32>;
 
 /// Represents a color in the Yxy color space with an YxyA format.
-/// Each channel (Y, x, y, A) uses 32-bit floating-point precision for high accuracy.
+/// Each channel (Y, x, y, A) uses 32-bit floating-point precision for high
+/// accuracy.
 pub type YxyA = palette::Yxy<palette::white_point::D65, f32>;
 
 /// Represents an RGBA color value in the Display P3 color space.
 ///
-/// Colors in this format are represented using 32 bits of floating point precision per channel.
+/// Colors in this format are represented using 32 bits of floating point
+/// precision per channel.
 ///
-/// Display P3 is a color space developed by Apple Inc. It used the primaries defined
-/// for the DCI-P3 standard as outlined in the Digital Cinema System Specification but
-/// instead of the approximate 6,500 K white point used in DCI-P3, it uses the CIE
-/// standard illuminant D65 as its white point. It also uses the same non-linear
-/// transfer function as sRGB instead of the gamma 2.6 transfer function used in DCI-P3.
+/// Display P3 is a color space developed by Apple Inc. It used the primaries
+/// defined for the DCI-P3 standard as outlined in the Digital Cinema System
+/// Specification but instead of the approximate 6,500 K white point used in
+/// DCI-P3, it uses the CIE standard illuminant D65 as its white point. It also
+/// uses the same non-linear transfer function as sRGB instead of the gamma 2.6
+/// transfer function used in DCI-P3.
 ///
-/// As this is using the same transfer function as sRGB, there is no performance penalty
-/// for using this color format while still relying on accurate (i.e. linear) alpha blending.
+/// As this is using the same transfer function as sRGB, there is no performance
+/// penalty for using this color format while still relying on accurate (i.e.
+/// linear) alpha blending.
 ///
-/// Compared to sRGB, Display P3 has a wider gamut and can represent more colors (about
-/// 25% more). Display P3 is supported on macOS and iOS devices and is one of the color
-/// spaces supported by major web browsers.
+/// Compared to sRGB, Display P3 has a wider gamut and can represent more colors
+/// (about 25% more). Display P3 is supported on macOS and iOS devices and is
+/// one of the color spaces supported by major web browsers.
 pub type DisplayP3RGB = palette::Srgba<f32>;
 
 // Some predefined colors.
@@ -274,7 +284,6 @@ pub const TRANSPARENT: SRGBA = SRGBA::new(0.0, 0.0, 0.0, 0.0);
 /// - `g`: The green channel of the color.
 /// - `b`: The blue channel of the color.
 /// - `a`: The alpha channel (opacity) of the color.
-///
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Zeroable, Pod)]
 pub struct RawRgba {
@@ -309,10 +318,8 @@ impl RawRgba {
         let g = self.g.to_ne_bytes();
         let b = self.b.to_ne_bytes();
         let a = self.a.to_ne_bytes();
-        [
-            r[0], r[1], r[2], r[3], g[0], g[1], g[2], g[3], b[0], b[1], b[2], b[3], a[0],
-            a[1], a[2], a[3],
-        ]
+        [r[0], r[1], r[2], r[3], g[0], g[1], g[2], g[3], b[0], b[1], b[2], b[3], a[0], a[1], a[2],
+         a[3]]
     }
 }
 
@@ -333,7 +340,7 @@ pub enum ColorFormat {
     SRGBA8,
 
     // /// The sRGB color space with 8 bits per channel (24 bits per pixel).
-    //SRGBA10,
+    // SRGBA10,
     /// Indicates that the rendering pipeline should use the Display P3 color
     /// space with 8 bits per channel (32 bits per pixel). This color format
     /// is supported on macOS and iOS devices and is one of the color spaces
@@ -359,20 +366,17 @@ impl ColorFormat {
     ///
     /// # Returns
     /// * `RawRgba<f32>` - The converted colour.
-    pub fn convert_to_raw_rgba(
-        &self,
-        col: impl IntoColor<Xyza<palette::white_point::D65, f32>>,
-    ) -> RawRgba {
+    pub fn convert_to_raw_rgba(&self,
+                               col: impl IntoColor<Xyza<palette::white_point::D65, f32>>)
+                               -> RawRgba {
         match self {
             ColorFormat::SRGBA8 => {
                 let col: Xyza<palette::white_point::D65, f32> = col.into_color();
                 let col: Srgba<f32> = col.into_color();
-                RawRgba {
-                    r: col.red as f32,
-                    g: col.green as f32,
-                    b: col.blue as f32,
-                    a: col.alpha as f32,
-                }
+                RawRgba { r: col.red as f32,
+                          g: col.green as f32,
+                          b: col.blue as f32,
+                          a: col.alpha as f32 }
             }
             ColorFormat::DisplayP3U8 => {
                 todo!()
@@ -380,12 +384,10 @@ impl ColorFormat {
             ColorFormat::RGB16f => {
                 let col: Xyza<palette::white_point::D65, f32> = col.into_color();
                 let col: Srgba<f32> = col.into_color();
-                RawRgba {
-                    r: col.red as f32,
-                    g: col.green as f32,
-                    b: col.blue as f32,
-                    a: col.alpha as f32,
-                }
+                RawRgba { r: col.red as f32,
+                          g: col.green as f32,
+                          b: col.blue as f32,
+                          a: col.alpha as f32 }
             }
         }
     }
@@ -406,12 +408,8 @@ impl ColorFormat {
     /// * `TextureFormat` - The texture format for the view.
     pub fn to_wgpu_swapchain_texture_format(&self) -> (TextureFormat, TextureFormat) {
         match self {
-            ColorFormat::SRGBA8 => {
-                (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
-            }
-            ColorFormat::DisplayP3U8 => {
-                (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb)
-            }
+            ColorFormat::SRGBA8 => (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb),
+            ColorFormat::DisplayP3U8 => (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8UnormSrgb),
             ColorFormat::RGB16f => (TextureFormat::Bgra8Unorm, TextureFormat::Bgra8Unorm),
         }
     }
@@ -437,12 +435,10 @@ impl ColorFormat {
 /// Implements the From trait for RawRgba<T> to convert to a wgpu::Color.
 impl From<RawRgba> for wgpu::Color {
     fn from(col: RawRgba) -> Self {
-        wgpu::Color {
-            r: col.r.into(),
-            g: col.g.into(),
-            b: col.b.into(),
-            a: col.a.into(),
-        }
+        wgpu::Color { r: col.r.into(),
+                      g: col.g.into(),
+                      b: col.b.into(),
+                      a: col.a.into() }
     }
 }
 
@@ -454,12 +450,10 @@ impl From<RawRgba> for glyphon::Color {
         let b: f64 = col.b.into();
         let a: f64 = col.a.into();
 
-        glyphon::Color::rgba(
-            (r * 255.0) as u8,
-            (g * 255.0) as u8,
-            (b * 255.0) as u8,
-            (a * 255.0) as u8,
-        )
+        glyphon::Color::rgba((r * 255.0) as u8,
+                             (g * 255.0) as u8,
+                             (b * 255.0) as u8,
+                             (a * 255.0) as u8)
     }
 }
 
@@ -471,12 +465,10 @@ impl IntoRawRgba for SRGBA {
                 let col = self.clone();
                 let col: Xyza<palette::white_point::D65, f32> = col.into_color();
                 let col: Srgba<f32> = col.into_color();
-                RawRgba {
-                    r: col.red as f32,
-                    g: col.green as f32,
-                    b: col.blue as f32,
-                    a: col.alpha as f32,
-                }
+                RawRgba { r: col.red as f32,
+                          g: col.green as f32,
+                          b: col.blue as f32,
+                          a: col.alpha as f32 }
             }
             ColorFormat::DisplayP3U8 => {
                 todo!()
@@ -485,12 +477,10 @@ impl IntoRawRgba for SRGBA {
                 let col = self.clone();
                 let col: Xyza<palette::white_point::D65, f32> = col.into_color();
                 let col: Srgba<f32> = col.into_color();
-                RawRgba {
-                    r: col.red as f32,
-                    g: col.green as f32,
-                    b: col.blue as f32,
-                    a: col.alpha as f32,
-                }
+                RawRgba { r: col.red as f32,
+                          g: col.green as f32,
+                          b: col.blue as f32,
+                          a: col.alpha as f32 }
             }
         }
     }

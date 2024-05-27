@@ -4,8 +4,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -19,9 +17,7 @@ pub enum PsychophysicsError {
     // event logging errors
     #[error("The column names provided need to be unique")]
     ColumnNamesNotUniqueError,
-    #[error(
-        "The lenght of the data ({0}) does not match the length of the column names ({1})."
-    )]
+    #[error("The lenght of the data ({0}) does not match the length of the column names ({1}).")]
     DataLengthMismatchError(usize, usize),
     #[error("The column name {0} does not exist.")]
     ColumnNameDoesNotExistError(String),

@@ -36,3 +36,13 @@ nav:
     - background/graphicspipeline.md
     - background/colours.md
     
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            find_stubs_package: true
+            allow_inspection: false
+            docstring_style: numpy
+            filters: 
+              - "!^_"

@@ -12,21 +12,13 @@
 
 use super::pattern_stimulus::PatternStimulus;
 use super::patterns::Image;
-
-
-
-use crate::visual::{
-    geometry::ToVertices, Window,
-};
+use crate::visual::geometry::ToVertices;
+use crate::visual::Window;
 
 pub type ImageStimulus = PatternStimulus<Image>;
 
 impl ImageStimulus {
-    pub fn new(
-        window: &Window,
-        shape: impl ToVertices + 'static,
-        image_path: &str,
-    ) -> Self {
+    pub fn new(window: &Window, shape: impl ToVertices + 'static, image_path: &str) -> Self {
         PatternStimulus::new_from_pattern(
             window,
             shape,

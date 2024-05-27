@@ -27,4 +27,8 @@ requires = ['rubicon-objc']
 select = ["ALL"]
 
 [tool.ruff]
-line-length = 120
+line-length = 130
+
+[tool.yapf]
+based_on_style = "google"
+column_limit = 50

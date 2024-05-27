@@ -61,10 +61,11 @@ pub use web_time as time;
 
 use crate::errors::{self, PsychophysicsError};
 
-/// Nonblocking logging. When using the `pyo3-log` crate, logging from a background thread can under certain circumstances cause a deadlock.
-/// This function is a workaround for this issue. It logs the message in a separate thread, but doesn't wait for the logging to finish.
-/// This is very bad for performance, but it's better than a deadlock.
-/// Example:
+/// Nonblocking logging. When using the `pyo3-log` crate, logging from a
+/// background thread can under certain circumstances cause a deadlock.
+/// This function is a workaround for this issue. It logs the message in a
+/// separate thread, but doesn't wait for the logging to finish. This is very
+/// bad for performance, but it's better than a deadlock. Example:
 /// ```
 /// log_nonblocking!(log::Level::Info, "This is a nonblocking log message");
 /// ```
@@ -129,6 +130,7 @@ macro_rules! for_each_tuple_ {
     for_each_tuple_! { $m !! $($t,)* }
     );
    }
+
 macro_rules! for_each_tuple {
     // implentation for 1 to 40 elements
     ( $m:ident ) => (
@@ -149,9 +151,8 @@ impl IntoStringVector for Vec<String> {
 }
 
 fn check_unique_column_names<I, S>(column_names: I) -> bool
-where
-    I: IntoIterator<Item = S>,
-    S: Into<String> + 'static,
+    where I: IntoIterator<Item = S>,
+          S: Into<String> + 'static
 {
     let column_names: Vec<String> = column_names.into_iter().map(Into::into).collect();
 
@@ -164,7 +165,8 @@ where
 }
 
 /// Event manager that handles "events" that occur during the experiment.
-/// Depending on the backend, this can be written to a file, sent over the network, etc.
+/// Depending on the backend, this can be written to a file, sent over the
+/// network, etc.
 pub struct CSVEventLogger {
     filepath: std::path::PathBuf,
     columns: Vec<String>,
@@ -174,16 +176,14 @@ pub struct CSVEventLogger {
 
 impl CSVEventLogger {
     /// Create a new CSVEventLogger.
-    pub fn new<I, S, P>(
-        path: P,
-        columns: I,
-        delimiter: u8,
-        overwrite: bool,
-    ) -> Result<Self, errors::PsychophysicsError>
-    where
-        P: Into<std::path::PathBuf>,
-        I: IntoIterator<Item = S>,
-        S: Into<String> + 'static,
+    pub fn new<I, S, P>(path: P,
+                        columns: I,
+                        delimiter: u8,
+                        overwrite: bool)
+                        -> Result<Self, errors::PsychophysicsError>
+        where P: Into<std::path::PathBuf>,
+              I: IntoIterator<Item = S>,
+              S: Into<String> + 'static
     {
         let filepath = path.into();
 
@@ -208,35 +208,29 @@ impl CSVEventLogger {
             }
         }
 
-        let mut writer = csv::WriterBuilder::new()
-            .has_headers(false)
-            .delimiter(delimiter)
-            .from_path(&filepath)?;
+        let mut writer = csv::WriterBuilder::new().has_headers(false)
+                                                  .delimiter(delimiter)
+                                                  .from_path(&filepath)?;
 
         writer.write_record(columns.clone())?;
 
-        Ok(Self {
-            filepath,
-            columns,
-            delimiter,
-            writer,
-        })
+        Ok(Self { filepath,
+                  columns,
+                  delimiter,
+                  writer })
     }
 
     /// Log an event.
     pub fn log<I>(&mut self, column_values: I) -> Result<(), PsychophysicsError>
-    where
-        I: IntoStringVector,
+        where I: IntoStringVector
     {
         // convert to vector
         let event: Vec<String> = column_values.into_string_vec();
 
         // make sure the event has the correct number of columns
         if event.len() != self.columns.len() {
-            return Err(errors::PsychophysicsError::DataLengthMismatchError(
-                event.len(),
-                self.columns.len(),
-            ));
+            return Err(errors::PsychophysicsError::DataLengthMismatchError(event.len(),
+                                                                           self.columns.len()));
         }
 
         // write event to file
@@ -246,14 +240,12 @@ impl CSVEventLogger {
         Ok(())
     }
 
-    pub fn log_cols<I, J>(
-        &mut self,
-        column_names: I,
-        column_values: J,
-    ) -> Result<(), PsychophysicsError>
-    where
-        I: IntoStringVector,
-        J: IntoStringVector,
+    pub fn log_cols<I, J>(&mut self,
+                          column_names: I,
+                          column_values: J)
+                          -> Result<(), PsychophysicsError>
+        where I: IntoStringVector,
+              J: IntoStringVector
     {
         let column_names: Vec<String> = column_names.into_string_vec();
         let column_values: Vec<String> = column_values.into_string_vec();
@@ -273,13 +265,12 @@ impl CSVEventLogger {
         }
 
         if column_names.len() != column_values.len() {
-            return Err(errors::PsychophysicsError::DataLengthMismatchError(
-                column_values.len(),
-                column_names.len(),
-            ));
+            return Err(errors::PsychophysicsError::DataLengthMismatchError(column_values.len(),
+                                                                           column_names.len()));
         }
 
-        // we need to cal self.log() with the correct order of columns, replacing missing columns with an empty string
+        // we need to cal self.log() with the correct order of columns, replacing
+        // missing columns with an empty string
         let mut new_column_values: Vec<String> = Vec::with_capacity(self.columns.len());
 
         for column in self.columns.iter() {
@@ -301,24 +292,17 @@ pub struct BIDSEventLogger {
 }
 
 impl BIDSEventLogger {
-    pub fn new<P, I, S>(
-        path: P,
-        columns: I,
-        overwrite: bool,
-    ) -> Result<Self, PsychophysicsError>
-    where
-        P: Into<std::path::PathBuf>,
-        I: IntoIterator<Item = S>,
-        S: Into<String> + 'static,
+    pub fn new<P, I, S>(path: P, columns: I, overwrite: bool) -> Result<Self, PsychophysicsError>
+        where P: Into<std::path::PathBuf>,
+              I: IntoIterator<Item = S>,
+              S: Into<String> + 'static
     {
         // make sure that the path ends with "events.tsv"
         let path = path.into();
         let path_str = path.to_str().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "path contains invalid characters",
-            )
-        })?;
+                                         std::io::Error::new(std::io::ErrorKind::InvalidInput,
+                                                             "path contains invalid characters")
+                                     })?;
 
         if !path_str.ends_with("events.tsv") {
             return Err(PsychophysicsError::InvalidBIDSPathError(
@@ -334,20 +318,13 @@ impl BIDSEventLogger {
 
         let logger = CSVEventLogger::new(path, columns, '\t' as u8, overwrite)?;
 
-        Ok(Self {
-            logger,
-            start_time: std::time::Instant::now(),
-        })
+        Ok(Self { logger,
+                  start_time: std::time::Instant::now() })
     }
 
     /// Log an event.
-    pub fn log<I>(
-        &mut self,
-        columns_values: I,
-        duration: f64,
-    ) -> Result<(), PsychophysicsError>
-    where
-        I: IntoStringVector,
+    pub fn log<I>(&mut self, columns_values: I, duration: f64) -> Result<(), PsychophysicsError>
+        where I: IntoStringVector
     {
         // convert to vector
         let columns_values: Vec<String> = columns_values.into_string_vec();
@@ -356,25 +333,23 @@ impl BIDSEventLogger {
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let columns_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
-            .into_iter()
-            .chain(columns_values.into_iter())
-            .collect();
+        let columns_values: Vec<String> =
+            vec![onset.to_string(), duration.to_string()].into_iter()
+                                                         .chain(columns_values.into_iter())
+                                                         .collect();
 
         // log event
         self.logger.log(columns_values)
     }
 
     /// Log an event with the given column names and values.
-    pub fn log_cols<I, J>(
-        &mut self,
-        column_names: I,
-        column_values: J,
-        duration: f64,
-    ) -> Result<(), PsychophysicsError>
-    where
-        I: IntoStringVector,
-        J: IntoStringVector,
+    pub fn log_cols<I, J>(&mut self,
+                          column_names: I,
+                          column_values: J,
+                          duration: f64)
+                          -> Result<(), PsychophysicsError>
+        where I: IntoStringVector,
+              J: IntoStringVector
     {
         // convert to vector
         let column_names: Vec<String> = column_names.into_string_vec();
@@ -384,15 +359,15 @@ impl BIDSEventLogger {
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let column_names: Vec<String> = vec!["onset".to_string(), "duration".to_string()]
-            .into_iter()
-            .chain(column_names.into_iter())
-            .collect();
+        let column_names: Vec<String> =
+            vec!["onset".to_string(), "duration".to_string()].into_iter()
+                                                             .chain(column_names.into_iter())
+                                                             .collect();
 
-        let column_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
-            .into_iter()
-            .chain(column_values.into_iter())
-            .collect();
+        let column_values: Vec<String> =
+            vec![onset.to_string(), duration.to_string()].into_iter()
+                                                         .chain(column_values.into_iter())
+                                                         .collect();
 
         // log event
         self.logger.log_cols(column_names, column_values)
@@ -408,23 +383,23 @@ pub fn create_random_lowercase_string(len: usize) -> String {
 
     let mut rng = rand::thread_rng();
 
-    let random_string: String = (0..len)
-        .map(|_| {
-            // Generate a random number in the ASCII range of lowercase letters
-            let ascii = rng.gen_range(97..=122) as u8;
-            // Convert the number to a char
-            ascii as char
-        })
-        .collect();
+    let random_string: String = (0..len).map(|_| {
+                                            // Generate a random number in the ASCII range of
+                                            // lowercase letters
+                                            let ascii = rng.gen_range(97..=122) as u8;
+                                            // Convert the number to a char
+                                            ascii as char
+                                        })
+                                        .collect();
 
     random_string
 }
 
-/// Converts a value to a byte array that can be used in WebGPU Shading Language (WGSL).
-/// For sake of simplicity, t
+/// Converts a value to a byte array that can be used in WebGPU Shading Language
+/// (WGSL). For sake of simplicity, t
 // pub trait ToWgslBytes<S> {
-//     /// Returns the WebGPU Shading Language (WGSL) representation of the object as a byte array.
-//     fn to_wgsl_bytes(&self) -> Vec<u8>;
+//     /// Returns the WebGPU Shading Language (WGSL) representation of the
+// object as a byte array.     fn to_wgsl_bytes(&self) -> Vec<u8>;
 // }
 
 const fn next_power_of_two(mut n: usize) -> usize {

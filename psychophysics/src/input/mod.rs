@@ -1,30 +1,19 @@
 use std::ops::Deref;
+
+use web_time::SystemTime;
+use winit::event as winit_event;
 pub use winit::keyboard::KeyCode as Key;
-#[cfg(any(
-    target_os = "windows",
-    target_os = "macos",
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "dragonfly",
-    target_os = "openbsd",
-    target_os = "netbsd"
-))]
+#[cfg(any(target_os = "windows",
+              target_os = "macos",
+              target_os = "linux",
+              target_os = "freebsd",
+              target_os = "dragonfly",
+              target_os = "openbsd",
+              target_os = "netbsd"))]
 use winit::platform::scancode::PhysicalKeyExtScancode;
 
-use crate::visual::{geometry::Size, Window};
-
-#[derive(Debug, Clone)]
-pub struct Event {
-    /// The timestamp when the event was received.
-    pub timestamp: std::time::SystemTime,
-    /// The event data.
-    pub data: EventData,
-    // /// The winit event (if available) that triggered this input event.
-    //pub winit_event: Option<winit::event::WindowEvent>,
-}
-
-unsafe impl Send for Event {}
-unsafe impl Sync for Event {}
+use crate::visual::geometry::Size;
+use crate::visual::Window;
 
 /// A mouse button.
 #[derive(Debug, Clone, PartialEq)]
@@ -43,10 +32,13 @@ pub enum MouseButton {
     Other(u16),
 }
 
-#[derive(Debug, Clone)]
-pub enum EventData {
+#[derive(Debug, Clone, enum_fields::EnumFields, strum::EnumDiscriminants)]
+#[strum_discriminants(name(EventKind))]
+pub enum Event {
     /// A keypress event. This is triggered when a key is pressed.
     KeyPress {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// String representation of the key that was pressed.
         key: String,
         /// KeyCode of the key that was pressed.
@@ -54,20 +46,30 @@ pub enum EventData {
     },
     /// A key release event. This is triggered when a key is released.
     KeyRelease {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// String representation of the key that was released.
         key: String,
         /// KeyCode of the key that was released.
         code: u32,
     },
-    /// A mouse button press event. This is triggered when a mouse button is pressed.
+
+    /// A mouse button press event. This is triggered when a mouse button is
+    /// pressed.
     MouseButtonPress {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// The button that was pressed.
         button: MouseButton,
         /// The position of the mouse cursor when the button was pressed.
         position: (Size, Size),
     },
-    /// A mouse button release event. This is triggered when a mouse button is released.
+
+    /// A mouse button release event. This is triggered when a mouse button is
+    /// released.
     MouseButtonRelease {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// The button that was released.
         button: MouseButton,
         /// The position of the mouse cursor when the button was released.
@@ -75,33 +77,54 @@ pub enum EventData {
     },
     /// A touch event. This is triggered when a touch screen is touched.
     TouchPress {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// The position of the touch.
         position: (Size, Size),
         /// The id of the touch (if available).
         id: Option<u64>,
     },
-    /// A touch release event. This is triggered when a touch screen is released.
+    /// A touch release event. This is triggered when a touch screen is
+    /// released.
     TouchRelease {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// The position of the touch.
         position: (Size, Size),
         /// The id of the touch (if available).
         id: Option<u64>,
     },
     /// The window has lost focus.
-    FocusGained,
+    FocusGained {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
+    },
     /// The window has gained focus.
-    FocusLost,
+    FocusLost {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
+    },
     /// The mouse cursor was moved.
     CursorMoved {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// The position of the cursor.
         position: (Size, Size),
     },
     /// The mouse cursor was entered into the window.
-    CursorEntered,
+    CursorEntered {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
+    },
     /// The mouse cursor was exited from the window.
-    CursorExited,
+    CursorExited {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
+    },
     /// A pressure-sensitive touchpad was pressed (if available).
     TouchpadPress {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// The pressure of the touch.
         pressure: f32,
         /// The level of the touch.
@@ -109,162 +132,164 @@ pub enum EventData {
     },
     /// The mouse wheel was scrolled (or the equivalent touchpad gesture).
     MouseWheel {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
         /// The amount of horizontal scrolling.
         horizontal: f32,
         /// The amount of vertical scrolling.
         vertical: f32,
     },
     /// Any other event. The string contains the name of the event.
-    Other(String),
+    Other {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
+        /// The name of the event.
+        name: String,
+    },
 }
 
 // Implements convenience methods for Event.
 impl Event {
     /// Returns true if this element represents a press of the given key.
     pub fn key_pressed(&self, key: &str) -> bool {
-        matches!(&self.data, EventData::KeyPress { key: k, .. } if k == key)
+        matches!(&self, Self::KeyPress { key: k, .. } if k == key)
     }
 
     /// Returns true if this element represents a release of the given key.
     pub fn key_released(&self, key: &str) -> bool {
-        matches!(&self.data, EventData::KeyRelease { key: k, .. } if k == key)
+        matches!(&self, Self::KeyRelease { key: k, .. } if k == key)
     }
 
-    /// Returns true if this element represents a press of the given mouse button.
+    /// Returns true if this element represents a press of the given mouse
+    /// button.
     pub fn mouse_button_pressed(&self, button_a: MouseButton) -> bool {
-        matches!(&self.data, EventData::MouseButtonPress { button, .. } if button_a == *button)
+        matches!(&self, Self::MouseButtonPress { button, .. } if button_a == *button)
     }
 
-    /// Returns true if this element represents a release of the given mouse button.
+    /// Returns true if this element represents a release of the given mouse
+    /// button.
     pub fn mouse_button_released(&self, button_a: MouseButton) -> bool {
-        matches!(&self.data, EventData::MouseButtonRelease { button, .. } if button_a == *button)
+        matches!(&self, Self::MouseButtonRelease { button, .. } if button_a == *button)
+    }
+
+    /// Returns the kind of this event.
+    pub fn kind(&self) -> EventKind {
+        self.into()
     }
 }
 
-// fn compare_mouse_button(
-//     button_a: MouseButton,
-//     button_b: winit::event::MouseButton,
-// ) -> bool {
-//     match button_b {
-//         winit::event::MouseButton::Left => button_a == MouseButton::Left,
-//         winit::event::MouseButton::Right => button_a == MouseButton::Right,
-//         winit::event::MouseButton::Middle => button_a == MouseButton::Middle,
-//         winit::event::MouseButton::Forward => button_a == MouseButton::Forward,
-//         winit::event::MouseButton::Back => button_a == MouseButton::Back,
-//         winit::event::MouseButton::Other(id) => button_a == MouseButton::Other(id),
-//     }
-// }
+// Custom conversion from winit events to InputEvents.
+pub(crate) trait EventTryFrom<T>: Sized {
+    type Error;
+
+    fn try_from_winit(value: T, window: &Window) -> Result<Self, Self::Error>;
+}
 
 /// Convert a winit WindowEvent to an InputEvent.
-impl TryFrom<winit::event::WindowEvent> for Event {
+impl EventTryFrom<winit_event::WindowEvent> for Event {
     type Error = &'static str;
 
-    fn try_from(event: winit::event::WindowEvent) -> Result<Self, Self::Error> {
-        let timestamp = std::time::SystemTime::now();
+    fn try_from_winit(event: winit_event::WindowEvent,
+                      window: &Window)
+                      -> Result<Self, Self::Error> {
+        let timestamp = SystemTime::now();
         let data = match event {
             // match keyboad events
-            winit::event::WindowEvent::KeyboardInput {
-                device_id: _,
-                event,
-                ..
-            } => {
+            winit_event::WindowEvent::KeyboardInput { device_id: _,
+                                                      event,
+                                                      .. } => {
                 let key_str = event.logical_key.to_text().unwrap_or_default();
 
                 let key_code = u32::default();
 
-                #[cfg(any(
-                    target_os = "windows",
-                    target_os = "macos",
-                    target_os = "linux",
-                    target_os = "freebsd",
-                    target_os = "dragonfly",
-                    target_os = "openbsd",
-                    target_os = "netbsd"
-                ))]
+                #[cfg(any(target_os = "windows",
+                          target_os = "macos",
+                          target_os = "linux",
+                          target_os = "freebsd",
+                          target_os = "dragonfly",
+                          target_os = "openbsd",
+                          target_os = "netbsd"))]
                 let key_code = event.physical_key.to_scancode().unwrap_or_default();
 
                 match event.state {
-                    winit::event::ElementState::Pressed => EventData::KeyPress {
-                        key: key_str.to_string(),
-                        code: key_code,
-                    },
-                    winit::event::ElementState::Released => EventData::KeyRelease {
-                        key: key_str.to_string(),
-                        code: key_code,
-                    },
+                    winit_event::ElementState::Pressed => Event::KeyPress { timestamp: timestamp,
+                                                                            key:
+                                                                                key_str.to_string(),
+                                                                            code: key_code },
+                    winit_event::ElementState::Released => {
+                        Event::KeyRelease { timestamp: timestamp,
+                                            key: key_str.to_string(),
+                                            code: key_code }
+                    }
                 }
             }
             // match mouse button events
-            winit::event::WindowEvent::MouseInput {
-                device_id: _,
-                state,
-                button,
-            } => {
+            winit_event::WindowEvent::MouseInput { device_id: _,
+                                                   state,
+                                                   button, } => {
                 let button = match button {
-                    winit::event::MouseButton::Left => MouseButton::Left,
-                    winit::event::MouseButton::Right => MouseButton::Right,
-                    winit::event::MouseButton::Middle => MouseButton::Middle,
-                    winit::event::MouseButton::Forward => MouseButton::Forward,
-                    winit::event::MouseButton::Back => MouseButton::Back,
-                    winit::event::MouseButton::Other(id) => MouseButton::Other(id),
+                    winit_event::MouseButton::Left => MouseButton::Left,
+                    winit_event::MouseButton::Right => MouseButton::Right,
+                    winit_event::MouseButton::Middle => MouseButton::Middle,
+                    winit_event::MouseButton::Forward => MouseButton::Forward,
+                    winit_event::MouseButton::Back => MouseButton::Back,
+                    winit_event::MouseButton::Other(id) => MouseButton::Other(id),
                 };
-                let position = (Size::Pixels(0.0), Size::Pixels(0.0));
+
+                let position = window.mouse_position()
+                                     .unwrap_or_else(|| (Size::Pixels(0.0), Size::Pixels(0.0)));
                 match state {
-                    winit::event::ElementState::Pressed => {
-                        EventData::MouseButtonPress { button, position }
-                    }
-                    winit::event::ElementState::Released => {
-                        EventData::MouseButtonRelease { button, position }
+                    winit_event::ElementState::Pressed => Event::MouseButtonPress { timestamp:
+                                                                                        timestamp,
+                                                                                    button,
+                                                                                    position },
+                    winit_event::ElementState::Released => {
+                        Event::MouseButtonRelease { timestamp: timestamp,
+                                                    button,
+                                                    position }
                     }
                 }
             }
             // match touch events
-            winit::event::WindowEvent::Touch(touch) => {
-                let _position = (
-                    Size::Pixels(touch.location.x),
-                    Size::Pixels(touch.location.y),
-                );
+            winit_event::WindowEvent::Touch(touch) => {
+                let _position = (Size::Pixels(touch.location.x), Size::Pixels(touch.location.y));
 
-                EventData::Other("touch".to_string())
+                Event::Other { timestamp: timestamp,
+                               name: format!("{:?}", touch) }
             }
             // match focus events
-            winit::event::WindowEvent::Focused(focused) => {
+            winit_event::WindowEvent::Focused(focused) => {
                 if focused {
-                    EventData::FocusGained
+                    Event::FocusGained { timestamp }
                 } else {
-                    EventData::FocusLost
+                    Event::FocusLost { timestamp }
                 }
             }
             // match cursor movement events
-            winit::event::WindowEvent::CursorMoved { position, .. } => {
-                let position = (
-                    Size::Pixels(position.x) - Size::ScreenWidth(0.5),
-                    Size::Pixels(-position.y) + Size::ScreenHeight(0.5),
-                );
-                EventData::CursorMoved { position }
+            winit_event::WindowEvent::CursorMoved { position, .. } => {
+                let position = (Size::Pixels(position.x) - Size::ScreenWidth(0.5),
+                                Size::Pixels(-position.y) + Size::ScreenHeight(0.5));
+                Event::CursorMoved { timestamp: timestamp,
+                                     position }
             }
             // match cursor enter events
-            winit::event::WindowEvent::CursorEntered { .. } => EventData::CursorEntered,
+            winit_event::WindowEvent::CursorEntered { .. } => Event::CursorEntered { timestamp },
             // match cursor exit events
-            winit::event::WindowEvent::CursorLeft { .. } => EventData::CursorExited,
+            winit_event::WindowEvent::CursorLeft { .. } => Event::CursorExited { timestamp },
             // match touchpad press events
-            winit::event::WindowEvent::TouchpadPressure {
-                device_id: _,
-                pressure,
-                stage,
-            } => EventData::TouchpadPress {
-                pressure,
-                stage: stage,
-            },
+            winit_event::WindowEvent::TouchpadPressure { device_id: _,
+                                                         pressure,
+                                                         stage, } => {
+                Event::TouchpadPress { timestamp: timestamp,
+                                       pressure,
+                                       stage: stage }
+            }
             // match any other event
-            _ => EventData::Other(format!("{:?}", event)),
+            _ => Event::Other { timestamp: timestamp,
+                                name: format!("{:?}", event) },
         };
 
-        Ok(Event {
-            timestamp,
-            data,
-            //winit_event: Some(winit::event::Event::WindowEvent(event)),
-        })
+        Ok(data)
     }
 }
 
@@ -280,12 +305,14 @@ pub struct EventVec(Vec<Event>);
 
 // convenience methods for KeyEventVec
 impl EventVec {
-    /// Check if the given KeyEventVec contains the provided key in the `Pressed` state (convenience method).
+    /// Check if the given KeyEventVec contains the provided key in the
+    /// `Pressed` state (convenience method).
     pub fn key_pressed(&self, key: &str) -> bool {
         self.iter().any(|key_event| key_event.key_pressed(key))
     }
 
-    /// Check if the given KeyEventVec contains the provided key in the `Released` state (convenience method).
+    /// Check if the given KeyEventVec contains the provided key in the
+    /// `Released` state (convenience method).
     pub fn key_released(&self, key: &str) -> bool {
         self.iter().any(|key_event| key_event.key_released(key))
     }
@@ -294,20 +321,13 @@ impl EventVec {
 // make KeyEventVec behave like a vector of KeyEvents
 impl Deref for EventVec {
     type Target = Vec<Event>;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl EventReceiver {
-    /// Create a new EventReceiver from the given window.
-    #[deprecated(note = "use the window's `create_event_receiver` method")]
-    pub fn new(window: &Window) -> Self {
-        Self {
-            receiver: window.event_receiver.activate_cloned(),
-        }
-    }
-
     pub fn poll(&mut self) -> EventVec {
         let mut inputs = Vec::new();
         while let Ok(input) = self.receiver.try_recv() {
@@ -316,9 +336,30 @@ impl EventReceiver {
         EventVec(inputs)
     }
 
-    /// Flushes the internal buffer of key events for this receiver without returning them.
-    /// This is slightly more efficient than calling `get_keys` and ignoring the result.
+    /// Flushes the internal buffer of key events for this receiver without
+    /// returning them. This is slightly more efficient than calling
+    /// `get_keys` and ignoring the result.
     pub fn flush(&mut self) {
         while let Ok(_) = self.receiver.try_recv() {}
     }
+}
+
+pub(crate) type EventHandlerId = usize;
+pub(crate) type EventHandler = Box<dyn Fn(Event) -> bool + Send + Sync>;
+
+/// Extension for tvpes
+pub trait EventHandlingExt {
+    // /// Create a new event receiver for this object.
+    // fn create_event_receiver(&self) -> EventReceiver;
+
+    /// Add an event handler to handle a specific event type.
+    fn add_event_handler<F>(&self, kind: EventKind, handler: F) -> EventHandlerId
+        where F: Fn(Event) -> bool + 'static + Send + Sync;
+
+    /// Remove an event handler.
+    fn remove_event_handler(&self, id: EventHandlerId);
+
+    /// Dispatch an event. Returns a boolean indicating whether the event was
+    /// consumed by any of the handlers.
+    fn dispatch_event(&self, event: Event) -> bool;
 }

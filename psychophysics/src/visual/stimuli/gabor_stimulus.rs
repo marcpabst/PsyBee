@@ -7,45 +7,48 @@
 use super::pattern_stimulus::PatternStimulus;
 use super::patterns::Gabor;
 use crate::generate_assessors;
-use crate::visual::color::IntoRawRgba;
-use crate::visual::geometry::Size;
-use crate::visual::{
-    color::RawRgba, geometry::ToVertices, Window,
-};
+use crate::visual::color::{IntoRawRgba, RawRgba};
+use crate::visual::geometry::{Size, ToVertices};
+use crate::visual::Window;
 
 pub type GaborStimulus = PatternStimulus<Gabor>;
 
 impl GaborStimulus {
-    pub fn new<L, C, M, N>(
-        window: &Window,
-        shape: impl ToVertices + 'static,
-        phase: f32,
-        cycle_length: L,
-        std_x: M,
-        std_y: N,
-        orientation: f32,
-        color: C,
-    ) -> Self
-    where
-        L: Into<Size>,
-        M: Into<Size>,
-        N: Into<Size>,
-        C: IntoRawRgba,
-    {
-        PatternStimulus::new_from_pattern(
-            window,
-            shape,
-            Gabor::new(phase, cycle_length, std_x, std_y, orientation, color),
-        )
-    }
-
     generate_assessors!(pattern, phase, f32);
+
     generate_assessors!(pattern, cycle_length, Into<Size>);
+
     generate_assessors!(pattern, std_x, Into<Size>);
+
     generate_assessors!(pattern, std_y, Into<Size>);
+
     generate_assessors!(pattern, orientation, f32);
 
-    pub fn set_color(&mut self, color: impl IntoRawRgba) -> () {
+    pub fn new<L, C, M, N>(window: &Window,
+                           shape: impl ToVertices + 'static,
+                           phase: f32,
+                           cycle_length: L,
+                           std_x: M,
+                           std_y: N,
+                           orientation: f32,
+                           color: C)
+                           -> Self
+        where L: Into<Size>,
+              M: Into<Size>,
+              N: Into<Size>,
+              C: IntoRawRgba
+    {
+        PatternStimulus::new_from_pattern(window,
+                                          shape,
+                                          Gabor::new(phase,
+                                                     cycle_length,
+                                                     std_x,
+                                                     std_y,
+                                                     orientation,
+                                                     color))
+    }
+
+    pub fn set_color(&self, color: impl IntoRawRgba) -> () {
         self.pattern.lock().unwrap().set_color(color)
     }
 
