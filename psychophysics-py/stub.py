@@ -7,15 +7,12 @@ import black
 from pathlib import Path
 import re
 
-
 INDENT = " " * 4
 GENERATED_COMMENT = "# Generated content DO NOT EDIT\n"
 TYPING = """from typing import Any, Callable, Dict, List, Optional, Tuple, Union, Sequence
 from os import PathLike
 """
-PSY_SPECIFIC_TYPING = (
-    "from candle.typing import _ArrayLike, Device, Scalar, Index, Shape\n"
-)
+PSY_SPECIFIC_TYPING = ("from candle.typing import _ArrayLike, Device, Scalar, Index, Shape\n")
 CANDLE_TENSOR_IMPORTS = "from candle import Tensor,DType,QTensor\n"
 RETURN_TYPE_MARKER = "&RETURNS&: "
 ADDITIONAL_TYPEHINTS = {}
@@ -42,7 +39,7 @@ def function(obj, indent: str, text_signature: str = None):
     doc_lines = doc_string.split("\n")
     if doc_lines[-1].lstrip().startswith(RETURN_TYPE_MARKER):
         # Extract the return type and remove it from the docstring
-        return_type = doc_lines[-1].lstrip()[len(RETURN_TYPE_MARKER) :].strip()
+        return_type = doc_lines[-1].lstrip()[len(RETURN_TYPE_MARKER):].strip()
         doc_string = "\n".join(doc_lines[:-1])
 
     string = ""
@@ -78,11 +75,7 @@ def fn_predicate(obj):
 
 
 def get_module_members(module):
-    members = [
-        member
-        for name, member in inspect.getmembers(module)
-        if not name.startswith("_") and not inspect.ismodule(member)
-    ]
+    members = [member for name, member in inspect.getmembers(module) if not name.startswith("_") and not inspect.ismodule(member)]
     members.sort(key=member_sort)
     return members
 
@@ -92,7 +85,6 @@ def pyi_file(obj, indent=""):
     if inspect.ismodule(obj):
         string += GENERATED_COMMENT
         string += TYPING
-        string += (PSY_SPECIFIC_TYPING,)
         members = get_module_members(obj)
         for member in members:
             string += pyi_file(member, indent)
@@ -108,9 +100,7 @@ def pyi_file(obj, indent=""):
 
         body = ""
         if obj.__doc__:
-            body += (
-                f'{indent}"""\n{indent}{do_indent(obj.__doc__, indent)}\n{indent}"""\n'
-            )
+            body += (f'{indent}"""\n{indent}{do_indent(obj.__doc__, indent)}\n{indent}"""\n')
 
         fns = inspect.getmembers(obj, fn_predicate)
 
@@ -197,11 +187,7 @@ def do_black(content, is_pyi):
 
 
 def write(module, directory, origin, check=False):
-    submodules = [
-        (name, member)
-        for name, member in inspect.getmembers(module)
-        if inspect.ismodule(member)
-    ]
+    submodules = [(name, member) for name, member in inspect.getmembers(module) if inspect.ismodule(member)]
 
     filename = os.path.join(directory, "__init__.pyi")
     pyi_content = pyi_file(module)
@@ -212,9 +198,7 @@ def write(module, directory, origin, check=False):
             data = f.read()
             print("generated content")
             print(pyi_content)
-            assert (
-                data == pyi_content
-            ), f"The content of {filename} seems outdated, please run `python stub.py`"
+            assert (data == pyi_content), f"The content of {filename} seems outdated, please run `python stub.py`"
     else:
         with open(filename, "w") as f:
             f.write(pyi_content)
@@ -239,9 +223,7 @@ def write(module, directory, origin, check=False):
                 data = f.read()
                 print("generated content")
                 print(py_content)
-                assert (
-                    data == py_content
-                ), f"The content of {filename} seems outdated, please run `python stub.py`"
+                assert (data == py_content), f"The content of {filename} seems outdated, please run `python stub.py`"
         else:
             with open(filename, "w") as f:
                 f.write(py_content)
@@ -271,7 +253,7 @@ if __name__ == "__main__":
 
     # Enable execution from the candle and candle-pyo3 directories
     cwd = Path.cwd()
-    directory = "src/"
+    directory = "psychophysics_py/"
 
     import psychophysics_py
     # import _additional_typing
