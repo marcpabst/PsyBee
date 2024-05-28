@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use super::base_stimulus::BaseStimulus;
 use super::Stimulus;
 use crate::visual::geometry::{Size, ToVertices, Transformable};
-use crate::visual::window::WindowState;
+use crate::visual::window::InternalWindowState;
 use crate::visual::Window;
 use crate::GPUState;
 
@@ -144,31 +144,22 @@ pub trait FillPattern: Send + Sync + Clone {
 }
 
 impl<P: FillPattern> PatternStimulus<P> {
-    pub fn new_from_pattern(window: &Window,
-                            geometry: impl ToVertices + 'static,
-                            mut pattern: P)
-                            -> Self {
+    pub fn new_from_pattern(window: &Window, geometry: impl ToVertices + 'static, mut pattern: P) -> Self {
         // get the uniform buffer data
         let _uniform_buffer_size = pattern.uniform_buffer_size(window);
 
-        let uniform_buffer_data =
-            if let Some(uniform_buffer_data) = pattern.uniform_buffer_data(window) {
-                uniform_buffer_data
-            } else {
-                // return an empty buffer
-                vec![]
-            };
+        let uniform_buffer_data = if let Some(uniform_buffer_data) = pattern.uniform_buffer_data(window) {
+            uniform_buffer_data
+        } else {
+            // return an empty buffer
+            vec![]
+        };
 
         let texture_size = pattern.texture_extent(window);
         let texture_data = pattern.texture_data(window);
         let fragment_shader_code = pattern.fragment_shader_code(window);
 
-        Self { base_stimulus: BaseStimulus::new(window,
-                                                geometry,
-                                                &fragment_shader_code,
-                                                texture_size,
-                                                texture_data,
-                                                &[uniform_buffer_data]),
+        Self { base_stimulus: BaseStimulus::new(window, geometry, &fragment_shader_code, texture_size, texture_data, &[uniform_buffer_data]),
                pattern: Arc::new(Mutex::new(pattern)) }
     }
 
@@ -186,12 +177,11 @@ impl<P: FillPattern> std::ops::Deref for PatternStimulus<P> {
 }
 
 impl<P: FillPattern + 'static> Stimulus for PatternStimulus<P> {
-    fn prepare(&mut self, window: &Window, window_state: &WindowState, gpu_state: &GPUState) -> () {
+    fn prepare(&mut self, window: &Window, window_state: &InternalWindowState, gpu_state: &GPUState) -> () {
         // update the uniform buffer
         let mut pattern = self.pattern.lock().unwrap();
         if let Some(uniform_buffer_data) = pattern.updated_uniform_buffers_data(window) {
-            self.base_stimulus
-                .set_uniform_buffers(&[uniform_buffer_data.as_slice()], gpu_state);
+            self.base_stimulus.set_uniform_buffers(&[uniform_buffer_data.as_slice()], gpu_state);
         }
 
         // update the texture

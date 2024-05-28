@@ -10,7 +10,7 @@ Some external triggers can result in multiple events being raised at the same ti
 
 ## Handling events
 
-There are two ways to handle events in psychophysics: polling and callbacks. Polling is the process of checking for events at regular intervals, while callbacks are functions that are called when an event occurs. Both methods have their advantages and disadvantages, and the best method to use depends on the specific requirements of your experiment.
+There are two ways to handle events in PsyBee: polling and callbacks. Polling is the process of checking for events at regular intervals, while callbacks are functions that are called when an event occurs. Both methods have their advantages and disadvantages, and the best method to use depends on the specific requirements of your experiment.
 
 - **Polling:** You can poll for events by creating a new `EventReceiver` object and calling its `poll` method. This will return a list of all events that have occurred since the last call to `poll`. This method is useful when you need to handle events in a loop.
 - **Callbacks:** By adding event handlers through `add_event_handler` to a `Window` (or, with certain limitations, to a `Stimulus`), you can register a callback function that will be called whenever an event occurs. This method is useful when you need to handle events as they occur, rather than in a loop.

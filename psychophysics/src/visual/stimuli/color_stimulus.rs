@@ -10,7 +10,7 @@ use super::patterns::Uniform;
 use crate::impl_stimulus;
 use crate::visual::color::IntoRawRgba;
 use crate::visual::geometry::ToVertices;
-use crate::visual::window::WindowState;
+use crate::visual::window::InternalWindowState;
 use crate::visual::Window;
 
 #[derive(Clone, Debug, Deref)]

@@ -44,13 +44,7 @@ pub use window::Window;
 pub trait Renderable {
     /// Prepare the renderable object for rendering. By default this
     /// function calls `prepare_async` function in a blocking manner.
-    async fn prepare(&mut self,
-                     device: &Device,
-                     queue: &Queue,
-                     view: &wgpu::TextureView,
-                     config: &SurfaceConfiguration,
-                     window_handle: &window::Window)
-                     -> ();
+    async fn prepare(&mut self, device: &Device, queue: &Queue, view: &wgpu::TextureView, config: &SurfaceConfiguration, window_handle: &window::Window) -> ();
     /// Render the object to the screen.
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();
     fn is_finnished(&self) -> bool {

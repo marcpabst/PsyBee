@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 #[cfg(target_arch = "wasm32")]
 use std::rc::Rc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use async_channel::{bounded, Receiver, Sender};
@@ -20,9 +20,7 @@ use wasm_bindgen::closure::Closure;
 
 use super::geometry::Size;
 use super::stimuli::Stimulus;
-use crate::input::{
-    Event, EventHandler, EventHandlerId, EventHandlingExt, EventKind, EventReceiver,
-};
+use crate::input::{Event, EventHandler, EventHandlerId, EventHandlingExt, EventKind, EventReceiver};
 #[cfg(target_arch = "wasm32")]
 use crate::request_animation_frame;
 use crate::visual::color::ColorFormat;
@@ -31,7 +29,7 @@ use crate::{GPUState, RenderThreadChannelPayload};
 /// Internal window state. This is used to store the winit window, the wgpu
 /// device, the wgpu queue, etc.
 #[derive(Debug)]
-pub struct WindowState {
+pub struct InternalWindowState {
     // the winit window
     pub window: Arc<winit::window::Window>,
     // the wgpu surface
@@ -48,12 +46,14 @@ pub struct Window {
     // WINDOW STATE
     /// The window state. This contains the underlying winit window, the wgpu
     /// device, the wgpu queue, etc.
-    pub(crate) state: Arc<RwLock<WindowState>>,
+    pub(crate) state: Arc<RwLock<InternalWindowState>>,
     /// The GPU state
     pub(crate) gpu_state: Arc<RwLock<GPUState>>,
     /// The current mouse position. None if the mouse is not over the
     /// window.
     pub(crate) mouse_position: Arc<Mutex<Option<(Size, Size)>>>,
+    /// Stores if the mouse cursor is currently visible.
+    pub(crate) mouse_cursor_visible: Arc<AtomicBool>,
 
     // CHANNELS FOR COMMUNICATION BETWEEN THREADS
     /// Broadcast sender for keyboard events. Used by the experiment task to
@@ -102,11 +102,11 @@ pub struct Window {
 
 impl Window {
     /// Returns a MutexGuard to the WindowState behind the mutex.
-    pub fn read_window_state_blocking(&self) -> RwLockReadGuard<WindowState> {
+    pub fn read_window_state_blocking(&self) -> RwLockReadGuard<InternalWindowState> {
         return self.state.read_blocking();
     }
 
-    pub fn write_window_state_blocking(&self) -> RwLockWriteGuard<WindowState> {
+    pub fn write_window_state_blocking(&self) -> RwLockWriteGuard<InternalWindowState> {
         return self.state.write_blocking();
     }
 
@@ -142,8 +142,7 @@ impl Window {
             Box::pin(task) as Pin<Box<dyn Future<Output = ()> + Send>>
         };
 
-        let rtask_boxed =
-            Box::new(rtask) as Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
+        let rtask_boxed = Box::new(rtask) as Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
 
         log::info!("Sending task to render task");
 
@@ -179,8 +178,20 @@ impl Window {
     }
 
     /// Returns the color format.
+    #[deprecated(note = "Color format handling will change in the future.")]
     pub fn get_color_format(&self) -> ColorFormat {
         self.color_format
+    }
+
+    /// Set the visibility of the mouse cursor.
+    pub fn set_cursor_visible(&self, visible: bool) {
+        self.state.read_blocking().window.set_cursor_visible(visible);
+        self.mouse_cursor_visible.store(visible, Ordering::Relaxed);
+    }
+
+    /// Returns true if the mouse cursor is currently visible.
+    pub fn cursor_visible(&self) -> bool {
+        self.mouse_cursor_visible.load(Ordering::Relaxed)
     }
 
     /// Returns the mouse position. None if cursor not in window.
@@ -209,10 +220,7 @@ impl Window {
     pub fn get_frame(&self) -> Frame {
         let mut frame = Frame { stimuli: Arc::new(Mutex::new(Vec::new())),
                                 color_format: self.color_format,
-                                bg_color: super::color::RawRgba { r: 0.0,
-                                                                  g: 0.0,
-                                                                  b: 0.0,
-                                                                  a: 1.0 } };
+                                bg_color: super::color::RawRgba { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } };
 
         // TODO: is this efficient?
         for stimulus in self.stimuli.lock_blocking().iter() {
@@ -282,9 +290,7 @@ impl EventHandlingExt for Window {
         };
 
         // add handler
-        self.event_handlers
-            .write_blocking()
-            .insert(id, (kind, Box::new(handler)));
+        self.event_handlers.write_blocking().insert(id, (kind, Box::new(handler)));
 
         return id;
     }
@@ -302,8 +308,7 @@ pub async fn render_task(window: Window) {
     // task
     #[cfg(target_arch = "wasm32")]
     {
-        log::debug!("Render task running on thread {:?}",
-                    std::thread::current().id());
+        log::debug!("Render task running on thread {:?}", std::thread::current().id());
 
         // here, we create a closure that will be called by requestAnimationFrame
         let f = Rc::new(RefCell::new(None));
@@ -329,19 +334,11 @@ pub async fn render_task(window: Window) {
                     // acquire lock on window
                     let window_lock = window.get_window_state_blocking();
 
-                    let suface_texture: wgpu::SurfaceTexture =
-                        window_lock.surface
-                                   .get_current_texture()
-                                   .expect("Failed to acquire next swap chain texture");
-                    let view = suface_texture.texture.create_view(
-                        &wgpu::TextureViewDescriptor {
-                            format: Some(wgpu::TextureFormat::Bgra8Unorm),
-                            ..wgpu::TextureViewDescriptor::default()
-                        },
-                    );
-                    let mut encoder =
-                        window_lock.device
-                                   .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                    let suface_texture: wgpu::SurfaceTexture = window_lock.surface.get_current_texture().expect("Failed to acquire next swap chain texture");
+                    let view = suface_texture.texture
+                                             .create_view(&wgpu::TextureViewDescriptor { format: Some(wgpu::TextureFormat::Bgra8Unorm),
+                                                                                         ..wgpu::TextureViewDescriptor::default() });
+                    let mut encoder = window_lock.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                     // clear the frame
                     {
@@ -369,12 +366,7 @@ pub async fn render_task(window: Window) {
                             });
                     }
 
-                    frame.prepare(&window_lock.device,
-                                  &window_lock.queue,
-                                  &view,
-                                  &window_lock.config,
-                                  &window)
-                         .await;
+                    frame.prepare(&window_lock.device, &window_lock.queue, &view, &window_lock.config, &window).await;
 
                     frame.render(&mut encoder, &view);
 
@@ -406,19 +398,13 @@ pub async fn render_task(window: Window) {
             let window_state = window.read_window_state_blocking();
             let gpu_state = window.read_gpu_state_blocking();
 
-            let suface_texture = window_state.surface
-                                             .get_current_texture()
-                                             .expect("Failed to acquire next swap chain texture");
+            let suface_texture = window_state.surface.get_current_texture().expect("Failed to acquire next swap chain texture");
 
-            let view =
-                suface_texture.texture
-                              .create_view(&wgpu::TextureViewDescriptor { format:
-                                                                              Some(wgpu::TextureFormat::Bgra8Unorm),
-                                                                          ..wgpu::TextureViewDescriptor::default() });
+            let view = suface_texture.texture
+                                     .create_view(&wgpu::TextureViewDescriptor { format: Some(wgpu::TextureFormat::Bgra8Unorm),
+                                                                                 ..wgpu::TextureViewDescriptor::default() });
 
-            let mut encoder =
-                gpu_state.device
-                         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            let mut encoder = gpu_state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
             // start timer
 
@@ -474,19 +460,13 @@ pub struct Frame {
 
 impl Frame {
     /// Set the background color of the frame.
-    pub fn set_bg_color(&mut self,
-                        bg_color: impl IntoColor<palette::Xyza<palette::white_point::D65, f32>>)
-    {
+    pub fn set_bg_color(&mut self, bg_color: impl IntoColor<palette::Xyza<palette::white_point::D65, f32>>) {
         self.bg_color = self.color_format.convert_to_raw_rgba(bg_color);
     }
 }
 
 impl Frame {
-    async fn prepare(&mut self,
-                     window: &Window,
-                     window_state: &WindowState,
-                     gpu_state: &GPUState)
-                     -> () {
+    async fn prepare(&mut self, window: &Window, window_state: &InternalWindowState, gpu_state: &GPUState) -> () {
         // call prepare() on all renderables
         for renderable in &mut self.stimuli.lock().await.iter_mut() {
             renderable.prepare(window, window_state, gpu_state);

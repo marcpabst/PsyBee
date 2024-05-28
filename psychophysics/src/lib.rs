@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use async_channel::{bounded, Receiver, Sender};
@@ -44,8 +44,7 @@ pub mod prelude {
 }
 
 // types to make the code more readable
-pub(crate) type RenderThreadChannelPayload =
-    Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
+pub(crate) type RenderThreadChannelPayload = Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread;
@@ -53,7 +52,7 @@ use std::thread;
 #[cfg(target_arch = "wasm32")]
 use wasm_thread as thread;
 
-use crate::visual::window::{render_task, Frame, Window, WindowState};
+use crate::visual::window::{render_task, Frame, InternalWindowState, Window};
 
 #[cfg(target_arch = "wasm32")]
 pub fn web_window() -> web_sys::Window {
@@ -112,16 +111,10 @@ pub enum WindowOptions {
     },
     /// Select window configuration that satisfies the given constraints and has
     /// the highest refresh rate.
-    FullscreenHighestRefreshRate {
-        monitor: Option<Monitor>,
-        resolution: Option<(u32, u32)>,
-    },
+    FullscreenHighestRefreshRate { monitor: Option<Monitor>, resolution: Option<(u32, u32)> },
     /// Select the highest resolution that satisfies the given constraints and
     /// has the highest resolution.
-    FullscreenHighestResolution {
-        monitor: Option<Monitor>,
-        refresh_rate: Option<f64>,
-    },
+    FullscreenHighestResolution { monitor: Option<Monitor>, refresh_rate: Option<f64> },
 }
 
 impl WindowOptions {
@@ -176,8 +169,7 @@ pub enum PsyEventLoopEvent {
     PromptEvent(String, Sender<String>),
     CreateNewWindowEvent(WindowOptions, Sender<Window>),
     NewWindowCreatedEvent(Window),
-    RunOnMainThread(#[dbg(placeholder = "...")]
-                    Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>),
+    RunOnMainThread(#[dbg(placeholder = "...")] Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>),
 }
 
 /// The GPUState struct holds the state of the wgpu device and queue. It is used
@@ -229,7 +221,8 @@ impl ExperimentManager {
             .expect("Failed to send event to event loop. This is likely a bug, please report it.");
 
         // wait for response
-        receiver.recv_blocking().expect("Failed to receive response from event loop. This is likely a bug, please report it.")
+        receiver.recv_blocking()
+                .expect("Failed to receive response from event loop. This is likely a bug, please report it.")
     }
 
     /// Create a new window with the given options. This function will dispatch
@@ -242,9 +235,7 @@ impl ExperimentManager {
         let user_event = PsyEventLoopEvent::CreateNewWindowEvent(window_options.clone(), sender);
 
         // send event
-        self.event_loop_proxy
-            .send_event(user_event)
-            .expect("Failed to send event to event loop.");
+        self.event_loop_proxy.send_event(user_event).expect("Failed to send event to event loop.");
         log::debug!("Requested new window, waiting for response");
 
         // wait for response
@@ -261,13 +252,10 @@ impl ExperimentManager {
         // find all monitors available
         let monitors = self.get_available_monitors();
         // get the second monitor if available, otherwise use the first one
-        let monitor =
-            monitors.get(1).unwrap_or(monitors.first()
-                                              .expect("No monitor found - this should not happen"));
+        let monitor = monitors.get(1).unwrap_or(monitors.first().expect("No monitor found - this should not happen"));
 
         log::debug!("Creating default window on monitor {:?}", monitor);
-        self.create_window(&WindowOptions::FullscreenHighestResolution { monitor:
-                                                                             Some(monitor.clone()),
+        self.create_window(&WindowOptions::FullscreenHighestResolution { monitor: Some(monitor.clone()),
                                                                          refresh_rate: None })
     }
 
@@ -285,11 +273,8 @@ impl MainLoop {
     pub async fn new() -> Self {
         // create channel for sending tasks to the render thread
         let (render_task_sender, render_task_receiver) = bounded(100);
-        let event_loop = EventLoopBuilder::<PsyEventLoopEvent>::with_user_event()
-            .build()
-            .expect(
-                "Failed to create event loop. This is likely a bug, please report it.",
-            );
+        let event_loop = EventLoopBuilder::<PsyEventLoopEvent>::with_user_event().build()
+                                                                                 .expect("Failed to create event loop. This is likely a bug, please report it.");
 
         // this is where we would chose a specific backend
         let backend = wgpu::Backends::all();
@@ -301,47 +286,34 @@ impl MainLoop {
         let instance = wgpu::Instance::new(instance_desc);
 
         // request an adapter
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
+        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 force_fallback_adapter: false,
                 compatible_surface: None, // idealy we would use the surface here, but we don't have it yet
             })
-            .await
-            .expect("Failed to find an appropiate graphics adapter. This is likely a bug, please report it.");
+                              .await
+                              .expect("Failed to find an appropiate graphics adapter. This is likely a bug, please report it.");
 
         log::debug!("Selected graphics adapter: {:?}", adapter.get_info());
 
         // Create the logical device and command queue
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                    required_limits: wgpu::Limits::default()
-                        .using_resolution(adapter.limits()),
-                },
-                None,
-            )
-            .await
-            .expect("Failed to create device. This is likely a bug, please report it.");
+        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { label: None,
+                                                                               required_features: wgpu::Features::empty(),
+                                                                               // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
+                                                                               required_limits: wgpu::Limits::default().using_resolution(adapter.limits()) },
+                                                     None)
+                                     .await
+                                     .expect("Failed to create device. This is likely a bug, please report it.");
 
         Self { event_loop: Some(event_loop),
                render_thread_channel_sender: render_task_sender,
                render_thread_channel_receiver: render_task_receiver,
                windows: vec![],
-               gpu_state: Arc::new(RwLock::new(GPUState { instance,
-                                                          adapter,
-                                                          device,
-                                                          queue })) }
+               gpu_state: Arc::new(RwLock::new(GPUState { instance, adapter, device, queue })) }
     }
 
     /// Create a new window with the given options.
-    pub fn create_window(&self,
-                         window_options: &WindowOptions,
-                         event_loop_target: &EventLoopWindowTarget<PsyEventLoopEvent>)
-                         -> Window {
+    pub fn create_window(&self, window_options: &WindowOptions, event_loop_target: &EventLoopWindowTarget<PsyEventLoopEvent>) -> Window {
         // set up window
         let winit_window: winit::window::Window;
 
@@ -350,79 +322,73 @@ impl MainLoop {
             let monitor_handle = if let Some(monitor) = window_options.monitor() {
                 monitor.handle
             } else {
-                event_loop_target.primary_monitor().expect("No primary monitor found. If a screen is connected, this is a bug, please report it.")
+                event_loop_target.primary_monitor()
+                                 .expect("No primary monitor found. If a screen is connected, this is a bug, please report it.")
             };
 
-            log::debug!("Video modes: {:?}",
-                        monitor_handle.video_modes().collect::<Vec<VideoMode>>());
+            log::debug!("Video modes: {:?}", monitor_handle.video_modes().collect::<Vec<VideoMode>>());
 
             // filter by resolution if specified
-            let video_modes: Vec<VideoMode> = if let Some(resolution) = window_options.resolution()
-            {
+            let video_modes: Vec<VideoMode> = if let Some(resolution) = window_options.resolution() {
                 monitor_handle.video_modes()
-                              .filter(|video_mode| {
-                                  video_mode.size().width as u32 == resolution.0
-                                  && video_mode.size().height as u32 == resolution.1
-                              })
+                              .filter(|video_mode| video_mode.size().width as u32 == resolution.0 && video_mode.size().height as u32 == resolution.1)
                               .collect()
             } else {
                 monitor_handle.video_modes().collect()
             };
 
             // filter by refresh rate if specified
-            let mut video_modes: Vec<VideoMode> = if let Some(refresh_rate) =
-                window_options.refresh_rate()
-            {
+            let mut video_modes: Vec<VideoMode> = if let Some(refresh_rate) = window_options.refresh_rate() {
                 video_modes.into_iter()
-                           .filter(|video_mode| {
-                               video_mode.refresh_rate_millihertz() as f64 / 1000.0 == refresh_rate
-                           })
+                           .filter(|video_mode| video_mode.refresh_rate_millihertz() as f64 / 1000.0 == refresh_rate)
                            .collect()
             } else {
                 video_modes
             };
 
             // sort by refresh rate
-            video_modes.sort_by(|a, b| {
-                           a.refresh_rate_millihertz()
-                            .cmp(&b.refresh_rate_millihertz())
-                       });
+            video_modes.sort_by(|a, b| a.refresh_rate_millihertz().cmp(&b.refresh_rate_millihertz()));
 
             // sort by resolution (width*height)
-            video_modes.sort_by(|a, b| {
-                           (a.size().width * a.size().height).cmp(&(b.size().width
-                                                                    * b.size().height))
-                       });
+            video_modes.sort_by(|a, b| (a.size().width * a.size().height).cmp(&(b.size().width * b.size().height)));
 
             log::debug!("Video modes: {:?}", video_modes);
 
             // match the type of window_options
             let video_mode = match window_options {
-              WindowOptions::FullscreenExact { .. } => {
-                  video_modes.first().expect("No suitable video modes found, please check your window options.").clone()
-              },
-              WindowOptions::FullscreenHighestRefreshRate { .. } => {
-                  // filter by refresh rate
-                video_modes.clone().into_iter().filter(|video_mode| {
-                      video_mode.refresh_rate_millihertz() == video_modes.last().unwrap().refresh_rate_millihertz()
-                  }).collect::<Vec<VideoMode>>().first().expect("No suitable video modes found, please check your window options.").clone()
-              },
-              WindowOptions::FullscreenHighestResolution { .. } => {
-                  // filter by resolution
-                  video_modes.clone().into_iter().filter(|video_mode| {
-                      video_mode.size().width * video_mode.size().height == video_modes.last().unwrap().size().width * video_modes.last().unwrap().size().height
-                  }).collect::<Vec<VideoMode>>().first().expect("No suitable video modes found, please check your window options.").clone()
-              },
-              _ => panic!("Invalid window options")
-          };
+                WindowOptions::FullscreenExact { .. } => video_modes.first().expect("No suitable video modes found, please check your window options.").clone(),
+                WindowOptions::FullscreenHighestRefreshRate { .. } => {
+                    // filter by refresh rate
+                    video_modes.clone()
+                               .into_iter()
+                               .filter(|video_mode| video_mode.refresh_rate_millihertz() == video_modes.last().unwrap().refresh_rate_millihertz())
+                               .collect::<Vec<VideoMode>>()
+                               .first()
+                               .expect("No suitable video modes found, please check your window options.")
+                               .clone()
+                }
+                WindowOptions::FullscreenHighestResolution { .. } => {
+                    // filter by resolution
+                    video_modes.clone()
+                               .into_iter()
+                               .filter(|video_mode| {
+                                   video_mode.size().width * video_mode.size().height == video_modes.last().unwrap().size().width * video_modes.last().unwrap().size().height
+                               })
+                               .collect::<Vec<VideoMode>>()
+                               .first()
+                               .expect("No suitable video modes found, please check your window options.")
+                               .clone()
+                }
+                _ => panic!("Invalid window options"),
+            };
 
             // create window
             winit_window = winit::window::WindowBuilder::new()
-                // make exclusive fullscreen
-                .with_fullscreen(Some(winit::window::Fullscreen::Exclusive(video_mode)))
-                .with_title("Experiment".to_string())
-                .build(&event_loop_target)
-                .unwrap();
+                                                              // make exclusive fullscreen
+                                                              .with_fullscreen(Some(winit::window::Fullscreen::Exclusive(video_mode)))
+                                                              .with_title("Experiment".to_string())
+                                                              .build(&event_loop_target)
+                                                              .unwrap();
         } else {
             // we just create a window on the specified monitor
 
@@ -434,8 +400,9 @@ impl MainLoop {
                                                               .unwrap();
         }
 
-        // hide cursor
-        // winit_window.set_cursor_visible(false);
+        // make sure cursor is visible (for normlisation across platforms)
+        winit_window.set_cursor_visible(true);
+
         winit_window.focus_window();
 
         log::debug!("Window created: {:?}", winit_window);
@@ -449,9 +416,8 @@ impl MainLoop {
 
         log::debug!("Creating wgup surface...");
 
-        let surface =
-            instance.create_surface(winit_window.clone())
-                    .expect("Failed to create surface. This is likely a bug, please report it.");
+        let surface = instance.create_surface(winit_window.clone())
+                              .expect("Failed to create surface. This is likely a bug, please report it.");
 
         // // get HAL using callback (but only on macos)
         // let hal_surface =  unsafe { surface.as_hal::<wgpu::hal::api::Dx12, _, _>(
@@ -479,8 +445,7 @@ impl MainLoop {
                                                   width: size.width,
                                                   height: size.height,
                                                   present_mode: wgpu::PresentMode::Fifo,
-                                                  alpha_mode: swapchain_capabilities.alpha_modes
-                                                      [0],
+                                                  alpha_mode: swapchain_capabilities.alpha_modes[0],
                                                   view_formats: swapchain_view_format,
                                                   desired_maximum_frame_latency: 1 };
 
@@ -489,19 +454,17 @@ impl MainLoop {
         surface.configure(&device, &config);
 
         // create channel for frame submission
-        let (frame_sender, frame_receiver): (Sender<Arc<Mutex<Frame>>>,
-                                             Receiver<Arc<Mutex<Frame>>>) = bounded(1);
+        let (frame_sender, frame_receiver): (Sender<Arc<Mutex<Frame>>>, Receiver<Arc<Mutex<Frame>>>) = bounded(1);
 
         let (frame_ok_sender, frame_ok_receiver): (Sender<bool>, Receiver<bool>) = bounded(1);
 
         // create a pwindow
-        let window_state = WindowState { window: winit_window.clone(),
-                                         surface,
-                                         config };
+        let window_state = InternalWindowState { window: winit_window.clone(),
+                                                 surface,
+                                                 config };
 
         // create channel for physical input
-        let (mut event_broadcast_sender, physical_input_receiver) =
-            async_broadcast::broadcast(10_000);
+        let (mut event_broadcast_sender, physical_input_receiver) = async_broadcast::broadcast(10_000);
         event_broadcast_sender.set_overflow(true);
         // deactivate the receiver
         let event_broadcast_receiver = physical_input_receiver.deactivate();
@@ -510,6 +473,7 @@ impl MainLoop {
         let window = Window { state: Arc::new(RwLock::new(window_state)),
                               gpu_state: self.gpu_state.clone(),
                               mouse_position: Arc::new(Mutex::new(None)),
+                              mouse_cursor_visible: Arc::new(AtomicBool::new(true)),
                               event_broadcast_receiver,
                               event_broadcast_sender,
                               frame_channel_sender: frame_sender,
@@ -530,9 +494,7 @@ impl MainLoop {
         // position
         window.add_event_handler(EventKind::CursorMoved, move |event| {
                   if let Some(pos) = event.position() {
-                      win_clone.mouse_position
-                               .lock_blocking()
-                               .replace(pos.clone());
+                      win_clone.mouse_position.lock_blocking().replace(pos.clone());
                   };
                   false
               });
@@ -588,8 +550,7 @@ impl MainLoop {
         let mut monitors = vec![];
         let event_loop = self.event_loop.as_ref().unwrap();
         for (i, handle) in event_loop.available_monitors().enumerate() {
-            monitors.push(Monitor { name: handle.name()
-                                                .unwrap_or(format!("Unnamed monitor {}", i)),
+            monitors.push(Monitor { name: handle.name().unwrap_or(format!("Unnamed monitor {}", i)),
                                     handle: handle });
         }
         monitors
@@ -604,9 +565,7 @@ impl MainLoop {
     ///   will be called with a `Window` object that you can use to create
     ///   stimuli and submit frames to the window.
     pub fn run_experiment<F>(&mut self, experiment_fn: F) -> ()
-        where F: FnOnce(ExperimentManager) -> Result<(), errors::PsychophysicsError>
-                  + 'static
-                  + Send
+        where F: FnOnce(ExperimentManager) -> Result<(), errors::PsychophysicsError> + 'static + Send
     {
         let event_loop = self.event_loop.take().unwrap();
 
@@ -623,10 +582,7 @@ impl MainLoop {
             // On wasm, append the canvas to the document body
             web_sys::window().and_then(|win| win.document())
                              .and_then(|doc| doc.body())
-                             .and_then(|body| {
-                                 body.append_child(&web_sys::Element::from(winit_window.canvas()))
-                                     .ok()
-                             })
+                             .and_then(|body| body.append_child(&web_sys::Element::from(winit_window.canvas())).ok())
                              .expect("couldn't append canvas to document body");
 
             // set canvas size
@@ -639,27 +595,18 @@ impl MainLoop {
         }
     }
 
-    async fn run_event_loop<F>(&mut self,
-                               event_loop: EventLoop<PsyEventLoopEvent>,
-                               experiment_fn: F)
-        where F: FnOnce(ExperimentManager) -> Result<(), errors::PsychophysicsError>
-                  + 'static
-                  + Send
+    async fn run_event_loop<F>(&mut self, event_loop: EventLoop<PsyEventLoopEvent>, experiment_fn: F)
+        where F: FnOnce(ExperimentManager) -> Result<(), errors::PsychophysicsError> + 'static + Send
     {
-        log::debug!("Main task is running on thread {:?}",
-                    std::thread::current().id());
+        log::debug!("Main task is running on thread {:?}", std::thread::current().id());
 
-        let available_monitors =
-            event_loop.available_monitors()
-                      .map(|monitor| Monitor { name:
-                                                   monitor.name()
-                                                          .unwrap_or("Unnamed monitor".to_string()),
-                                               handle: monitor })
-                      .collect();
+        let available_monitors = event_loop.available_monitors()
+                                           .map(|monitor| Monitor { name: monitor.name().unwrap_or("Unnamed monitor".to_string()),
+                                                                    handle: monitor })
+                                           .collect();
 
         let wm = ExperimentManager { event_loop_proxy: event_loop.create_proxy(),
-                                     render_taks_sender: self.render_thread_channel_sender
-                                                             .clone(),
+                                     render_taks_sender: self.render_thread_channel_sender.clone(),
                                      available_monitors: available_monitors };
 
         // // start renderer
@@ -701,133 +648,95 @@ impl MainLoop {
         // set event loop to poll
         event_loop.set_control_flow(ControlFlow::Poll);
 
-        let _ =
-            event_loop.run(move |event: WinitEvent<PsyEventLoopEvent>, win_target| {
-                match event {
-                    WinitEvent::UserEvent(event) => {
-                        match event {
-                            PsyEventLoopEvent::CreateNewWindowEvent(
-                                window_options,
-                                sender,
-                            ) => {
-                                log::debug!("Event loop received CreateNewWindowEvent - creating new window");
+        let _ = event_loop.run(move |event: WinitEvent<PsyEventLoopEvent>, win_target| {
+                              match event {
+                                  WinitEvent::UserEvent(event) => {
+                                      match event {
+                                          PsyEventLoopEvent::CreateNewWindowEvent(window_options, sender) => {
+                                              log::debug!("Event loop received CreateNewWindowEvent - creating new window");
 
-                                let window = self.create_window(
-                                    &window_options,
-                                    win_target,
-                                );
+                                              let window = self.create_window(&window_options, win_target);
 
-                                      // start renderer
-                                {
-                                    let win_handle = window.clone();
-                                    #[cfg(target_arch = "wasm32")]
-                                    spawn_async_task(render_task(window));
-                                    #[cfg(not(target_arch = "wasm32"))]
-                                    thread::spawn(move || {
-                                        smol::block_on(render_task(win_handle.clone()));
-                                    });
-                                }
+                                              // start renderer
+                                              {
+                                                  let win_handle = window.clone();
+                                                  #[cfg(target_arch = "wasm32")]
+                                                  spawn_async_task(render_task(window));
+                                                  #[cfg(not(target_arch = "wasm32"))]
+                                                  thread::spawn(move || {
+                                                      smol::block_on(render_task(win_handle.clone()));
+                                                  });
+                                              }
 
-                                // push window to list of windows
-                                self.windows.push(window.clone());
+                                              // push window to list of windows
+                                              self.windows.push(window.clone());
 
-                                sender.send_blocking(window).expect("Failed to send window to sender. This is likely a bug, please report it.");
-                            },
-                            PsyEventLoopEvent::PromptEvent(
-                                message,
-                                sender,
-                            ) => {
-                                log::debug!("Event loop received PromptEvent - showing prompt");
+                                              sender.send_blocking(window)
+                                                    .expect("Failed to send window to sender. This is likely a bug, please report it.");
+                                          }
+                                          PsyEventLoopEvent::PromptEvent(message, sender) => {
+                                              log::debug!("Event loop received PromptEvent - showing prompt");
 
-                                let result = self.prompt(&message);
+                                              let result = self.prompt(&message);
 
-                                sender.send_blocking(result).expect("Failed to send result to sender. This is likely a bug, please report it.");
-                            }
-                            PsyEventLoopEvent::NewWindowCreatedEvent(
-                                _window,
-                            ) => {
-                                log::debug!("Event loop received NewWindowCreatedEvent");
-                                // add window to list of windows
-                                //self.windows.push(window);
-                            }
-                            PsyEventLoopEvent::RunOnMainThread(
-                                task,
-                            ) => {
-                                log::debug!("Running task on main thread");
-                                let _ = block_on(task());
-                            }
-                        }
-                    }
-                    WinitEvent::WindowEvent {
-                        window_id: id,
-                        event: WindowEvent::Resized(new_size),
-                    } => {
-                        log::debug!(
-                            "Window {:?} resized to {:?}",
-                            id,
-                            new_size
-                        );
+                                              sender.send_blocking(result)
+                                                    .expect("Failed to send result to sender. This is likely a bug, please report it.");
+                                          }
+                                          PsyEventLoopEvent::NewWindowCreatedEvent(_window) => {
+                                              log::debug!("Event loop received NewWindowCreatedEvent");
+                                              // add window to list of windows
+                                              //self.windows.push(window);
+                                          }
+                                          PsyEventLoopEvent::RunOnMainThread(task) => {
+                                              log::debug!("Running task on main thread");
+                                              let _ = block_on(task());
+                                          }
+                                      }
+                                  }
+                                  WinitEvent::WindowEvent { window_id: id,
+                                                            event: WindowEvent::Resized(new_size), } => {
+                                      log::debug!("Window {:?} resized to {:?}", id, new_size);
 
-                        if let  Some(window) = self.get_window_by_id(id) {
-                    
-                        let mut window_state =
-                            window.write_window_state_blocking();
-                            let gpu_state = self.gpu_state.read_blocking();
+                                      if let Some(window) = self.get_window_by_id(id) {
+                                          let mut window_state = window.write_window_state_blocking();
+                                          let gpu_state = self.gpu_state.read_blocking();
 
-                        window_state.config.width = new_size.width.max(1);
-                        window_state.config.height =
-                            new_size.height.max(1);
+                                          window_state.config.width = new_size.width.max(1);
+                                          window_state.config.height = new_size.height.max(1);
 
-                        window_state.surface.configure(
-                            &gpu_state.device,
-                            &window_state.config,
-                        );
+                                          window_state.surface.configure(&gpu_state.device, &window_state.config);
 
-                        // on macos, the window size is not updated automatically
-                        window_state.window.request_redraw();
+                                          // on macos, the window size is not updated automatically
+                                          window_state.window.request_redraw();
 
-                        // update window size
-                        window.width_px.store(
-                            new_size.width as u32,
-                            Ordering::Relaxed,
-                        );
-                        window.height_px.store(
-                            new_size.height as u32,
-                            Ordering::Relaxed,
-                        );
-                    }
-                }
+                                          // update window size
+                                          window.width_px.store(new_size.width as u32, Ordering::Relaxed);
+                                          window.height_px.store(new_size.height as u32, Ordering::Relaxed);
+                                      }
+                                  }
 
-                    // handle window events
-                     WinitEvent::WindowEvent {
-                        window_id: id,
-                        event,
-                    } => {
+                                  // handle window events
+                                  WinitEvent::WindowEvent { window_id: id, event } => {
+                                      if let Some(window) = self.get_window_by_id(id) {
+                                          if let Some(input) = Event::try_from_winit(event.clone(), &window).ok() {
+                                              // if escape key was pressed, close window
+                                              if input.key_pressed("\u{1b}") {
+                                                  win_target.exit();
+                                              }
 
-                        if let  Some(window) = self.get_window_by_id(id) {
-                                if let Some(input) =
-                                    Event::try_from_winit(event.clone(), &window).ok()
-                                {
+                                              // broadcast event to window
+                                              window.event_broadcast_sender.try_broadcast(input.clone());
 
-                                    // if escape key was pressed, close window
-                                    if input.key_pressed("\u{1b}") {
-                                        win_target.exit();
-                                    }
-                                
-                                    // broadcast event to window
-                                    window.event_broadcast_sender
-                                        .try_broadcast(input.clone());
-
-                                    // dispatch_event to window
-                                    // note: this should be done in a separate thread using the winndow's event_broadcast channel
-                                    window.dispatch_event(input);
-                                }
-                            }
-                    }
-                    // handle close event
-                    _ => {}
-                }
-            });
+                                              // dispatch_event to window
+                                              // note: this should be done in a separate thread using the winndow's event_broadcast channel
+                                              window.dispatch_event(input);
+                                          }
+                                      }
+                                  }
+                                  // handle close event
+                                  _ => {}
+                              }
+                          });
     }
 
     pub fn get_window_by_id(&self, id: winit::window::WindowId) -> Option<Window> {

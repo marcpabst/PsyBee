@@ -2725,6 +2725,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43d84d1d7a6ac92673717f9f6d1518374ef257669c24ebc5ac25d5033828be58"
 
 [[package]]
+name = "psybee-py"
+version = "0.1.1"
+dependencies = [
+ "derive-debug",
+ "dyn-clone",
+ "log",
+ "psychophysics",
+ "pyo3",
+ "pyo3-log",
+ "pywrap",
+ "send_wrapper",
+ "smol 2.0.0",
+]
+
+[[package]]
 name = "psychophysics"
 version = "0.1.0"
 dependencies = [
@@ -2777,21 +2792,6 @@ dependencies = [
  "web-time 1.1.0",
  "wgpu",
  "winit",
-]
-
-[[package]]
-name = "psychophysics-py"
-version = "0.1.0"
-dependencies = [
- "derive-debug",
- "dyn-clone",
- "log",
- "psychophysics",
- "pyo3",
- "pyo3-log",
- "pywrap",
- "send_wrapper",
- "smol 2.0.0",
 ]
 
 [[package]]

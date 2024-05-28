@@ -1,7 +1,17 @@
-site_name: Psychophysics
+site_name: PsyBee
 site_url: https://mydomain.org/mysite
+
 theme:
   name: material
+  icon:
+    logo: material/bee 
+  features:
+    - navigation.tabs
+    - navigation.footer
+  palette:
+    scheme: pybee
+extra_css:
+  - stylesheets/styles.css
 
 markdown_extensions:
   - footnotes
@@ -22,27 +32,36 @@ markdown_extensions:
 
 # order of the pages in the navigation
 nav:
-  - Introduction: index.md
-  - installation.md
-  - getting-started.md
-  - Concepts:
-    - concepts/frame.md
-    - concepts/colours.md
-    - concepts/events.md
-    - concepts/sizes.md
-    - concepts/visual-stimuli/index.md
-  - advanced/index.md
-  - Background:
-    - background/graphicspipeline.md
-    - background/colours.md
-    
+  - Home: index.md
+  - User Guide:
+    - Getting Started: getting-started/index.md
+    - getting-started/installation.md
+    - Tutorials:
+      - getting-started/tutorial1.md
+    - Concepts:
+      - concepts/frame.md
+      - concepts/colours.md
+      - concepts/events.md
+      - concepts/sizes.md
+      - concepts/visual-stimuli/index.md
+    - advanced/index.md
+    - Background:
+      - background/graphicspipeline.md
+      - background/colours.md
+  - API: 
+      - api/index.md
+      - api/window.md
+      - api/events.md
+      
 plugins:
-  - mkdocstrings:
-      handlers:
-        python:
-          options:
-            find_stubs_package: true
-            allow_inspection: false
-            docstring_style: numpy
-            filters: 
-              - "!^_"
+   - search
+   - mkdocstrings:
+        handlers:
+          python:
+            options:
+              find_stubs_package: true
+              
+              allow_inspection: false
+              docstring_style: numpy
+              show_source: false
+              

@@ -1,7 +1,7 @@
 use uuid::Uuid;
 
 use super::geometry::Size;
-use super::window::WindowState;
+use super::window::InternalWindowState;
 use super::Window;
 use crate::GPUState;
 
@@ -28,7 +28,7 @@ pub use video_stimulus::VideoStimulus;
 /// The stimulus trait.
 pub trait Stimulus: Send + Sync + downcast_rs::Downcast + dyn_clone::DynClone {
     /// Prepare the renderable object for rendering.
-    fn prepare(&mut self, window: &Window, window_state: &WindowState, gpu_state: &GPUState) -> ();
+    fn prepare(&mut self, window: &Window, window_state: &InternalWindowState, gpu_state: &GPUState) -> ();
     /// Render the object to the screen.
     fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();
     /// Check if the stimulus contains a specific Point.
@@ -54,6 +54,12 @@ pub trait Stimulus: Send + Sync + downcast_rs::Downcast + dyn_clone::DynClone {
         self.set_visible(false);
     }
 
+    /// Show the stimulus. This is a convenience method that calls
+    /// `set_visible(true)`.
+    fn show(&self) -> () {
+        self.set_visible(true);
+    }
+
     /// Toggle the visibility of the stimulus.
     fn toggle_visibility(&self) -> () {
         self.set_visible(!self.visible());
@@ -73,11 +79,7 @@ macro_rules! impl_stimulus {
         use crate::GPUState;
 
         impl Stimulus for $newtype {
-            fn prepare(&mut self,
-                       window: &Window,
-                       window_state: &WindowState,
-                       gpu_state: &GPUState)
-                       -> () {
+            fn prepare(&mut self, window: &Window, window_state: &InternalWindowState, gpu_state: &GPUState) -> () {
                 self._inner.prepare(window, window_state, gpu_state);
             }
 

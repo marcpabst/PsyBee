@@ -5,13 +5,13 @@
 </div>
 
 
-Correct handling of colours is important for investigating many interesting questions in cognitive and perceptual science. Unfortunately, colours and colour spaces are complex and can be difficult to understand and work with. This document is intended to provide a brief overview over the handling of colours in the *psychophysics* library. 
+Correct handling of colours is important for investigating many interesting questions in cognitive and perceptual science. Unfortunately, colours and colour spaces are complex and can be difficult to understand and work with. This document is intended to provide a brief overview over the handling of colours in the *PsyBee* library. 
 
 Please read the background information on [colours and colour spaces](./colours-and-colour-spaces.md) if you are interested in a more detailed discussion of the topic.
 
 Key points:
 
-- __There is currently no dedicated support for full colour managment in the *psychophysics* library.__
+- __There is currently no dedicated support for full colour managment in the *PsyBee* library.__
   As such, the library is limited to working with colours in the RGB colour space using your monitor's primaries. Crucially, this puts the responsibility on the user to ensure that colours are handled correctly.
 - __However, the library provides a number of tools to help you work with colours in the RGB colour space.__
   This mainly concerns the RGB *encoding functions*, describing the non-linear relationship between the RGB values as defined in a particular RGB colour space and the actual light emitted by the monitor. On top of that, the library provides a way to correct for non-linearities in the monitor's gamma curve (that deviates from the standard sRGB gamma curve). Taken, together, these tools allow for what is often called "gamma correction".

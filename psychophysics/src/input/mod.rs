@@ -75,8 +75,8 @@ pub enum Event {
         /// The position of the mouse cursor when the button was released.
         position: (Size, Size),
     },
-    /// A touch event. This is triggered when a touch screen is touched.
-    TouchPress {
+    /// A touch start event. This is triggered when a touch screen is touched.
+    TouchStart {
         /// Timestamp of the event.
         timestamp: SystemTime,
         /// The position of the touch.
@@ -84,9 +84,28 @@ pub enum Event {
         /// The id of the touch (if available).
         id: Option<u64>,
     },
-    /// A touch release event. This is triggered when a touch screen is
+    /// A touch move event. This is triggered when a touch screen is moved.
+    TouchMove {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
+        /// The position of the touch.
+        position: (Size, Size),
+        /// The id of the touch (if available).
+        id: Option<u64>,
+    },
+    /// A touch end event. This is triggered when a touch screen is
     /// released.
-    TouchRelease {
+    TouchEnd {
+        /// Timestamp of the event.
+        timestamp: SystemTime,
+        /// The position of the touch.
+        position: (Size, Size),
+        /// The id of the touch (if available).
+        id: Option<u64>,
+    },
+    /// A touch cancel event. This is triggered when a touch screen is
+    /// cancelled.
+    TouchCancel {
         /// Timestamp of the event.
         timestamp: SystemTime,
         /// The position of the touch.
@@ -189,15 +208,11 @@ pub(crate) trait EventTryFrom<T>: Sized {
 impl EventTryFrom<winit_event::WindowEvent> for Event {
     type Error = &'static str;
 
-    fn try_from_winit(event: winit_event::WindowEvent,
-                      window: &Window)
-                      -> Result<Self, Self::Error> {
+    fn try_from_winit(event: winit_event::WindowEvent, window: &Window) -> Result<Self, Self::Error> {
         let timestamp = SystemTime::now();
         let data = match event {
             // match keyboad events
-            winit_event::WindowEvent::KeyboardInput { device_id: _,
-                                                      event,
-                                                      .. } => {
+            winit_event::WindowEvent::KeyboardInput { device_id: _, event, .. } => {
                 let key_str = event.logical_key.to_text().unwrap_or_default();
 
                 let key_code = u32::default();
@@ -213,20 +228,15 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
 
                 match event.state {
                     winit_event::ElementState::Pressed => Event::KeyPress { timestamp: timestamp,
-                                                                            key:
-                                                                                key_str.to_string(),
+                                                                            key: key_str.to_string(),
                                                                             code: key_code },
-                    winit_event::ElementState::Released => {
-                        Event::KeyRelease { timestamp: timestamp,
-                                            key: key_str.to_string(),
-                                            code: key_code }
-                    }
+                    winit_event::ElementState::Released => Event::KeyRelease { timestamp: timestamp,
+                                                                               key: key_str.to_string(),
+                                                                               code: key_code },
                 }
             }
             // match mouse button events
-            winit_event::WindowEvent::MouseInput { device_id: _,
-                                                   state,
-                                                   button, } => {
+            winit_event::WindowEvent::MouseInput { device_id: _, state, button } => {
                 let button = match button {
                     winit_event::MouseButton::Left => MouseButton::Left,
                     winit_event::MouseButton::Right => MouseButton::Right,
@@ -236,26 +246,36 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
                     winit_event::MouseButton::Other(id) => MouseButton::Other(id),
                 };
 
-                let position = window.mouse_position()
-                                     .unwrap_or_else(|| (Size::Pixels(0.0), Size::Pixels(0.0)));
+                let position = window.mouse_position().unwrap_or_else(|| (Size::Pixels(0.0), Size::Pixels(0.0)));
                 match state {
-                    winit_event::ElementState::Pressed => Event::MouseButtonPress { timestamp:
-                                                                                        timestamp,
+                    winit_event::ElementState::Pressed => Event::MouseButtonPress { timestamp: timestamp,
                                                                                     button,
                                                                                     position },
-                    winit_event::ElementState::Released => {
-                        Event::MouseButtonRelease { timestamp: timestamp,
-                                                    button,
-                                                    position }
-                    }
+                    winit_event::ElementState::Released => Event::MouseButtonRelease { timestamp: timestamp,
+                                                                                       button,
+                                                                                       position },
                 }
             }
             // match touch events
             winit_event::WindowEvent::Touch(touch) => {
-                let _position = (Size::Pixels(touch.location.x), Size::Pixels(touch.location.y));
+                //  let position = (Size::Pixels(position.x) - Size::ScreenWidth(0.5), Size::Pixels(-position.y) + Size::ScreenHeight(0.5));
+                let position = (Size::Pixels(touch.location.x) - Size::ScreenWidth(0.5), Size::Pixels(-touch.location.y) + Size::ScreenHeight(0.5));
 
-                Event::Other { timestamp: timestamp,
-                               name: format!("{:?}", touch) }
+                // dispatch on TouchPhase
+                match touch.phase {
+                    winit_event::TouchPhase::Started => Event::TouchStart { timestamp: timestamp,
+                                                                            position: position,
+                                                                            id: Some(touch.id) },
+                    winit_event::TouchPhase::Moved => Event::TouchMove { timestamp: timestamp,
+                                                                         position: position,
+                                                                         id: Some(touch.id) },
+                    winit_event::TouchPhase::Ended => Event::TouchEnd { timestamp: timestamp,
+                                                                        position: position,
+                                                                        id: Some(touch.id) },
+                    winit_event::TouchPhase::Cancelled => Event::TouchCancel { timestamp: timestamp,
+                                                                               position: position,
+                                                                               id: Some(touch.id) },
+                }
             }
             // match focus events
             winit_event::WindowEvent::Focused(focused) => {
@@ -267,23 +287,17 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
             }
             // match cursor movement events
             winit_event::WindowEvent::CursorMoved { position, .. } => {
-                let position = (Size::Pixels(position.x) - Size::ScreenWidth(0.5),
-                                Size::Pixels(-position.y) + Size::ScreenHeight(0.5));
-                Event::CursorMoved { timestamp: timestamp,
-                                     position }
+                let position = (Size::Pixels(position.x) - Size::ScreenWidth(0.5), Size::Pixels(-position.y) + Size::ScreenHeight(0.5));
+                Event::CursorMoved { timestamp: timestamp, position }
             }
             // match cursor enter events
             winit_event::WindowEvent::CursorEntered { .. } => Event::CursorEntered { timestamp },
             // match cursor exit events
             winit_event::WindowEvent::CursorLeft { .. } => Event::CursorExited { timestamp },
             // match touchpad press events
-            winit_event::WindowEvent::TouchpadPressure { device_id: _,
-                                                         pressure,
-                                                         stage, } => {
-                Event::TouchpadPress { timestamp: timestamp,
-                                       pressure,
-                                       stage: stage }
-            }
+            winit_event::WindowEvent::TouchpadPressure { device_id: _, pressure, stage } => Event::TouchpadPress { timestamp: timestamp,
+                                                                                                                   pressure,
+                                                                                                                   stage: stage },
             // match any other event
             _ => Event::Other { timestamp: timestamp,
                                 name: format!("{:?}", event) },

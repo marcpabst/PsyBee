@@ -8,7 +8,7 @@ use wgpu::TextureFormat;
 use super::Stimulus;
 use crate::utils::AtomicExt;
 use crate::visual::geometry::{Size, ToVertices, Transformation2D, Vertex};
-use crate::visual::window::WindowState;
+use crate::visual::window::InternalWindowState;
 use crate::visual::Window;
 use crate::GPUState;
 
@@ -552,7 +552,7 @@ impl crate::visual::geometry::Transformable for BaseStimulus {
 }
 
 impl Stimulus for BaseStimulus {
-    fn prepare(&mut self, window: &Window, window_state: &WindowState, gpu_state: &GPUState) {
+    fn prepare(&mut self, window: &Window, window_state: &InternalWindowState, gpu_state: &GPUState) {
         // if the stimulus is not visible we don't need to do anything
         if !self.visible.load_relaxed() {
             return;

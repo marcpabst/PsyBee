@@ -4,21 +4,13 @@ import logging
 import os
 import time
 
-from bubble_simulation import BubbleSimulation
-from psychophysics_py import (
-    AudioDevice,
-    Circle,
-    EventKind,
-    ExperimentManager,
-    FileStimulus,
-    GaborStimulus,
-    ImageStimulus,
-    MainLoop,
-    Pixels,
-    Rectangle,
-    ScreenWidth,
-    SpriteStimulus,
-)
+from .bubble_simulation import BubbleSimulation
+from psychophysics_py import MainLoop, ExperimentManager
+from psychophysics_py.audio import AudioDevice, FileStimulus
+from psychophysics_py.geometry import Circle, Rectangle, Pixels, ScreenWidth
+from psychophysics_py.events import EventKind
+from psychophysics_py.stimuli import GaborStimulus, ImageStimulus, SpriteStimulus
+from psychophysics_py.window import Window
 
 n_balls = 4
 n_init_steps = 10000
@@ -39,8 +31,8 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
 
     default_audio_device = AudioDevice()
 
-    audio_miss = FileStimulus(default_audio_device, "./resources/bubles.mp3")
-    audio_hit = FileStimulus(default_audio_device, "./resources/collect.mp3")
+    audio_miss = FileStimulus(default_audio_device, os.path.join(resources, "bubbles.mp3"))  # noqa: PTH118
+    audio_hit = FileStimulus(default_audio_device, os.path.join(resources, "collect.mp3"))  # noqa: PTH118
 
     ball_stims = []
 
@@ -55,11 +47,13 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
         Rectangle(Pixels(-50), Pixels(-50), Pixels(100), Pixels(100)),
         os.path.join(resources, "crosshair.png"),  # noqa: PTH118
     )
+    # hide by default
+    crosshair.hide()
 
     bubbles = SpriteStimulus(
         window,
         Rectangle(ScreenWidth(-0.05), ScreenWidth(-0.05), ScreenWidth(0.1), ScreenWidth(0.1)),
-        "resources/buble_pop_two_spritesheet_512px_by512px_per_frame.png",
+        os.path.join(resources, "buble_pop_two_spritesheet_512px_by512px_per_frame.png"),
         4,
         2,
         fps=20,
@@ -69,25 +63,27 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
     sparkle = SpriteStimulus(
         window,
         Rectangle(ScreenWidth(-0.05), ScreenWidth(-0.05), ScreenWidth(0.1), ScreenWidth(0.1)),
-        "resources/sparkle_spritesheet_256px_by_256px_per_frame.png",
+        os.path.join(resources, "sparkle_spritesheet_256px_by_256px_per_frame.png"),
         3,
         3,
         fps=20,
         repeat=1,
     )
 
-    subject_id = exp_manager.prompt("Press any key to start the experiment")
+    # subject_id = exp_manager.prompt("Press any key to start the experiment")
 
-    print(f"Subject ID: {subject_id}")  # noqa: T201
+    # print(f"Subject ID: {subject_id}")  # noqa: T201
 
     window.stimuli.extend(ball_stims)
     window.stimuli.append(crosshair)
     window.stimuli.append(bubbles)
     window.stimuli.append(sparkle)
 
+    # hide the cursor
+    window.cursor_visible = False
+
     def click_handler(event):
         hit = False
-
         for stim in ball_stims:
             if stim.visible and stim.contains(*event.position):
                 stim.hide()
@@ -104,11 +100,13 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
             bubbles.reset()
 
     def mouse_move_handler(event):
+        crosshair.show()
         crosshair.set_translation(*event.position)
 
     # add event handlers
     window.add_event_handler(EventKind.CURSOR_MOVED, mouse_move_handler)
     window.add_event_handler(EventKind.MOUSE_BUTTON_PRESS, click_handler)
+    window.add_event_handler(EventKind.TOUCH_START, click_handler)
 
     while True:
         frame = window.get_frame()
