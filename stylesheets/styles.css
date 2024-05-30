@@ -1,0 +1,11 @@
+[data-md-color-scheme="psybee"] {
+    --md-primary-fg-color: rgb(238, 186, 25);
+    --md-primary-bg-color: rgb(79, 51, 27);
+
+    --md-accent-fg-color: rgb(0, 0, 0);
+    --md-typeset-a-color: rgb(79, 51, 27);
+
+    --md-typeset-color: #000000;
+
+    --md-code-bg-color: rgb(255, 251, 225);
+}

@@ -1,0 +1,1254 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://psybee.org/background/colours/">
+      
+      
+        <link rel="prev" href="../graphicspipeline/">
+      
+      
+        <link rel="next" href="../../api/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.25">
+    
+    
+      
+        <title>Colours and Gamma Correction - PsyBee</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.6543a935.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/styles.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="psybee" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#colours-and-gamma-correction" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="PsyBee" class="md-header__button md-logo" aria-label="PsyBee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23 14.5c0-1.56-1.03-2.87-2.45-3.32.28-.5.45-1.07.45-1.68 0-1.56-1.03-2.87-2.45-3.32.28-.5.45-1.07.45-1.68C19 2.57 17.43 1 15.5 1h-7C6.57 1 5 2.57 5 4.5c0 .61.17 1.18.45 1.68C4.04 6.63 3 7.94 3 9.5c0 .61.17 1.18.45 1.68C2.04 11.63 1 12.94 1 14.5c0 1.26.67 2.34 1.67 2.96-.42.57-.67 1.28-.67 2.04C2 21.43 3.57 23 5.5 23h13c1.93 0 3.5-1.57 3.5-3.5 0-.76-.25-1.47-.67-2.04 1-.62 1.67-1.7 1.67-2.96M8.5 3h7c.83 0 1.5.67 1.5 1.5S16.33 6 15.5 6h-7C7.67 6 7 5.33 7 4.5S7.67 3 8.5 3m-2 5h11c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-11C5.67 11 5 10.33 5 9.5S5.67 8 6.5 8M4 19.5c0-.83.67-1.5 1.5-1.5H9v3H5.5c-.83 0-1.5-.67-1.5-1.5M18.5 21H15v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5m1-5h-4.68c-.42-1.16-1.52-2-2.82-2s-2.4.84-2.82 2H4.5c-.83 0-1.5-.67-1.5-1.5S3.67 13 4.5 13h15c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PsyBee
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Colours and Gamma Correction
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/marcpabst/psybee" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    marcpabst/psybee
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/" class="md-tabs__link">
+          
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="PsyBee" class="md-nav__button md-logo" aria-label="PsyBee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23 14.5c0-1.56-1.03-2.87-2.45-3.32.28-.5.45-1.07.45-1.68 0-1.56-1.03-2.87-2.45-3.32.28-.5.45-1.07.45-1.68C19 2.57 17.43 1 15.5 1h-7C6.57 1 5 2.57 5 4.5c0 .61.17 1.18.45 1.68C4.04 6.63 3 7.94 3 9.5c0 .61.17 1.18.45 1.68C2.04 11.63 1 12.94 1 14.5c0 1.26.67 2.34 1.67 2.96-.42.57-.67 1.28-.67 2.04C2 21.43 3.57 23 5.5 23h13c1.93 0 3.5-1.57 3.5-3.5 0-.76-.25-1.47-.67-2.04 1-.62 1.67-1.7 1.67-2.96M8.5 3h7c.83 0 1.5.67 1.5 1.5S16.33 6 15.5 6h-7C7.67 6 7 5.33 7 4.5S7.67 3 8.5 3m-2 5h11c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-11C5.67 11 5 10.33 5 9.5S5.67 8 6.5 8M4 19.5c0-.83.67-1.5 1.5-1.5H9v3H5.5c-.83 0-1.5-.67-1.5-1.5M18.5 21H15v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5m1-5h-4.68c-.42-1.16-1.52-2-2.82-2s-2.4.84-2.82 2H4.5c-.83 0-1.5-.67-1.5-1.5S3.67 13 4.5 13h15c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5Z"/></svg>
+
+    </a>
+    PsyBee
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/marcpabst/psybee" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    marcpabst/psybee
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Tutorials
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            Tutorials
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/tutorial1/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Your first experiment
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Concepts
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            Concepts
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/frame/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Windows and Frames
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/colours/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Colours
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/events/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/sizes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sizes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/visual-stimuli/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Visual stimuli
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Advanced Usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Background
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            Background
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../graphicspipeline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Modern Graphics Pipelines
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Colours and Gamma Correction
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Colours and Gamma Correction
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#useful-colour-spaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Useful colour spaces
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Useful colour spaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rgb-colour-spaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      RGB colour spaces
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cie-1931-xyz-colour-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      CIE 1931 XYZ colour space
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lms-colour-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      LMS colour space
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-numbers-to-light-intensity" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting numbers to light intensity
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#srgb-colour-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      sRGB colour space
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gamma-correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gamma correction
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    API
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            API
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/window/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Window
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/events/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#useful-colour-spaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Useful colour spaces
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Useful colour spaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rgb-colour-spaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      RGB colour spaces
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cie-1931-xyz-colour-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      CIE 1931 XYZ colour space
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lms-colour-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      LMS colour space
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-numbers-to-light-intensity" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting numbers to light intensity
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#srgb-colour-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      sRGB colour space
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gamma-correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gamma correction
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="colours-and-gamma-correction">Colours and Gamma Correction</h1>
+<p><strong><em>This article proides background information on colour spaces and gamma correction. <em>PsyBee</em> currently does not provide full colour management support, but you can specify the encoding used and you can perform gamma calibration yourself.</em></strong></p>
+<p>A colour space is a mathematical model that describes how colours can be represented as tuples of numbers. Since human vision is trichromatic (i.e. we have three types of colour receptors in our eyes), most colour spaces are tristimulus colour spaces, meaning that colours can be represented as a combination of three numbers.</p>
+<h2 id="useful-colour-spaces">Useful colour spaces</h2>
+<h3 id="rgb-colour-spaces">RGB colour spaces</h3>
+<p>RGB colour spaces are tristimulus colour spaces that are based on defining values for red, green, and blue (so-called "primaries") and a white point. They are the most ubiquitous colour spaces in computer graphics and will probably be the most familiar to you.</p>
+<div class="admonition terminology">
+<p class="admonition-title">Terminology</p>
+<p>It can be slightly confusing that the term "RGB colour space" is used to refer to both the concept of a colour space represented by red, green, and blue, and to a specific colour space that is defined by a set of specific red, green, and blue primaries and a white point (like sRGB or Adobe RGB). <strong>For sake of clarity, you should always clearly state which RGB colour space you are referring to.</strong></p>
+</div>
+<p>The three most important concepts in RGB colour spaces are: the <strong>primaries</strong>, the <strong>white point</strong>, and the <strong>encoding</strong>.</p>
+<p>The <strong>primaries</strong> are the three colours that are used to represent all other colours. Any given, clearly defined colour space will have a distinct set of primaries. For example, the sRGB colour space uses the following primaries (in CIE xyY colour space):</p>
+<ul>
+<li>Red: (X = 0.64, Y = 0.33)</li>
+<li>Green: (X = 0.30, Y = 0.60)</li>
+<li>Blue: (X = 0.15, Y = 0.06)</li>
+</ul>
+<p>The <strong>white point</strong> is the colour of a perfectly white surface, i.e. when all three primary colours are present in equal amounts. White points are usually defined in terms of their spectral power distribution, and the most commonly used white point is the CIE standard illuminant D65, which is characterized by a colour temperature of approximately 6500 K <sup id="fnref:3"><a class="footnote-ref" href="#fn:3">3</a></sup> <sup id="fnref:4"><a class="footnote-ref" href="#fn:4">4</a></sup>.</p>
+<p>The <strong>encoding</strong> is the transfer function that is used to convert the RGB values to light intensity (also called electro-optical transfer function, see <a href="#converting-numbers-to-light-intensity">below</a>). The encoding can be linear or non-linear.</p>
+<p>Confusingly, some definitions of certain RGB colour spaces include the encoding, while others do not. For example, the sRGB colour space is usually used with with so-called "sRGB transfer function" (a non-linear encoding), but you sometimes the sRGB primaries and white point are used with a linear encoding (often called "linear sRGB"). Even more confusingly, not all implementations of sRGB use the same transfer function. The sRGB transfer function is formally defined by an ICE standard, and it is a piecewise function that combines a linear segment with a power function with an exponent of 2.4. However, some implementations of sRGB use a slightly different transfer function. For example, many displays approximate the sRGB transfer function using a power function with an exponent of 2.2. Annoyingly, some (even professional) software packages have needlessly invented their own transfer functions for sRGB, which can cause confusion and compatibility issues.<sup id="fnref:5"><a class="footnote-ref" href="#fn:5">5</a></sup></p>
+<p>RGB colour spaces are extremely useful for computer graphics because they are very intuitive and easy to understand. Moreover, almost all modern display technologies are based on emitting red, green, and blue light, which makes RGB colour spaces a natural choice for representing colours that are to be displayed on a screen. Some common RGB colour spaces are:</p>
+<ul>
+<li>sRGB (the standard colour space for most consumer applications)</li>
+<li>Adobe RGB (a colour space that is used in professional photography and printing)</li>
+<li>Display P3 (a colour space that is used in Apple's devices)</li>
+<li>Rec. 709 (a colour space that is used in HDTV systems)</li>
+<li>Rec. 2020 (a colour space that is used in UHDTV systems)</li>
+</ul>
+<h3 id="cie-1931-xyz-colour-space">CIE 1931 XYZ colour space</h3>
+<p>The CIE XYZ colour space captures all perceivable colours through three components: <code>X</code>, <code>Y</code>, and <code>Z</code>. Where <code>Y</code> denotes luminance, while <code>X</code> and <code>Z</code> denote colour information. Because it's device-independant, it is often used a a universal standard for colour representation. Also, the CIE XYZ colour space is the foundation for many other colour spaces, including the CIE xyY colour space, which is a transformation of XYZ to a more perceptually uniform space.</p>
+<h3 id="lms-colour-space">LMS colour space</h3>
+<p>The LMS colour space is a colour space that is based on the response of the three types of cones in the human retina. It is a linear colour space, meaning that the values are proportional to the number of photons that are absorbed by the cones. This makes it a very useful colour space for vision scientists, because it allows us to represent colours in a way that is directly related to the physical properties of the light that is absorbed by the cones. However, it is not a very intuitive colour space for most people, and because it is linke to the spectral properties of both the display and the observer, it can be difficult to work with in practice.</p>
+<h2 id="converting-numbers-to-light-intensity">Converting numbers to light intensity</h2>
+<p>How do we go from three colour values to light intensity? This is where the concept of the electro-optical transfer function (EOTF) comes in.</p>
+<p>The electro-optical transfer function (EOTF) is a function that describes how the RGB values are converted to light intensity. In other words, it describes how the RGB values are converted to actual number of photons emitted by the display. In the simplest case, the EOTF is a linear function that simply scales the RGB values by a constant factor. For example, this would mean that an RGB value of <code>(100, 100, 100)</code> would result in twice as much light being emitted as an RGB value of <code>(50, 50, 50)</code>.</p>
+<p>However, most displays use a non-linear EOTF. This is for both historical, perceptual, and technical reasons.</p>
+<blockquote>
+<p>The following section contains some semi-techincal and vaguely interesting information about the history of display technology. Feel free to skip it if you are not interested in this.</p>
+</blockquote>
+<p>Until the late 1990s, most displays were based on the cathode ray tube (CRT) technology. In CRT displays, an electron beam is used to excite phosphors on the screen, which then emit light. The brightness of the light emitted is a function of the voltage difference between the electron gun (cathode) and the grid (anode). This function is, as it turns out, highly non-linear (it is a somewhat common misconception that the nonlinearity of a CRT is due to the phosphor, but this is not the case; in fact, the nonlinearity is due to the physics of the electron beam while the phosphor response is actually quite linear) <sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>.</p>
+<p>Here is really interesting part: If you are fammiliar with basic human physiology, you might be aware that the human visual system also behaves non-linearly (in fact, this is a principle that holds for most sensory systems and was first described by Gustav Theodor Fechner and Ernst Heinrich Weber in the 19th century).</p>
+<p>This means that the perceived brightness of a light is not proportional to the actual number of photons emitted, but roughly follows a power law. This is an amazing coincidence, because it means that the non-linear response of the human visual system is almost perfectly matched to the <em>inverse</em> of the non-linear response of the CRT.</p>
+<p>Why is this important?</p>
+<p>When encoding colour values in a limited number of bits per channel (e.g. 8 bits per channel or 256 values per channel as is common in computer graphics), it would be a bad idea to spread the values uniformly across the entire range.</p>
+<blockquote>
+<p><strong>Example: Linear encoding</strong></p>
+<p>Assuming 256 values per channel, a linear encoding would mean that the difference between the darkest and the brightest value is 255. This would mean that the difference between the darkest and the second darkest value is 1/255. This might sound like a small difference, but it is actually a huge difference in terms of perceived light intensity. In fact, the ratio of the perceived intensities of the darkest and the second darkest value is over 6%, well above the threshold of visibility.</p>
+<p>On the other hand, the difference between the brightest and the second brightest value is also 1/255, but this is a much smaller difference in terms of perceived light intensity. In fact, the ratio of the perceived intensities of the brightest and the second brightest value is less than 0.3%. That is completely invisible to the human eye!</p>
+</blockquote>
+<p>but rather concentrate them where the human visual system is most sensitive. In practive, one shoud use more of the 256 values to represent darker shades, and fewer to represent brighter shades. Mathematically, this mweans that we should use an <em>encoding</em> function that is the inverse of the human visual system's <em>decoding</em> function.</p>
+<p>The fact that the CRT's non-linear response is almost perfectly matched to the human visual system's non-linear response is a happy coincidence, and it means that it was possible to exploit the CRT's non-linear response to encode the colour values in a way that is more efficient than a linear encoding.</p>
+<p>Fast forward to today, and we no longer use CRT displays. However, the non-linear EOTF has stuck around and has been adopted as the standard for most modern displays. This is because it is still a very efficient way to encode colour values, and because it is compatible with the vast amount of content that has been created for and using CRT displays.</p>
+<h2 id="srgb-colour-space">sRGB colour space</h2>
+<p>The most commonly used EOTF today is the sRGB transfer function.</p>
+<p>The sRGB color space, which is the standard color space for numerous consumer applications, was developed by HP and Microsoft in 1996 ans was later regosnised by the International Electrotechnical Commission (IEC) <sup id="fnref:2"><a class="footnote-ref" href="#fn:2">2</a></sup>. sRGB incorporates the Rec. 709 primaries, which were originally introduced in 1990 for HDTV systems under the ITU-R Recommendation BT.709. The white point in sRGB is the CIE standard illuminant D65, characterized by a color temperature of approximately 6500 K<sup id="fnref2:3"><a class="footnote-ref" href="#fn:3">3</a></sup>.</p>
+<p>The transfer function of sRGB is non-linear and piecewise linear, approximating a gamma of 2.2:</p>
+<div class="highlight"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mf">0.0031308</span>
+<span class="w">   </span><span class="n">c</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">12.92</span>
+<span class="k">else</span>
+<span class="w">  </span><span class="mf">1.055</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">c</span><span class="o">^</span><span class="p">(</span><span class="mf">1.0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">2.4</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">0.055</span>
+</code></pre></div>
+<p>where <code>c</code> is the RGB in the range [0.0, 1.0].</p>
+<p>As described above, this encoding method was initially tailored for the gamma characteristics of CRT displays. Coincidentally, it also mimics the response of the human visual system to light in daylight conditions, making linearly spaced RGB values correspond to perceived linear light intensity.</p>
+<h2 id="gamma-correction">Gamma correction</h2>
+<div class="admonition terminology">
+<p class="admonition-title">Terminology</p>
+<p>Note that the term "gamma correction" might be used slightly differently in other contexts.</p>
+</div>
+<p>When vision scientists talk about "gamma correction", they are usually referring to the process of compensating for the non-linear transfer function of the display. The goal of gamma correction in this context is to ensure that the light intensity emitted by the display is proportional to the RGB values that are sent to the display. This is important because it means that the RGB values can be interpreted as light intensity.</p>
+<p>It is important to note that all modern graphics libraries and hardware perform some sort of gamma correction automatically because it is a fundamental part of the display pipeline to enure correct colour and alpha blending. However, by default, values are then automatically re-encoded into a (usually non-linear) colour space before being sent to the display.</p>
+<p>If your goal is to present stimuli with a specific light intensity, you have a number of options to deal with this:</p>
+<ol>
+<li>
+<p><strong>You either trust the display manufacturer to have done a good job at calibrating the display or you calibrate the display yourself, using the tools privded by your operating system or the display manufacturer.</strong> You then provide the correct colour values in the correct (linear!) colour space, and let the rendering pipeline take care of the rest. This means basically telling your GPU to skip the conversion into linear space and then have the linear values correctly encoded into the display's colour space. This is the most common approach when working colour managed applications. However, it requires that you have a well-calibrated display and that your operating system, graphics API, and GPU drivers all correctly support colour management.</p>
+</li>
+<li>
+<p>You can perform the gamma correction yourself, either by transforming colours before you pass them to the rendering pipeline, by setting a LUT in the GPU set through your operating system, or by correcting it yourself before the framebuffer is sent to the display (either using a transfer function in a fragment shader or by using a LUT in the GPU).</p>
+</li>
+</ol>
+<p><em>PsyBee</em> allows you to combine these two approaches. By default, your operating system and GPU drivers will take care of the gamma correction, but you can also <em>correct for innacuracies</em> in the display's gamma correction by performing the gamma correction yourself. This basically means that we provide a mapping from the theoretically expected light intensity to the actual light intensity emitted by the display. <strong>Note that this approach is slightly different from the traditional approach to gamma correction, which is to provide a mapping from whatever colour space you are using to the actual light intensity emitted by the display.</strong></p>
+<p><em>PsyBee</em> provides a number of tools to help you calibrate your display, and to ensure that the gamma correction is performed correctly.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:1">
+<p>Charles Poynton, A Technical Introduction to Digital Video. New York: Wiley, 1996.&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn:2">
+<p>The sRGB colour space is defined by the International Electrotechnical Commission (IEC) in the standard IEC 61966-2-1:1999.&#160;<a class="footnote-backref" href="#fnref:2" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+<li id="fn:3">
+<p>Following the re-definition of several physical constants in 1968 by the International Committee for Weights and Measures (CIPM), there was a minor shift in the Planckian locus. As a result, the CIE standard illuminant D65 is not precisely at 6500 K, but rather at 6504 K.&#160;<a class="footnote-backref" href="#fnref:3" title="Jump back to footnote 3 in the text">&#8617;</a><a class="footnote-backref" href="#fnref2:3" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+</li>
+<li id="fn:4">
+<p>If you are wondering why this white point was chosen, it apparently matches the colour of normal daylight in western/central Europe.&#160;<a class="footnote-backref" href="#fnref:4" title="Jump back to footnote 4 in the text">&#8617;</a></p>
+</li>
+<li id="fn:5">
+<p>Will the Real sRGB Profile Please Stand Up?, <a href="https://ninedegreesbelow.com/photography/srgb-profile-comparison.html">https://ninedegreesbelow.com/photography/srgb-profile-comparison.html</a>&#160;<a class="footnote-backref" href="#fnref:5" title="Jump back to footnote 5 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../graphicspipeline/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Modern Graphics Pipelines">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Modern Graphics Pipelines
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../api/" class="md-footer__link md-footer__link--next" aria-label="Next: API">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                API
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.footer"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.081f42fc.min.js"></script>
+      
+    
+  </body>
+</html>
