@@ -1,0 +1,38 @@
+# This project was generated with 0.3.18 using template: https://github.com/beeware/briefcase-template@v0.3.18
+
+[tool.briefcase]
+project_name = "Demo App"
+bundle = "uk.co.childvisionlab"
+version = "0.0.1"
+url = "https://childvisionlab.co.uk/demo_app"
+license = "Other"
+author = "Marc Pabst"
+author_email = "n/a"
+
+[tool.briefcase.app.demo_app]
+formal_name = "Demo App"
+description = "A demo app for physohysics"
+long_description = """More details about the app should go here."""
+
+sources = [
+    "src/demo_app",
+]
+test_sources = [
+    "tests",
+]
+
+requires = [
+    "numpy",
+]
+
+
+
+[tool.ruff.lint]
+select = ["ALL"]
+
+[tool.ruff]
+line-length = 130
+
+[tool.yapf]
+based_on_style = "google"
+column_limit = 50
