@@ -26,6 +26,7 @@ use crate::visual::color::ColorFormat;
 pub mod audio;
 pub mod errors;
 pub mod input;
+pub mod options;
 pub mod utils;
 pub mod visual;
 
@@ -256,7 +257,7 @@ impl ExperimentManager {
 
         log::debug!("Creating default window on monitor {:?}", monitor);
         self.create_window(&&WindowOptions::FullscreenHighestResolution { monitor: Some(monitor.clone()),
-                                                                         refresh_rate: None })
+                                                                          refresh_rate: None })
     }
 
     /// Retrive available monitors. This reflects the state of the monitors at

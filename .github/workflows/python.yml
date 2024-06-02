@@ -7,12 +7,12 @@ name: psybee-py (Python)
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
     paths:
       - "psybee/**"
       - "psybee-py/**"
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
     paths:
       - "psybee/**"
       - "psybee-py/**"

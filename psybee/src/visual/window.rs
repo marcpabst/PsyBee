@@ -39,26 +39,6 @@ pub struct InternalWindowState {
 }
 
 /// How to block when presenting a frame.
-pub enum BlockingStrategy {
-    /// Will render the current frame using a command buffer and submit it to the GPU, then immediately return.
-    /// Note that this may still block depending on the maximum number of frames in flight, i.e. if you submit
-    /// too many frames in short succession, this will block until the GPU has caught up with the work.
-    DoNotBlock,
-
-    // /// Will block until the previous the GPU has finished processing the previous frame. Depending on
-    // /// the platform, this may be identical to `BlockUntilVBlank`, but there is generally no guarantee
-    // /// that this will return in sync with the vertical blanking interval or the actual frame presentation.
-    // BlockUntilPreviousFrameFinished,
-    /// Will block until the vertical blanking interval at which the current frame will be presented,
-    /// then return as quickly as possible.
-    BlockUntilVBlank,
-
-    /// Will block until the vertical blanking interval at which the current frame will be presented,
-    /// then return as quickly as possible. This will also verify that the frame has been presented and
-    /// that no frame has been dropped. This is not supported on all platforms.
-    BlockUntilBVBlankVerified,
-}
-
 /// A Window represents a window on the screen. It is used to create stimuli and
 /// to submit them to the screen for rendering. Each window has a render task
 /// that is responsible for rendering stimuli to the screen.
@@ -119,6 +99,9 @@ pub struct Window {
     /// the event id as the key.
     #[dbg(placeholder = "...")]
     pub event_handlers: Arc<RwLock<HashMap<EventHandlerId, (EventKind, EventHandler)>>>,
+
+    /// global options
+    pub options: Arc<Mutex<crate::options::GlobalOptions>>,
 }
 
 impl Window {
@@ -183,7 +166,7 @@ impl Window {
     /// Submits a frame to the render task. This will in turn call the prepare()
     /// and render() functions of all renderables in the frame.
     /// This will block until the frame has been consumed by the render task.
-    pub fn present(&self, frame: Frame, blocking_strategy: Option<BlockingStrategy>) {
+    pub fn present(&self, frame: Frame) {
         let frame_sender = self.frame_channel_sender.clone();
         let frame_ok_receiver = self.frame_consumed_channel_receiver.clone();
 
@@ -408,8 +391,8 @@ pub async fn render_task(window: Window) {
     // on native, we submit frames when they are ready
     #[cfg(not(target_arch = "wasm32"))]
     {
-
         let flip_count = Arc::new(AtomicU32::new(0));
+
         loop {
             // wait for frame to be submitted
             let frame = rx.recv().await.unwrap();
@@ -455,27 +438,22 @@ pub async fn render_task(window: Window) {
 
             let t_start = std::time::Instant::now();
             frame.prepare(&window, &window_state, &gpu_state).await;
-            log::warn!("Frame - Time to prepare: {:?}", t_start.elapsed());
 
-            let t_start = std::time::Instant::now();
             frame.render(&mut encoder, &view);
-            log::warn!("Frame - Time to render: {:?}", t_start.elapsed());
+            log::warn!("Frame - Time to prepare and render: {:?}", t_start.elapsed());
 
-            let t_start = std::time::Instant::now();
             let _ = gpu_state.queue.submit(Some(encoder.finish()));
-            log::warn!("Frame - Time to submit: {:?}", t_start.elapsed());
 
+            // present the frame
             suface_texture.present();
-
-            // drop window_state
-            drop(window_state);
-
-            let mut window_state = window.write_window_state_blocking();
-
-       
 
             #[cfg(target_os = "windows")]
             {
+                // drop window_state to avoid deadlock
+                drop(window_state);
+
+                let mut window_state = window.write_window_state_blocking();
+
                 let hal_surface_callback = |sf: Option<&wgpu::hal::dx12::Surface>| {
                     let dxgi_surface = sf.unwrap();
                     let swap_chain = dxgi_surface.raw_swap_chain().unwrap();
