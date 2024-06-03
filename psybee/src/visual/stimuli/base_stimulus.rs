@@ -511,7 +511,11 @@ impl Stimulus for BaseStimulus {
 
         let t_start = std::time::Instant::now();
         // update the vertex buffer
-        gpu_state.queue.write_buffer(&(self.vertex_buffer.lock_blocking()), 0, bytemuck::cast_slice(&vertices));
+        let vertex_buffer = self.vertex_buffer.lock_blocking();
+        let buffer_size = BufferSize::new(vertex_buffer.size()).unwrap();
+        let mut h = gpu_state.queue.write_buffer_with(&vertex_buffer, 0, buffer_size).unwrap();
+        h.copy_from_slice(bytemuck::cast_slice(&vertices));
+
         let t_end = std::time::Instant::now();
         log::warn!("Time to write vertex buffer: {:?}", t_end - t_start);
         // update the transform buffer
