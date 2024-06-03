@@ -4,7 +4,6 @@ use byte_slice_cast::AsSliceOf;
 use gst::element_error;
 use gst::prelude::*;
 use gst_app::AppSink;
-use image::GenericImageView;
 
 use super::super::pattern_stimulus::FillPattern;
 use crate::prelude::PsybeeError;
@@ -141,10 +140,10 @@ impl Video {
                     }
                     MessageView::StateChanged(s) => {
                         log::info!("State changed from {:?}: {:?} -> {:?} ({:?})",
-                                 s.src().map(|s| s.path_string()),
-                                 s.old(),
-                                 s.current(),
-                                 s.pending());
+                                   s.src().map(|s| s.path_string()),
+                                   s.old(),
+                                   s.current(),
+                                   s.pending());
                     }
                     _ => {
                         log::info!("Other message: {:?}", msg);

@@ -21,6 +21,10 @@ impl Uniform {
     pub fn set_color(&mut self, color: impl IntoRawRgba) {
         self.color = color.convert_to_raw_rgba(ColorFormat::SRGBA8);
     }
+
+    pub fn color(&self) -> RawRgba {
+        self.color
+    }
 }
 
 impl FillPattern for Uniform {

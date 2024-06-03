@@ -280,7 +280,7 @@ impl MainLoop {
         let backend = wgpu::Backends::all();
 
         #[cfg(target_os = "windows")]
-        let backend = wgpu::Backends::DX12;
+        let backend = wgpu::Backends::VULKAN;
 
         let instance_desc = wgpu::InstanceDescriptor { backends: backend,
                                                        // use defaults for the rest
@@ -486,7 +486,8 @@ impl MainLoop {
                               height_px: Arc::new(AtomicU32::new(300)),
                               render_task_sender: self.render_thread_channel_sender.clone(),
                               stimuli: Arc::new(Mutex::new(vec![])),
-                              event_handlers: Arc::new(RwLock::new(HashMap::new())) };
+                              event_handlers: Arc::new(RwLock::new(HashMap::new())),
+                              options: Arc::new(Mutex::new(options::GlobalOptions::default())) };
 
         let win_clone = window.clone();
         // add a default event handler for mouse move events, which updates the mouse

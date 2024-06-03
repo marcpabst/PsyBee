@@ -447,30 +447,30 @@ pub async fn render_task(window: Window) {
             // present the frame
             suface_texture.present();
 
-            #[cfg(target_os = "windows")]
-            {
-                // drop window_state to avoid deadlock
-                drop(window_state);
+            // #[cfg(target_os = "windows")]
+            // {
+            //     // drop window_state to avoid deadlock
+            //     drop(window_state);
 
-                let mut window_state = window.write_window_state_blocking();
+            //     let mut window_state = window.write_window_state_blocking();
 
-                let hal_surface_callback = |sf: Option<&wgpu::hal::dx12::Surface>| {
-                    let dxgi_surface = sf.unwrap();
-                    let swap_chain = dxgi_surface.raw_swap_chain().unwrap();
+            //     let hal_surface_callback = |sf: Option<&wgpu::hal::dx12::Surface>| {
+            //         let dxgi_surface = sf.unwrap();
+            //         let swap_chain = unsafe { dxgi_surface.swap_chain().unwrap() };
 
-                    // get frame statistics
-                    let mut stats = winapi::shared::dxgi::DXGI_FRAME_STATISTICS::default();
-                    unsafe { swap_chain.GetFrameStatistics(&mut stats) };
+            //         // get frame statistics
+            //         let mut stats = winapi::shared::dxgi::DXGI_FRAME_STATISTICS::default();
+            //         unsafe { swap_chain.GetFrameStatistics(&mut stats) };
 
-                    // get frame statistics
-                    let diff = stats.SyncRefreshCount - flip_count.load(Ordering::Relaxed);
-                    flip_count.store(stats.SyncRefreshCount, Ordering::Relaxed);
+            //         // get frame statistics
+            //         let diff = stats.SyncRefreshCount - flip_count.load(Ordering::Relaxed);
+            //         flip_count.store(stats.SyncRefreshCount, Ordering::Relaxed);
 
-                    log::warn!("Flips since last frame: {}", diff);
-                };
+            //         log::warn!("Flips since last frame: {}", diff);
+            //     };
 
-                unsafe { &window_state.surface.as_hal::<wgpu::core::api::Dx12, _, _>(hal_surface_callback) }.unwrap();
-            }
+            //     unsafe { &window_state.surface.as_hal::<wgpu::core::api::Dx12, _, _>(hal_surface_callback) }.unwrap();
+            // }
 
             // notify sender that frame has been consumed
             let _ = block_on(tx.send(true));

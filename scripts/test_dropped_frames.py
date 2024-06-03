@@ -8,7 +8,7 @@ from psybee import MainLoop, ExperimentManager
 from psybee.audio import AudioDevice, FileStimulus
 from psybee.geometry import Circle, Rectangle, Pixels, ScreenWidth
 from psybee.events import EventKind
-from psybee.stimuli import GaborStimulus, ImageStimulus, SpriteStimulus
+from psybee.stimuli import GaborStimulus, ImageStimulus, SpriteStimulus, ColorStimulus
 from psybee.window import Window
 
 
@@ -20,8 +20,23 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
 
     (width, height) = (window.width_px, window.height_px)
 
-    while True:
+    c1 = (233 / 255, 113 / 255, 113 / 255)
+    c2 = (148 / 255, 253 / 255, 253 / 255)
+
+    stim = ColorStimulus(window, Rectangle.fullscreen(), c1)
+
+    window.stimuli.append(stim)
+
+    for i in range(int(1e6)):
         frame = window.get_frame()
+
+        # change the color of the stimulus
+        if i % 2 == 0:
+            stim.color = c1
+        else:
+            stim.color = c2
+
+        #print(stim.color)
 
         window.present(frame)
 

@@ -10,6 +10,7 @@ use psybee::visual::window::Frame;
 use psybee::visual::Window;
 use psybee::{errors, ExperimentManager, MainLoop, Monitor, WindowOptions};
 use pyo3::prelude::*;
+use pyo3::types::PyTuple;
 use pyo3::{py_run, Python};
 use pywrap::{py_forward, py_wrap, transmute_ignore_size};
 use send_wrapper::SendWrapper;
@@ -147,7 +148,7 @@ impl PyWindow {
     fn present(&self, frame: &PyFrame, py: Python<'_>) {
         let self_wrapper = SendWrapper::new(self);
         py.allow_threads(move || {
-              self_wrapper.0.present(frame.0.clone(), None);
+              self_wrapper.0.present(frame.0.clone());
           });
     }
 
@@ -690,6 +691,46 @@ impl PyGaborStimulus {
     }
 }
 
+/// An ImageStimulus.
+#[pyclass(name = "ColorStimulus", extends = PyStimulus)]
+#[derive(Clone)]
+pub struct PyColorStimulus();
+
+#[pymethods]
+impl PyColorStimulus {
+    #[new]
+    fn __new__(window: &PyWindow, shape: &PyShape, color: (f32, f32, f32), py: Python<'_>) -> (Self, PyStimulus) {
+        let _self_wrapper = SendWrapper::new(window);
+        py.allow_threads(move || {
+              let stim = psybee::visual::stimuli::ColorStimulus::new(&window.0, shape.0.clone_box(), psybee::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0));
+              (PyColorStimulus(), PyStimulus(Box::new(stim)))
+          })
+    }
+
+    #[setter]
+    fn set_color(slf: PyRef<'_, Self>, color: &Bound<'_, PyTuple>) {
+        let color = color.extract::<(f32, f32, f32)>().expect("Failed to extract color tuple");
+        slf.into_super()
+           .0
+           .downcast_ref::<psybee::visual::stimuli::ColorStimulus>()
+           .expect("Failed to downcast to ColourStimulus")
+           .set_color(psybee::visual::color::SRGBA::new(color.0, color.1, color.2, 1.0));
+    }
+
+    #[getter]
+    fn color<'a>(slf: PyRef<'a, Self>, py: Python<'a>) -> Bound<'a, PyTuple> {
+        let color = slf.into_super()
+                       .0
+                       .downcast_ref::<psybee::visual::stimuli::ColorStimulus>()
+                       .expect("Failed to downcast to ColourStimulus")
+                       .color();
+
+        let color_vec = vec![color.r, color.g, color.b];
+
+        PyTuple::new_bound(py, color_vec)
+    }
+}
+
 py_wrap!(AudioDevice, unsendable);
 py_forward!(AudioDevice, fn new() -> AudioDevice);
 
@@ -1001,9 +1042,9 @@ pub enum PyEventData {
 #[pymodule]
 #[pyo3(name = "psybee")]
 fn psybee_py(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    pyo3_log::init();
+    //pyo3_log::init();
     // init simplelog to file
-    //simplelog::WriteLogger::init(simplelog::LevelFilter::Warn, simplelog::Config::default(), std::fs::File::create("C:/Users/psyphyuser/Documents/psybee.log").unwrap()).unwrap();
+    simplelog::WriteLogger::init(simplelog::LevelFilter::Warn, simplelog::Config::default(), std::fs::File::create("C:/Users/psyphyuser/Documents/psybee.log").unwrap()).unwrap();
 
     pyo3::prepare_freethreaded_python();
 
@@ -1032,6 +1073,7 @@ fn psybee_py(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     mod_stimuli.add_class::<PyGaborStimulus>()?;
     mod_stimuli.add_class::<PyImageStimulus>()?;
     mod_stimuli.add_class::<PySpriteStimulus>()?;
+    mod_stimuli.add_class::<PyColorStimulus>()?;
     mod_stimuli.add_class::<PyStimulus>()?;
     #[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
     mod_stimuli.add_class::<PyVideoStimulus>()?;

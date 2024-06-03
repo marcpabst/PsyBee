@@ -15,6 +15,8 @@ use winit::platform::scancode::PhysicalKeyExtScancode;
 use crate::visual::geometry::Size;
 use crate::visual::Window;
 
+pub mod video;
+
 /// A mouse button.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MouseButton {

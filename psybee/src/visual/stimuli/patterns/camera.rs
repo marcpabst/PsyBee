@@ -4,7 +4,6 @@ use byte_slice_cast::AsSliceOf;
 use gst::element_error;
 use gst::prelude::*;
 use gst_app::AppSink;
-use image::GenericImageView;
 
 use super::super::pattern_stimulus::FillPattern;
 use crate::prelude::PsybeeError;
@@ -48,18 +47,16 @@ impl Camera {
         let (width, height) = self.dimensions;
 
         // use gst_parse_launch to create the pipeline
-        let pipeline =
-            gst::parse::launch("queue name=q0 ! videoconvert ! videoscale name=converter").unwrap();
+        let pipeline = gst::parse::launch("queue name=q0 ! videoconvert ! videoscale name=converter").unwrap();
 
         let pipeline = pipeline.dynamic_cast::<gst::Pipeline>().unwrap();
 
         // create the camera source
 
         // for Mac OS, use avfvideosrc
-        let src =
-            gst::ElementFactory::make("avfvideosrc").property("device-index", &1)
-                                                    .build()
-                                                    .expect("Failed to create source element");
+        let src = gst::ElementFactory::make("avfvideosrc").property("device-index", &1)
+                                                          .build()
+                                                          .expect("Failed to create source element");
 
         // add the source to the pipeline
         pipeline.add(&src).unwrap();
@@ -71,70 +68,55 @@ impl Camera {
         //     .by_name("src")
         //     .expect("Failed to get source element");
 
-        let appsink = AppSink::builder()
-            .caps(
-                &gst::Caps::builder("video/x-raw")
-                    .field("format", &gst_video::VideoFormat::Bgra.to_string())
-                    .field("width", &(width as i32))
-                    .field("height", &(height as i32))
-                    .build(),
-            )
-            .build();
+        let appsink = AppSink::builder().caps(&gst::Caps::builder("video/x-raw").field("format", &gst_video::VideoFormat::Bgra.to_string())
+                                                                                .field("width", &(width as i32))
+                                                                                .field("height", &(height as i32))
+                                                                                .build())
+                                        .build();
 
         // add the appsink to the pipeline
-        pipeline.add(&appsink.upcast_ref() as &gst::Element)
-                .unwrap();
+        pipeline.add(&appsink.upcast_ref() as &gst::Element).unwrap();
 
-        let converter = pipeline.by_name("converter")
-                                .expect("Failed to get converter element");
+        let converter = pipeline.by_name("converter").expect("Failed to get converter element");
 
-        converter.link(&appsink)
-                 .expect("Failed to link converter to appsink");
+        converter.link(&appsink).expect("Failed to link converter to appsink");
 
         // add a callback to the appsink to get the frame and write it to the image
-        appsink.set_callbacks(
-            gst_app::AppSinkCallbacks::builder()
-                // Add a handler to the "new-sample" signal.
-                .new_sample(move |appsink| {
-                    // get the frame
-                    let sample = appsink.pull_sample().expect("Failed to get sample");
+        appsink.set_callbacks(gst_app::AppSinkCallbacks::builder()
+                                                                  // Add a handler to the "new-sample" signal.
+                                                                  .new_sample(move |appsink| {
+                                                                      // get the frame
+                                                                      let sample = appsink.pull_sample().expect("Failed to get sample");
 
-                    // print the size of the buffer
-                    let buffer = sample.buffer().ok_or_else(|| {
-                        element_error!(
-                            appsink,
-                            gst::ResourceError::Failed,
-                            ("Failed to get buffer from appsink")
-                        );
-                        gst::FlowError::Error
-                    })?;
+                                                                      // print the size of the buffer
+                                                                      let buffer = sample.buffer().ok_or_else(|| {
+                                                                                                       element_error!(appsink,
+                                                                                                                      gst::ResourceError::Failed,
+                                                                                                                      ("Failed to get buffer from appsink"));
+                                                                                                       gst::FlowError::Error
+                                                                                                   })?;
 
-                    let map = buffer.map_readable().map_err(|_| {
-                        element_error!(
-                            appsink,
-                            gst::ResourceError::Failed,
-                            ("Failed to map buffer readable")
-                        );
-                        gst::FlowError::Error
-                    })?;
+                                                                      let map = buffer.map_readable().map_err(|_| {
+                                                                                                          element_error!(appsink,
+                                                                                                                         gst::ResourceError::Failed,
+                                                                                                                         ("Failed to map buffer readable"));
+                                                                                                          gst::FlowError::Error
+                                                                                                      })?;
 
-                    // obtain the data from the buffer
-                    let data = map.as_slice_of::<u8>().unwrap().to_vec();
+                                                                      // obtain the data from the buffer
+                                                                      let data = map.as_slice_of::<u8>().unwrap().to_vec();
 
-                    // copy into buffer
-                    *buffer_clone.lock().unwrap() = data;
+                                                                      // copy into buffer
+                                                                      *buffer_clone.lock().unwrap() = data;
 
-                    Ok(gst::FlowSuccess::Ok)
-                })
-                .build(),
-        );
+                                                                      Ok(gst::FlowSuccess::Ok)
+                                                                  })
+                                                                  .build());
 
-        let bus = pipeline.bus()
-                          .expect("Pipeline without bus. Shouldn't happen!");
+        let bus = pipeline.bus().expect("Pipeline without bus. Shouldn't happen!");
 
         // start the pipeline
-        pipeline.set_state(gst::State::Paused)
-                .expect("Unable to set the pipeline to the `Paused` state");
+        pipeline.set_state(gst::State::Paused).expect("Unable to set the pipeline to the `Paused` state");
 
         // run the pipeline in a separate thread
         let pipeline_clone = pipeline.clone();
@@ -156,10 +138,10 @@ impl Camera {
                     }
                     MessageView::StateChanged(s) => {
                         log::info!("State changed from {:?}: {:?} -> {:?} ({:?})",
-                                 s.src().map(|s| s.path_string()),
-                                 s.old(),
-                                 s.current(),
-                                 s.pending());
+                                   s.src().map(|s| s.path_string()),
+                                   s.old(),
+                                   s.current(),
+                                   s.pending());
                     }
                     _ => {
                         log::info!("Other message: {:?}", msg);

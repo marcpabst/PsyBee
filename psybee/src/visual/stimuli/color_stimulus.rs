@@ -8,7 +8,7 @@ use derive_more::Deref;
 use super::pattern_stimulus::PatternStimulus;
 use super::patterns::Uniform;
 use crate::impl_stimulus;
-use crate::visual::color::IntoRawRgba;
+use crate::visual::color::{IntoRawRgba, RawRgba};
 use crate::visual::geometry::ToVertices;
 use crate::visual::window::InternalWindowState;
 use crate::visual::Window;
@@ -22,14 +22,17 @@ impl ColorStimulus {
     /// Create a new color stimulus. This is composed of a pattern stimulus with
     /// a uniform color pattern.
     pub fn new(window: &Window, shape: impl ToVertices + 'static, color: impl IntoRawRgba) -> Self {
-        ColorStimulus { _inner: PatternStimulus::new_from_pattern(window,
-                                                                  shape,
-                                                                  Uniform::new(color)) }
+        ColorStimulus { _inner: PatternStimulus::new_from_pattern(window, shape, Uniform::new(color)) }
     }
 
     /// Set the color of the pattern.
-    pub fn set_color(&mut self, _color: impl IntoRawRgba) -> () {
-        todo!()
+    pub fn set_color(&self, color: impl IntoRawRgba) -> () {
+        self._inner.pattern.lock().unwrap().set_color(color);
+    }
+
+    /// Get the color of the pattern.
+    pub fn color(&self) -> RawRgba {
+        self._inner.pattern.lock().unwrap().color()
     }
 }
 
