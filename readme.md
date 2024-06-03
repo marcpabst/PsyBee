@@ -16,6 +16,7 @@ PsyBee is a framework for neuroscience and psychology experiments. It is designe
 - **Easy installation**: `pip install psybee` and you're ready to go - no external dependencies!
 - **Exact timings and low latency**: Depending on driver-support, PsyBee can provide `vblank` timestamps with a precision of ~50µs or better. PsyBee can also automatically detect dropped frames (currently only supported on `Windows/DirectX 12`).
 - **Future-proof**: PsyBee is built on top of `wgpu`, a modern, low-level graphics API that allows to use of native graphics APIs like `DirectX 12`, `Metal`, `Vulkan`, and `OpenGL`.
+- **Accurate color h
 
 
 ## Philosophy

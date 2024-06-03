@@ -19,7 +19,8 @@ crate-type = ["lib"]
 # General dependencies
 [dependencies]
 winapi = "0.3"
-wgpu = {version = "0.20", git = "https://github.com/marcpabst/wgpu/" }
+# wgpu = {version = "0.20", git = "https://github.com/marcpabst/wgpu/" }
+wgpu = {version = "0.20", path = "../../wgpu/wgpu" }
 raw-window-handle = "0.6"
 winit = { version = "0.29"}
 rand = "0.8.5"
