@@ -3,12 +3,12 @@ name: user-guide
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - user-guide/**
   pull_request:
     branches:
-      - master
+      - main
     paths:
       - user-guide/**
 

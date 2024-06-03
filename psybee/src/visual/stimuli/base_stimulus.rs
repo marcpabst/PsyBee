@@ -505,9 +505,11 @@ impl Stimulus for BaseStimulus {
 
         let vertices = geometry.to_vertices_px(screen_width_mm, viewing_distance_mm, screen_width_px, screen_height_px);
 
+        let t_start = std::time::Instant::now();
         // update the vertex buffer
         gpu_state.queue.write_buffer(&(self.vertex_buffer.lock_blocking()), 0, bytemuck::cast_slice(&vertices));
-
+        let t_end = std::time::Instant::now();
+        log::warn!("Time to write vertex buffer: {:?}", t_end - t_start);
         // update the transform buffer
         let win_transform = Window::transformation_matrix_to_ndc(screen_width_px, screen_height_px).map(|x| x as f32);
 
