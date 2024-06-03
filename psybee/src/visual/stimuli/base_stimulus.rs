@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_lock::Mutex;
 use wgpu::util::DeviceExt;
-use wgpu::TextureFormat;
+use wgpu::{BufferSize, TextureFormat};
 
 use super::Stimulus;
 use crate::utils::AtomicExt;
@@ -459,7 +459,11 @@ impl BaseStimulus {
 
         // for (i, buffer) in uniform_buffers.iter().enumerate() {
         let t_start = std::time::Instant::now();
-        queue.write_buffer(&uniform_buffers[0], 0, data[0]);
+
+        let buffer_size = BufferSize::new(uniform_buffers[0].size()).unwrap();
+        let mut h = queue.write_buffer_with(&uniform_buffers[0], 0, buffer_size).unwrap();
+        h.copy_from_slice(data[0]);
+
         let t_end = std::time::Instant::now();
         let tt_end = std::time::Instant::now();
         // }
