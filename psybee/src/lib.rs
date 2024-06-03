@@ -393,6 +393,7 @@ impl MainLoop {
         let winit_window = winit::window::WindowBuilder::new()
                                                               // make exclusive fullscreen
                                                               .with_title("Experiment".to_string())
+                                                              .with_fullscreen(fullscreen_mode)
                                                               .build(&event_loop_target)
                                                               .unwrap();
 
