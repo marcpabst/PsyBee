@@ -453,6 +453,19 @@ impl MainLoop {
         // set fullscreen mode
         winit_window.set_fullscreen(fullscreen_mode);
 
+        // for DX12, use SetFullscreenState
+        #[cfg(target_os = "windows")]
+        unsafe {
+            let hal_surface_callback = |sf: Option<&wgpu::hal::dx12::Surface>| {
+                // get the surface
+                let swap_chain = sf.unwrap().swap_chain.as_raw();
+                // call SetFullscreenState
+                swap_chain.SetFullscreenState(true, std::ptr::null());
+            };
+
+            surface.as_hal::<wgpu::core::api::Dx12, _, _>(hal_surface_callback).unwrap();
+        }
+
         // create channel for frame submission
         let (frame_sender, frame_receiver): (Sender<Arc<Mutex<Frame>>>, Receiver<Arc<Mutex<Frame>>>) = bounded(1);
 
