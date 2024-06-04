@@ -256,8 +256,8 @@ impl ExperimentManager {
         let monitor = monitors.get(1).unwrap_or(monitors.first().expect("No monitor found - this should not happen"));
 
         log::debug!("Creating default window on monitor {:?}", monitor);
-        self.create_window(&&WindowOptions::FullscreenHighestResolution { monitor: Some(monitor.clone()),
-                                                                          refresh_rate: None })
+        self.create_window(&WindowOptions::FullscreenHighestResolution { monitor: Some(monitor.clone()),
+                                                                         refresh_rate: None })
     }
 
     /// Retrive available monitors. This reflects the state of the monitors at
@@ -383,7 +383,7 @@ impl MainLoop {
             };
 
             // create window
-            Some(winit::window::Fullscreen::Exclusive(video_mode))
+            Some(winit::window::Fullscreen::Borderless(Some(monitor_handle)))
         } else {
             // we just create a window on the specified monitor
 
