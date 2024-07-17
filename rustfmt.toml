@@ -1,5 +1,4 @@
-max_width = 180
-indent_style = "Visual"
+max_width = 120
 reorder_imports = true
 group_imports = "StdExternalCrate"
 imports_granularity = "Module"

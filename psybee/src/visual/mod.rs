@@ -32,22 +32,3 @@ pub mod geometry;
 // pub mod stimuli;
 pub mod stimuli;
 pub mod window;
-
-use async_trait::async_trait;
-use wgpu::{Device, Queue, SurfaceConfiguration};
-pub use window::Window;
-
-/// Trait for all renderable objects. This mostly follows the `wgpu`
-/// recommendations for rendering middleware. This is trait is mostly
-/// used internall but can be used to create custom stimuli.
-#[async_trait(?Send)]
-pub trait Renderable {
-    /// Prepare the renderable object for rendering. By default this
-    /// function calls `prepare_async` function in a blocking manner.
-    async fn prepare(&mut self, device: &Device, queue: &Queue, view: &wgpu::TextureView, config: &SurfaceConfiguration, window_handle: &window::Window) -> ();
-    /// Render the object to the screen.
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> ();
-    fn is_finnished(&self) -> bool {
-        false
-    }
-}

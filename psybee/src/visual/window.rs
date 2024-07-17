@@ -4,25 +4,24 @@ use std::collections::HashMap;
 use std::pin::Pin;
 #[cfg(target_arch = "wasm32")]
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_channel::{bounded, Receiver, Sender};
 use async_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use atomic_float::AtomicF64;
 use derive_debug::Dbg;
 use futures_lite::future::block_on;
 use futures_lite::Future;
 use nalgebra;
 use palette::IntoColor;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::closure::Closure;
+use pyo3::prelude::*;
+use send_wrapper::SendWrapper;
 
 use super::geometry::Size;
 use super::stimuli::Stimulus;
 use crate::input::{Event, EventHandler, EventHandlerId, EventHandlingExt, EventKind, EventReceiver};
-#[cfg(target_arch = "wasm32")]
-use crate::request_animation_frame;
+use crate::renderer::{Renderable, Renderer};
 use crate::visual::color::ColorFormat;
 use crate::{GPUState, RenderThreadChannelPayload};
 
@@ -38,11 +37,27 @@ pub struct InternalWindowState {
     pub config: wgpu::SurfaceConfiguration,
 }
 
+/// Describes the physical aspect of a window.
+#[derive(Debug, Clone, Copy)]
+pub struct WindowPhysicalProperties {
+    /// The width of the window in pixels.
+    pub width: u32,
+    /// The height of the window in pixels.
+    pub height: u32,
+    /// The width of the window in meters.
+    pub width_m: f32,
+    /// The pixel aspect ratio.
+    pub pixel_aspect_ratio: f32,
+    /// The viewing distance in meters.
+    pub viewing_distance: f32,
+}
+
 /// How to block when presenting a frame.
 /// A Window represents a window on the screen. It is used to create stimuli and
 /// to submit them to the screen for rendering. Each window has a render task
 /// that is responsible for rendering stimuli to the screen.
 #[derive(Clone, Dbg)]
+#[pyclass]
 pub struct Window {
     // WINDOW STATE
     /// The window state. This contains the underlying winit window, the wgpu
@@ -80,15 +95,9 @@ pub struct Window {
 
     // PHYSICAL WINDOW PROPERTIES
     /// Physical width of the window in millimeters.
-    pub physical_width: Arc<AtomicF64>,
-    /// Viewing distance in millimeters.
-    pub viewing_distance: Arc<AtomicF64>,
+    pub physical_properties: WindowPhysicalProperties,
     /// The color format used for rendering.
     pub color_format: ColorFormat,
-    /// The window's width in pixels.
-    pub width_px: Arc<AtomicU32>,
-    /// The window's height in pixels.
-    pub height_px: Arc<AtomicU32>,
 
     /// Vector of stimuli that will be added to each frame automatically.
     #[dbg(placeholder = "...")]
@@ -126,12 +135,15 @@ impl Window {
     /// Creates a new physical input receiver that will receive physical input
     /// events from the window.
     pub fn create_event_receiver(&self) -> EventReceiver {
-        EventReceiver { receiver: self.event_broadcast_receiver.activate_cloned() }
+        EventReceiver {
+            receiver: self.event_broadcast_receiver.activate_cloned(),
+        }
     }
 
     pub fn run_on_render_thread<R, Fut>(&self, task: impl FnOnce() -> Fut + 'static + Send) -> R
-        where Fut: Future<Output = R> + 'static + Send,
-              R: std::marker::Send + 'static
+    where
+        Fut: Future<Output = R> + 'static + Send,
+        R: std::marker::Send + 'static,
     {
         // create channel to receive result
         let (tx, rx) = bounded(1);
@@ -222,9 +234,16 @@ impl Window {
 
     // Create a new frame with a black background.
     pub fn get_frame(&self) -> Frame {
-        let mut frame = Frame { stimuli: Arc::new(Mutex::new(Vec::new())),
-                                color_format: self.color_format,
-                                bg_color: super::color::RawRgba { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } };
+        let mut frame = Frame {
+            stimuli: Arc::new(Mutex::new(Vec::new())),
+            color_format: self.color_format,
+            bg_color: super::color::RawRgba {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            },
+        };
 
         // TODO: is this efficient?
         for stimulus in self.stimuli.lock_blocking().iter() {
@@ -233,35 +252,47 @@ impl Window {
 
         return frame;
     }
+}
 
-    /// Returns the physical width of the window in millimeters.
-    pub fn physical_width(&self) -> f64 {
-        self.physical_width.load(Ordering::Relaxed)
+#[pyo3::prelude::pymethods]
+impl Window {
+    #[pyo3(name = "get_frame")]
+    fn py_get_frame(&self) -> Frame {
+        self.get_frame()
     }
 
-    /// Sets the physical width of the window in millimeters.
-    pub fn set_physical_width(&self, width: f64) {
-        self.physical_width.store(width, Ordering::Relaxed);
+    #[pyo3(name = "present")]
+    fn py_present(&self, frame: Frame) {
+        self.present(frame);
     }
 
-    /// Returns the viewing distance in millimeters.
-    pub fn viewing_distance(&self) -> f64 {
-        self.viewing_distance.load(Ordering::Relaxed)
-    }
+    /// Add an event handler to the window. The event handler will be called
+    /// whenever an event of the specified kind occurs.
+    ///
+    /// Parameters
+    /// ----------
+    /// kind : EventKind
+    ///   The kind of event to listen for.
+    /// callback : callable
+    ///  The callback that will be called when the event occurs. The callback should take a single argument, an instance of `Event`.
+    #[pyo3(name = "add_event_handler")]
+    fn py_add_event_handler(&self, kind: String, callback: Py<PyAny>, py: Python<'_>) {
+        let kind = EventKind::from_str(&kind).expect("Invalid event kind");
 
-    /// Sets the viewing distance in millimeters.
-    pub fn set_viewing_distance(&self, distance: f64) {
-        self.viewing_distance.store(distance, Ordering::Relaxed);
-    }
+        let rust_callback_fn = move |event: Event| -> bool {
+            Python::with_gil(|py| -> PyResult<()> {
+                    callback.call1(py, (event,))
+                            .expect("Error calling callback in event handler. Make sure the callback takes a single argument of type Event. Error");
+                    Ok(())
+                }).unwrap();
+            false
+        };
 
-    /// Returns the width of the window in pixels.
-    pub fn width_px(&self) -> u32 {
-        self.width_px.load(Ordering::Relaxed)
-    }
+        let self_wrapper = SendWrapper::new(self);
 
-    /// Returns the height of the window in pixels.
-    pub fn height_px(&self) -> u32 {
-        self.height_px.load(Ordering::Relaxed)
+        // give up the GIL and
+        // run the experiment
+        py.allow_threads(move || self_wrapper.add_event_handler(kind.into(), rust_callback_fn));
     }
 }
 
@@ -283,7 +314,8 @@ impl EventHandlingExt for Window {
     }
 
     fn add_event_handler<F>(&self, kind: EventKind, handler: F) -> EventHandlerId
-        where F: Fn(Event) -> bool + 'static + Send + Sync
+    where
+        F: Fn(Event) -> bool + 'static + Send + Sync,
     {
         // find a free id
         let id = loop {
@@ -294,7 +326,9 @@ impl EventHandlingExt for Window {
         };
 
         // add handler
-        self.event_handlers.write_blocking().insert(id, (kind, Box::new(handler)));
+        self.event_handlers
+            .write_blocking()
+            .insert(id, (kind, Box::new(handler)));
 
         return id;
     }
@@ -308,8 +342,7 @@ pub async fn render_task(window: Window) {
     let tx = window.frame_consumed_channel_sender.clone();
     let rx = window.frame_channel_receiver.clone();
 
-    // on wasm, we register our own requestAnimationFrame callback in a separate
-    // task
+    // on wasm, we register our own requestAnimationFrame callback in a separate task
     #[cfg(target_arch = "wasm32")]
     {
         log::debug!("Render task running on thread {:?}", std::thread::current().id());
@@ -338,39 +371,48 @@ pub async fn render_task(window: Window) {
                     // acquire lock on window
                     let window_lock = window.get_window_state_blocking();
 
-                    let suface_texture: wgpu::SurfaceTexture = window_lock.surface.get_current_texture().expect("Failed to acquire next swap chain texture");
-                    let view = suface_texture.texture
-                                             .create_view(&wgpu::TextureViewDescriptor { format: Some(wgpu::TextureFormat::Bgra8Unorm),
-                                                                                         ..wgpu::TextureViewDescriptor::default() });
-                    let mut encoder = window_lock.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                    let suface_texture: wgpu::SurfaceTexture = window_lock
+                        .surface
+                        .get_current_texture()
+                        .expect("Failed to acquire next swap chain texture");
+                    let view = suface_texture.texture.create_view(&wgpu::TextureViewDescriptor {
+                        format: Some(wgpu::TextureFormat::Bgra8Unorm),
+                        ..wgpu::TextureViewDescriptor::default()
+                    });
+                    let mut encoder = window_lock
+                        .device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                     // clear the frame
                     {
                         // clear the frame (once the lifetime annoyance is fixed, this can be
                         // removed only a single render pass is needed using
                         // the LoadOp::Clear option)
-                        let _rpass =
-                            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                                label: None,
-                                color_attachments: &[Some(
-                                    wgpu::RenderPassColorAttachment {
-                                        view: &view,
-                                        resolve_target: None,
-                                        ops: wgpu::Operations {
-                                            load: wgpu::LoadOp::Clear(
-                                                frame.bg_color.into(),
-                                            ),
-                                            store: wgpu::StoreOp::Store,
-                                        },
-                                    },
-                                )],
-                                depth_stencil_attachment: None,
-                                timestamp_writes: None,
-                                occlusion_query_set: None,
-                            });
+                        let _rpass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: None,
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(frame.bg_color.into()),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            timestamp_writes: None,
+                            occlusion_query_set: None,
+                        });
                     }
 
-                    frame.prepare(&window_lock.device, &window_lock.queue, &view, &window_lock.config, &window).await;
+                    frame
+                        .prepare(
+                            &window_lock.device,
+                            &window_lock.queue,
+                            &view,
+                            &window_lock.config,
+                            &window,
+                        )
+                        .await;
 
                     frame.render(&mut encoder, &view);
 
@@ -391,86 +433,75 @@ pub async fn render_task(window: Window) {
     // on native, we submit frames when they are ready
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let flip_count = Arc::new(AtomicU32::new(0));
+        // create the renderer
+        let mut renderer = {
+            let gpu_state = window.read_gpu_state_blocking();
+            Renderer::new(&gpu_state.device)
+        };
 
         loop {
             // wait for frame to be submitted
             let frame = rx.recv().await.unwrap();
 
             // acquire lock on frame
-            let mut frame = frame.lock_blocking();
+            let frame = frame.lock_blocking();
 
             // acquire lock on window
             let window_state = window.read_window_state_blocking();
             let gpu_state = window.read_gpu_state_blocking();
 
-            let suface_texture = window_state.surface.get_current_texture().expect("Failed to acquire next swap chain texture");
+            let device = &gpu_state.device;
+            let queue = &gpu_state.queue;
+            let config = &window_state.config;
 
-            let view = suface_texture.texture
-                                     .create_view(&wgpu::TextureViewDescriptor { format: Some(wgpu::TextureFormat::Bgra8Unorm),
-                                                                                 ..wgpu::TextureViewDescriptor::default() });
+            let suface_texture = window_state
+                .surface
+                .get_current_texture()
+                .expect("Failed to acquire next swap chain texture");
 
-            let mut encoder = gpu_state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            let view = suface_texture.texture.create_view(&wgpu::TextureViewDescriptor {
+                format: Some(wgpu::TextureFormat::Bgra8Unorm),
+                ..wgpu::TextureViewDescriptor::default()
+            });
 
-            // start timer
+            let mut encoder = gpu_state
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-            // clear the frame
             {
-                // clear the frame (once the lifetime annoyance is fixed, this can be removed
-                // only a single render pass is needed using the LoadOp::Clear
-                // option)
-                let _rpass =
-                    &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: None,
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(frame.bg_color.into()),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                    });
+                // draw frame to obtain vector of renderables
+                let renderables = frame.draw(&window);
+                let geoms = renderables
+                    .into_iter()
+                    .map(|r| r.as_geom().unwrap())
+                    .collect::<Vec<_>>();
+
+                // prepare renderables
+                let rdata = renderer.prepare(device, queue, config, &geoms);
+
+                // create render pass
+                let rpass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: None,
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(frame.bg_color.into()),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+
+                renderer.render(rpass, device, &geoms, &rdata);
             }
-
-            let t_start = std::time::Instant::now();
-            frame.prepare(&window, &window_state, &gpu_state).await;
-
-            frame.render(&mut encoder, &view);
-            log::warn!("Frame - Time to prepare and render: {:?}", t_start.elapsed());
 
             let _ = gpu_state.queue.submit(Some(encoder.finish()));
 
             // present the frame
             suface_texture.present();
-
-            // #[cfg(target_os = "windows")]
-            // {
-            //     // drop window_state to avoid deadlock
-            //     drop(window_state);
-
-            //     let mut window_state = window.write_window_state_blocking();
-
-            //     let hal_surface_callback = |sf: Option<&wgpu::hal::dx12::Surface>| {
-            //         let dxgi_surface = sf.unwrap();
-            //         let swap_chain = unsafe { dxgi_surface.swap_chain().unwrap() };
-
-            //         // get frame statistics
-            //         let mut stats = winapi::shared::dxgi::DXGI_FRAME_STATISTICS::default();
-            //         unsafe { swap_chain.GetFrameStatistics(&mut stats) };
-
-            //         // get frame statistics
-            //         let diff = stats.SyncRefreshCount - flip_count.load(Ordering::Relaxed);
-            //         flip_count.store(stats.SyncRefreshCount, Ordering::Relaxed);
-
-            //         log::warn!("Flips since last frame: {}", diff);
-            //     };
-
-            //     unsafe { &window_state.surface.as_hal::<wgpu::core::api::Dx12, _, _>(hal_surface_callback) }.unwrap();
-            // }
 
             // notify sender that frame has been consumed
             let _ = block_on(tx.send(true));
@@ -483,6 +514,7 @@ pub async fn render_task(window: Window) {
 /// renderables will only be called once the frame is submitted to the render
 /// task.
 #[derive(Clone, Dbg)]
+#[pyclass]
 pub struct Frame {
     #[dbg(placeholder = "...")]
     pub stimuli: Arc<Mutex<Vec<Box<dyn Stimulus>>>>,
@@ -495,40 +527,35 @@ impl Frame {
     pub fn set_bg_color(&mut self, bg_color: impl IntoColor<palette::Xyza<palette::white_point::D65, f32>>) {
         self.bg_color = self.color_format.convert_to_raw_rgba(bg_color);
     }
-}
 
-impl Frame {
-    async fn prepare(&mut self, window: &Window, window_state: &InternalWindowState, gpu_state: &GPUState) -> () {
-        // call prepare() on all renderables
-
-        for renderable in &mut self.stimuli.lock().await.iter_mut() {
-            renderable.prepare(window, window_state, gpu_state);
+    fn draw(&self, window: &Window) -> Vec<Renderable> {
+        let stimuli = self.stimuli.lock_blocking();
+        let mut renderables = Vec::with_capacity(stimuli.len());
+        for stimulus in stimuli.iter() {
+            renderables.extend(stimulus.draw(window));
         }
+        renderables
     }
 
-    fn render(&mut self, enc: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) -> () {
-        // call render() on all renderables
-        let t_start = std::time::Instant::now();
-        let lb = &mut self.stimuli.lock_blocking();
-
-        for renderable in lb.iter_mut() {
-            renderable.render(enc, view);
-        }
-        //log::info!("Time to render stimuli: {:?}", t_start.elapsed());
-    }
-}
-
-impl Frame {
     /// Add a renderable to the frame.
     pub fn add(&mut self, stimulus: Box<dyn Stimulus>) -> () {
         self.stimuli.lock_blocking().push(stimulus);
     }
 
     pub fn add_many<E>(&mut self, stimuli: Vec<E>) -> ()
-        where E: Into<Box<dyn Stimulus>>
+    where
+        E: Into<Box<dyn Stimulus>>,
     {
         for stimulus in stimuli {
             self.add(stimulus.into());
         }
+    }
+}
+
+#[pymethods]
+impl Frame {
+    #[pyo3(name = "add")]
+    fn py_add(&mut self, stimulus: crate::visual::stimuli::PyStimulus) {
+        self.add(stimulus.0)
     }
 }

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use rodio::source::{SineWave, Source, Zero};
+use rodio::source::{SineWave, Source};
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sample, Sink};
 use web_time::Duration;
 
@@ -12,8 +12,10 @@ pub struct AudioDevice {
 impl AudioDevice {
     pub fn new() -> Self {
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-        AudioDevice { output_stream: Arc::new(_stream),
-                      stream_handle }
+        AudioDevice {
+            output_stream: Arc::new(_stream),
+            stream_handle,
+        }
     }
 }
 
@@ -62,8 +64,10 @@ impl SineWaveStimulus {
         sink.append(source);
         sink.pause();
 
-        SineWaveStimulus { stream_handle,
-                           sink: Arc::new(Mutex::new(sink)) }
+        SineWaveStimulus {
+            stream_handle,
+            sink: Arc::new(Mutex::new(sink)),
+        }
     }
 }
 
@@ -124,9 +128,9 @@ impl FileStimulus {
     pub fn new(audio_device: &AudioDevice, file_path: &str) -> Self {
         let stream_handle = audio_device.stream_handle.clone();
         let file = std::fs::File::open(file_path).unwrap();
-        let source =
-            Decoder::new(std::io::BufReader::new(file)).unwrap()
-                                                       .skip_duration(Duration::from_secs_f32(0.1));
+        let source = Decoder::new(std::io::BufReader::new(file))
+            .unwrap()
+            .skip_duration(Duration::from_secs_f32(0.1));
 
         let source = NeverStop::new(Cache::new(source));
 
@@ -136,8 +140,10 @@ impl FileStimulus {
 
         sink.pause();
 
-        FileStimulus { stream_handle,
-                       sink: Arc::new(Mutex::new(sink)) }
+        FileStimulus {
+            stream_handle,
+            sink: Arc::new(Mutex::new(sink)),
+        }
     }
 }
 
@@ -155,10 +161,11 @@ impl AudioStimulus for FileStimulus {
     }
 
     fn seek(&mut self, time: f32) -> () {
-        let _ = self.sink
-                    .lock()
-                    .unwrap()
-                    .try_seek(std::time::Duration::from_secs_f32(time));
+        let _ = self
+            .sink
+            .lock()
+            .unwrap()
+            .try_seek(std::time::Duration::from_secs_f32(time));
     }
 
     fn reset(&mut self) -> () {
@@ -190,15 +197,17 @@ impl AudioStimulus for FileStimulus {
 /// A source that appends an infinite stream of zeros to the end of the source.
 #[derive(Clone, Debug)]
 pub struct NeverStop<I>
-    where I: Source,
-          I::Item: Sample
+where
+    I: Source,
+    I::Item: Sample,
 {
     source: I,
 }
 
 impl<I> NeverStop<I>
-    where I: Source,
-          I::Item: Sample
+where
+    I: Source,
+    I::Item: Sample,
 {
     pub fn new(source: I) -> Self {
         NeverStop { source }
@@ -206,8 +215,9 @@ impl<I> NeverStop<I>
 }
 
 impl<I> Iterator for NeverStop<I>
-    where I: Source,
-          I::Item: Sample
+where
+    I: Source,
+    I::Item: Sample,
 {
     type Item = <I as Iterator>::Item;
 
@@ -218,8 +228,9 @@ impl<I> Iterator for NeverStop<I>
 }
 
 impl<I> Source for NeverStop<I>
-    where I: Iterator + Source,
-          I::Item: Sample
+where
+    I: Iterator + Source,
+    I::Item: Sample,
 {
     fn current_frame_len(&self) -> Option<usize> {
         None
@@ -246,8 +257,9 @@ impl<I> Source for NeverStop<I>
 /// underlying source amd keeps the buffer in memory.
 #[derive(Clone, Debug)]
 pub struct Cache<I>
-    where I: Source,
-          I::Item: Sample
+where
+    I: Source,
+    I::Item: Sample,
 {
     buffer: Vec<I::Item>,
     channels: u16,
@@ -258,8 +270,9 @@ pub struct Cache<I>
 }
 
 impl<I> Cache<I>
-    where I: Source,
-          I::Item: Sample
+where
+    I: Source,
+    I::Item: Sample,
 {
     pub fn new(source: I) -> Self {
         let channels = source.channels();
@@ -268,17 +281,20 @@ impl<I> Cache<I>
 
         let buffer = source.collect();
 
-        Cache { buffer,
-                channels,
-                sample_rate,
-                total_duration,
-                current_sample: 0 }
+        Cache {
+            buffer,
+            channels,
+            sample_rate,
+            total_duration,
+            current_sample: 0,
+        }
     }
 }
 
 impl<I> Iterator for Cache<I>
-    where I: Source,
-          I::Item: Sample
+where
+    I: Source,
+    I::Item: Sample,
 {
     type Item = <I as Iterator>::Item;
 
@@ -290,8 +306,9 @@ impl<I> Iterator for Cache<I>
 }
 
 impl<I> Source for Cache<I>
-    where I: Source,
-          I::Item: Sample
+where
+    I: Source,
+    I::Item: Sample,
 {
     fn current_frame_len(&self) -> Option<usize> {
         None
