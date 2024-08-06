@@ -11,10 +11,13 @@ import numpy as np
 # create an Iterator that simulates the movement of a stimulus
 class BubbleSimulation:
 
-    def __init__(self, n_balls=4, width=1000, height=1000, n_init_steps=0):
+    def __init__(self, bubble_radius, n_bubbles=0, area_width=1000, area_height=1000, n_init_steps=0):
         # set up the simulation
-        self.speed = 0.0
-        self.n_balls = n_balls
+        self.area_width = area_width
+        self.area_height = area_height
+        self.speed = 100.0
+        self.n_bubbles = n_bubbles
+        self.bubble_radius = bubble_radius
 
         # create sets
         self.collider_set = rapier2d_py.ColliderSet()
@@ -22,11 +25,11 @@ class BubbleSimulation:
 
         # create walls for a FHD screen, with (0,0) at the center
         walls_vertices = [
-            rapier2d_py.RealPoint(-width / 2, -height / 2),
-            rapier2d_py.RealPoint(width / 2, -height / 2),
-            rapier2d_py.RealPoint(width / 2, height / 2),
-            rapier2d_py.RealPoint(-width / 2, height / 2),
-            rapier2d_py.RealPoint(-width / 2, -height / 2),
+            rapier2d_py.RealPoint(-area_width / 2, -area_height / 2),
+            rapier2d_py.RealPoint(area_width / 2, -area_height / 2),
+            rapier2d_py.RealPoint(area_width / 2, area_height / 2),
+            rapier2d_py.RealPoint(-area_width / 2, area_height / 2),
+            rapier2d_py.RealPoint(-area_width / 2, -area_height / 2),
         ]
 
         wall_collider = rapier2d_py.Collider(
@@ -38,35 +41,10 @@ class BubbleSimulation:
 
         self.collider_set.insert(wall_collider)
 
-        self.balls = []
+        self.handles = []
 
-        for i in range(self.n_balls):
-            # build a collider
-            ball = rapier2d_py.Collider(
-                collider_type="ball",
-                radius=100.0,
-                restitution=1.0,  # no energy loss
-                friction=0.0,  # no friction
-            )
-
-            # calculate the initial position of the ball (in a grid)
-            max_balls_per_row = int(np.sqrt(self.n_balls))
-            initial_position = rapier2d_py.RealVector(
-                -800.0 + 1600.0 / (max_balls_per_row + 1) * (i % max_balls_per_row + 1),
-                -400.0 + 800.0 / (max_balls_per_row + 1) * (i // max_balls_per_row + 1),
-            )
-
-            # build a rigid body
-            ball_rigid_body = rapier2d_py.RigidBody(
-                body_type="dynamic",
-                translation=initial_position,
-                linvel=rapier2d_py.RealVector(50.0, 50.0),
-            )
-            # add rigid body to rigid body set
-            rigid_body_handle = self.rigid_body_set.insert(ball_rigid_body)
-            self.collider_set.insert_with_parent(ball, rigid_body_handle, self.rigid_body_set)
-
-            self.balls.append(rigid_body_handle)
+        for i in range(self.n_bubbles):
+            self.add_bubble();
 
         # set-up physics
         self.gravity = rapier2d_py.RealVector(0.0, 0.0)
@@ -84,15 +62,75 @@ class BubbleSimulation:
         for _ in range(n_init_steps):
             next(self)
 
+    def remove_bubble(self, handle):
+        rigid_body_handle, collider_handle = handle
+        #Error calling experiment_fn: PyErr { type: <class 'TypeError'>, value: TypeError("ColliderSet.remove() missing 3 required positional arguments: 'islands', 'bodies', and 'wake_up'"), traceback: Some(<traceback object at 0x108aa3a40>) }
+        self.collider_set.remove(collider_handle, self.island_manager, self.rigid_body_set, True)
+        self.handles.remove(handle)
+
+    def add_bubble(self):
+        # to place a bubble in an appropriate position, we draw a random position
+        # and check if it is not too close to any other bubble
+
+
+        initial_position = rapier2d_py.RealVector(0.0, 0.0)
+        while True:
+            # draw a random position
+            initial_position = rapier2d_py.RealVector(
+                np.random.uniform(-self.area_width / 2, self.area_width / 2),
+                np.random.uniform(-self.area_height / 2, self.area_height / 2),
+            )
+
+            # check if it is too close to any other bubble
+            too_close = False
+            # for bubble in self.bubbles:
+            #     if (initial_position - self.rigid_body_set.get(bubble).translation()).norm() < 200:
+            #         too_close = True
+            #         break
+
+            if not too_close:
+                break
+
+        # build a collider
+        bubble = rapier2d_py.Collider(
+            collider_type="ball",
+            radius=self.bubble_radius,
+            restitution=1.0,  # no energy loss
+            friction=0.0,  # no friction
+        )
+
+        # calculate the initial position of the ball (in a grid)
+        max_balls_per_row = int(np.sqrt(self.n_bubbles))
+
+        # create a random direction in radians
+        direction = np.random.uniform(0, 2 * np.pi)
+
+        # create a random velocity vector
+        linvel = rapier2d_py.RealVector(self.speed * np.cos(direction), self.speed * np.sin(direction))
+
+        # build a rigid body
+        ball_rigid_body = rapier2d_py.RigidBody(
+            body_type="dynamic",
+            translation=initial_position,
+            linvel=linvel,
+        )
+
+        # add rigid body to rigid body set
+        rigid_body_handle = self.rigid_body_set.insert(ball_rigid_body)
+        collider_handle = self.collider_set.insert_with_parent(bubble, rigid_body_handle, self.rigid_body_set)
+
+        handle = (rigid_body_handle, collider_handle)
+
+        self.handles.append(handle)
+
+        # return the index of the new bubble
+        return handle
+
     def __iter__(self):
         return self
 
     def __next__(self):
 
-        # set velocity
-        for i in range(self.n_balls):
-            rigid_body = self.rigid_body_set.get(self.balls[i])
-            rigid_body.set_linvel(rapier2d_py.RealVector(0.0, 0.0), True)
 
         # run physics
         for i in range(100):
@@ -111,7 +149,9 @@ class BubbleSimulation:
             )
 
             # print position of all balls
-            return [(
-                self.rigid_body_set.get(self.balls[i]).translation().x(),
-                self.rigid_body_set.get(self.balls[i]).translation().y(),
-            ) for i in range(self.n_balls)]
+            return {handle:
+
+                (
+                self.rigid_body_set.get(self.handles[i][0]).translation().x(),
+                self.rigid_body_set.get(self.handles[i][0]).translation().y(),
+            ) for i, handle in enumerate(self.handles)}
