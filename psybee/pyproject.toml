@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "psybee"
-authors = [{name = "Marc Pabst", email = "mail@marcpabst.com"}]
+authors = [{ name = "Marc Pabst", email = "mail@marcpabst.com" }]
 description = "Python bindings for the PsyBee library"
 license = "MPL-2.0"
 requires-python = ">=3.8"
@@ -17,3 +17,4 @@ dynamic = ["version"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+cargo-extra-args = "--features extension-module"

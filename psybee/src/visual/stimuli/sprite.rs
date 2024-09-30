@@ -1,208 +1,54 @@
-use super::PyStimulus;
-use image::{DynamicImage, GenericImageView};
-use pyo3::prelude::*;
+use std::sync::Arc;
+
+use super::{
+    animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
+    WrappedImage, WrappedStimulus,
+};
+use crate::{
+    prelude::{Size, Transformation2D},
+    visual::window::Window,
+};
+
+use psybee_proc::StimulusParams;
+use pyo3::{exceptions::PyValueError, prelude::*};
+use renderer::{image::GenericImageView, prelude::*};
 use uuid::Uuid;
 
-use super::Stimulus;
-use crate::{
-    renderer::{
-        material::{TextureFilter, TextureMaterial, TextureRepeat, TextureSize},
-        texture::TextureFormat,
-        Geom, Material, Point2D, Primitive, Renderable, TessellationOptions, Texture,
-    },
-    visual::{
-        geometry::{Size, Transformation2D},
-        window::Window,
-    },
-};
+#[derive(StimulusParams, Clone, Debug)]
+pub struct SpriteParams {
+    pub x: Size,
+    pub y: Size,
+    pub fps: f64,
+    pub repeat: bool,
+    pub width: Size,
+    pub height: Size,
+}
 
 #[derive(Clone, Debug)]
 pub struct SpriteStimulus {
     id: uuid::Uuid,
 
-    origin: (Size, Size),
-    transformation: Transformation2D,
-    visible: bool,
+    params: SpriteParams,
 
-    textures: Vec<Texture>,
-    texture_index: usize,
-
-    fps: Option<f32>,
-    repeat: Option<u32>,
-
+    images: Vec<WrappedImage>,
     start_time: std::time::Instant,
 
-    pub width: Size,
-    pub height: Size,
+    transformation: Transformation2D,
+    animations: Vec<Animation>,
+    visible: bool,
 }
 
 impl SpriteStimulus {
-    pub fn new_from_images(
-        width: Size,
-        height: Size,
-        images: Vec<image::DynamicImage>,
-        fps: Option<f32>,
-        repeat: Option<u32>,
-    ) -> Self {
-        let textures = images
-            .into_iter()
-            .map(|image| -> _ { Texture::from_image(image, TextureFormat::Srgba8U) })
-            .collect();
-
+    pub fn new(images: Vec<WrappedImage>, params: SpriteParams) -> Self {
         Self {
             id: Uuid::new_v4(),
-            origin: (Size::Pixels(0.0), Size::Pixels(0.0)),
-            transformation: Transformation2D::Identity(),
+            transformation: crate::visual::geometry::Transformation2D::Identity(),
+            animations: Vec::new(),
             visible: true,
-            textures,
-            texture_index: 0,
-            fps,
-            repeat,
             start_time: std::time::Instant::now(),
-            width,
-            height,
+            images,
+            params,
         }
-    }
-
-    pub fn new_from_paths(width: Size, height: Size, paths: Vec<&str>, fps: Option<f32>, repeat: Option<u32>) -> Self {
-        let images = paths
-            .into_iter()
-            .map(|path| -> _ { image::open(path) })
-            .collect::<Result<Vec<_>, _>>()
-            .expect("Failed to open the images");
-
-        Self::new_from_images(width, height, images, fps, repeat)
-    }
-
-    pub fn new_from_spritesheet(
-        width: Size,
-        height: Size,
-        path: &str,
-        num_sprites_x: u32,
-        num_sprites_y: u32,
-        fps: Option<f32>,
-        repeat: Option<u32>,
-    ) -> Self {
-        let image = image::open(path).expect("Failed to open the sprite sheet");
-        let (img_width, img_height) = image.dimensions();
-
-        // check that the sprite sheet is divisible by the sprite size
-        if img_width % num_sprites_x != 0 || img_height % num_sprites_y != 0 {
-            panic!("The sprite sheet is not divisible by the sprite size");
-        }
-
-        // calculate the sprite size
-        let sprite_width = img_width / num_sprites_x;
-        let sprite_height = img_height / num_sprites_y;
-
-        println!("Sprite size: {}x{}", sprite_width, sprite_height);
-
-        // split the image into sprites
-        let mut images: Vec<image::DynamicImage> = Vec::new();
-        for y in (0..img_height).step_by(sprite_height as usize) {
-            for x in (0..img_width).step_by(sprite_width as usize) {
-                let sprite = image.view(x, y, sprite_width, sprite_height).to_image();
-                images.push(DynamicImage::ImageRgba8(sprite));
-            }
-        }
-
-        Self::new_from_images(width, height, images, fps, repeat)
-    }
-
-    pub fn next_image(&mut self) {
-        self.texture_index = (self.texture_index + 1) % self.textures.len();
-    }
-
-    pub fn reset(&mut self) {
-        self.start_time = std::time::Instant::now();
-    }
-}
-
-impl Stimulus for SpriteStimulus {
-    fn uuid(&self) -> Uuid {
-        self.id
-    }
-
-    fn draw(&self, window: &Window) -> Vec<Renderable> {
-        // find current index
-        // if fps is set, calculate the index based on the time
-        let mut index = self.texture_index;
-        if let Some(fps) = self.fps {
-            let elapsed = self.start_time.elapsed().as_secs_f32();
-            let frames = elapsed * fps;
-            index = frames as usize;
-        }
-
-        if let Some(repeat) = self.repeat {
-            // if repeat is set, make sure that the new index is within the maximum index
-            // if not, set index to the last image
-            if index >= self.textures.len() * repeat as usize {
-                index = self.textures.len() * repeat as usize - 1;
-            }
-        }
-
-        // calculate the current index by wrapping around the number of images
-        let wrapped_index = index % self.textures.len();
-
-        // create the material
-        let tmaterial = TextureMaterial {
-            texture: self.textures[wrapped_index].clone(),
-            size_x: TextureSize::Relative(1.0),
-            size_y: TextureSize::Relative(1.0),
-            repeat_x: TextureRepeat::Clamp,
-            repeat_y: TextureRepeat::Clamp,
-            filter: TextureFilter::Linear,
-        };
-
-        let material = Material::Texture(tmaterial);
-
-        let trans_mat = self
-            .transformation
-            .to_transformation_matrix(&window.physical_properties);
-
-        let width_px = self.width.eval(&window.physical_properties);
-        let height_px = self.height.eval(&window.physical_properties);
-
-        // create the drawables
-        let patch_geom = Geom::new(
-            Primitive::Rectangle {
-                a: Point2D { x: 0.0, y: 0.0 },
-                b: Point2D {
-                    x: width_px,
-                    y: height_px,
-                },
-            },
-            material,
-            Some(trans_mat.into()),
-            vec![],
-            TessellationOptions::Fill,
-        );
-
-        vec![Renderable::Geom(patch_geom)]
-    }
-
-    fn set_visible(&mut self, visible: bool) {
-        self.visible = visible;
-    }
-
-    fn visible(&self) -> bool {
-        self.visible
-    }
-
-    fn set_origin(&mut self, x: Size, y: Size) {
-        self.origin = (x, y);
-    }
-
-    fn origin(&self) -> (Size, Size) {
-        self.origin.clone()
-    }
-
-    fn set_transformation(&mut self, transformation: Transformation2D) {
-        self.transformation = transformation;
-    }
-
-    fn add_transformation(&mut self, transformation: Transformation2D) {
-        self.transformation = transformation * self.transformation.clone();
     }
 }
 
@@ -213,44 +59,138 @@ pub struct PySpriteStimulus();
 #[pymethods]
 impl PySpriteStimulus {
     #[new]
+    #[pyo3(signature = (
+        images,
+        fps,
+        x,
+        y,
+        width,
+        height,
+        repeat = true
+    ))]
+
     fn __new__(
-        width: Size,
-        height: Size,
-        sprite_sheet_path: &str,
-        num_sprites_x: u32,
-        num_sprites_y: u32,
-        fps: Option<f32>,
-        repeat: Option<u32>,
+        images: Vec<WrappedImage>,
+        fps: f64,
+        x: IntoSize,
+        y: IntoSize,
+        width: IntoSize,
+        height: IntoSize,
+        repeat: bool,
     ) -> (Self, PyStimulus) {
         (
             Self(),
-            PyStimulus(Box::new(SpriteStimulus::new_from_spritesheet(
-                width,
-                height,
-                sprite_sheet_path,
-                num_sprites_x,
-                num_sprites_y,
-                fps,
-                repeat,
-            ))),
+            PyStimulus(Arc::new(std::sync::Mutex::new(SpriteStimulus::new(
+                images,
+                SpriteParams {
+                    x: x.into(),
+                    y: y.into(),
+                    fps,
+                    repeat,
+                    width: width.into(),
+                    height: height.into(),
+                },
+            )))),
         )
     }
+}
 
-    #[pyo3(name = "next_image")]
-    fn py_next_image(slf: PyRefMut<'_, Self>) {
-        slf.into_super()
-            .0
-            .downcast_mut::<SpriteStimulus>()
-            .expect("Failed to downcast to ColourStimulus")
-            .next_image()
+impl_pystimulus_for_wrapper!(PySpriteStimulus, SpriteStimulus);
+
+impl Stimulus for SpriteStimulus {
+    fn uuid(&self) -> Uuid {
+        self.id
     }
 
-    #[pyo3(name = "reset")]
-    fn py_reset(slf: PyRefMut<'_, Self>) {
-        slf.into_super()
-            .0
-            .downcast_mut::<SpriteStimulus>()
-            .expect("Failed to downcast to ColourStimulus")
-            .reset()
+    fn draw(&self, scene: &mut VelloScene, window: &Window) {
+        if !self.visible {
+            return;
+        }
+
+        // work out the current frame
+        let elapsed = self.start_time.elapsed().as_secs_f32();
+        let n_frame = (elapsed * self.params.fps as f32) as usize;
+
+        let n_frame = if self.params.repeat {
+            n_frame % self.images.len()
+        } else {
+            n_frame.min(self.images.len() - 1)
+        };
+
+        let image = &self.images[n_frame];
+
+        // convert physical units to pixels
+        let x = self.params.x.eval(&window.physical_properties) as f64;
+        let y = self.params.y.eval(&window.physical_properties) as f64;
+        let width = self.params.width.eval(&window.physical_properties) as f64;
+        let height = self.params.height.eval(&window.physical_properties) as f64;
+
+        let trans_mat = self.transformation.eval(&window.physical_properties);
+
+        scene.draw(Geom::new_image(
+            image.inner(),
+            x,
+            y,
+            width,
+            height,
+            trans_mat.into(),
+            ImageFitMode::Fill,
+        ));
+    }
+
+    fn set_visible(&mut self, visible: bool) {
+        self.visible = visible;
+    }
+
+    fn visible(&self) -> bool {
+        self.visible
+    }
+
+    fn animations(&mut self) -> &mut Vec<Animation> {
+        &mut self.animations
+    }
+
+    fn add_animation(&mut self, animation: Animation) {
+        self.animations.push(animation);
+    }
+
+    fn set_transformation(&mut self, transformation: crate::visual::geometry::Transformation2D) {
+        self.transformation = transformation;
+    }
+
+    fn add_transformation(&mut self, transformation: crate::visual::geometry::Transformation2D) {
+        self.transformation = transformation * self.transformation.clone();
+    }
+
+    fn transformation(&self) -> crate::visual::geometry::Transformation2D {
+        self.transformation.clone()
+    }
+
+    fn contains(&self, x: Size, y: Size, window: &WrappedWindow) -> bool {
+        let window = window.inner();
+        let ix = self.params.x.eval(&window.physical_properties);
+        let iy = self.params.y.eval(&window.physical_properties);
+        let width = self.params.width.eval(&window.physical_properties);
+        let height = self.params.height.eval(&window.physical_properties);
+
+        let trans_mat = self.transformation.eval(&window.physical_properties);
+
+        let x = x.eval(&window.physical_properties);
+        let y = y.eval(&window.physical_properties);
+
+        // apply transformation by multiplying the point with the transformation matrix
+        let p = nalgebra::Vector3::new(x, y, 1.0);
+        let p_new = trans_mat * p;
+
+        // check if the point is inside the rectangle
+        p_new[0] >= ix && p_new[0] <= ix + width && p_new[1] >= iy && p_new[1] <= iy + height
+    }
+
+    fn get_param(&self, name: &str) -> Option<StimulusParamValue> {
+        self.params.get_param(name)
+    }
+
+    fn set_param(&mut self, name: &str, value: StimulusParamValue) {
+        self.params.set_param(name, value)
     }
 }

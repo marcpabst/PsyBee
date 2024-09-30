@@ -32,11 +32,6 @@ pub enum PsybeeError {
     #[error("{0}")]
     CustomError(String),
 
-    // serial port errors
-    #[cfg(feature = "serial")]
-    #[error("{0}")]
-    SerialPortError(#[from] serialport::Error),
-
     // image errors
     #[error("{0}")]
     ImageError(#[from] image::ImageError),

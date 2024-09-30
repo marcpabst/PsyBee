@@ -102,39 +102,40 @@ impl_clone_wrap!(PyCollider);
 #[pymethods]
 impl PyCollider {
     #[new]
-    pub fn new(collider_type: &str,
+    pub fn new(
+        collider_type: &str,
 
-               // options for different collider shapes
-               half_height: Option<f32>,
-               radius: Option<f32>,
-               border_radius: Option<f32>,
-               vertices: Option<Vec<PyRealPoint>>,
-               indices: Option<Vec<[u32; 2]>>,
+        // options for different collider shapes
+        half_height: Option<f32>,
+        radius: Option<f32>,
+        border_radius: Option<f32>,
+        vertices: Option<Vec<PyRealPoint>>,
+        indices: Option<Vec<[u32; 2]>>,
 
-               // options for all colliders
-               user_data: Option<u128>,
-               // collision_groups: Option<InteractionGroups>,
-               // solver_groups: Option<InteractionGroups>,
-               is_sensor: Option<bool>,
-               // active_hooks: Option<ActiveHooks>,
-               // active_events: Option<ActiveEvents>,
-               // active_collision_types: Option<ActiveCollisionTypes>,
-               friction: Option<f32>,
-               // friction_combine_rule: Option<CoefficientCombineRule>,
-               restitution: Option<f32>,
-               // restitution_combine_rule: Option<CoefficientCombineRule>,
-               density: Option<f32>,
-               mass: Option<f32>,
-               // mass_properties: Option<MassProperties>,
-               contact_force_event_threshold: Option<f32>,
-               // translation: Option<Vector<Real>>,
-               rotation: Option<AngVector<Real>>,
-               // position: Option<Isometry<Real>>,
-               // position_wrt_parent: Option<Isometry<Real>>,
-               // delta: Option<Isometry<Real>>,
-               contact_skin: Option<Real>,
-               enabled: Option<bool>)
-               -> Self {
+        // options for all colliders
+        user_data: Option<u128>,
+        // collision_groups: Option<InteractionGroups>,
+        // solver_groups: Option<InteractionGroups>,
+        is_sensor: Option<bool>,
+        // active_hooks: Option<ActiveHooks>,
+        // active_events: Option<ActiveEvents>,
+        // active_collision_types: Option<ActiveCollisionTypes>,
+        friction: Option<f32>,
+        // friction_combine_rule: Option<CoefficientCombineRule>,
+        restitution: Option<f32>,
+        // restitution_combine_rule: Option<CoefficientCombineRule>,
+        density: Option<f32>,
+        mass: Option<f32>,
+        // mass_properties: Option<MassProperties>,
+        contact_force_event_threshold: Option<f32>,
+        // translation: Option<Vector<Real>>,
+        rotation: Option<AngVector<Real>>,
+        // position: Option<Isometry<Real>>,
+        // position_wrt_parent: Option<Isometry<Real>>,
+        // delta: Option<Isometry<Real>>,
+        contact_skin: Option<Real>,
+        enabled: Option<bool>,
+    ) -> Self {
         let mut builder: ColliderBuilder = match collider_type {
             "ball" => ColliderBuilder::ball(radius.expect("Radius is required")),
             "polyline" => {
@@ -176,9 +177,11 @@ py_wrap!(ColliderSet);
 py_forward!(ColliderSet, fn new() -> Self);
 py_forward!(ColliderSet, fn insert(&mut self, collider: Collider) -> ColliderHandle);
 py_forward!(ColliderSet, fn insert_with_parent(&mut self, collider: Collider, parent_handle: RigidBodyHandle, bodies: &mut RigidBodySet) -> ColliderHandle);
+py_forward!(ColliderSet, fn remove(&mut self, handle: ColliderHandle, islands: &mut IslandManager, bodies: &mut RigidBodySet, wake_up: bool) -> Option<Collider>);
 
 // ColliderHandle
 py_wrap!(ColliderHandle);
+impl_clone_wrap!(PyColliderHandle);
 
 // RigidBodySet
 py_wrap!(RigidBodySet);
@@ -288,7 +291,13 @@ py_forward!(MultibodyJointSet, fn new() -> Self);
 
 #[pymethods]
 impl PyMultibodyJointSet {
-    pub fn insert_spring(&mut self, body1: PyRigidBodyHandle, body2: PyRigidBodyHandle, data: &PySpringJoint, wake_up: bool) -> Option<PyMultibodyJointHandle> {
+    pub fn insert_spring(
+        &mut self,
+        body1: PyRigidBodyHandle,
+        body2: PyRigidBodyHandle,
+        data: &PySpringJoint,
+        wake_up: bool,
+    ) -> Option<PyMultibodyJointHandle> {
         let data = data.0;
         let out = self.0.insert(body1.0, body2.0, data, wake_up);
         match out {
@@ -312,7 +321,12 @@ py_forward!(QueryPipeline, fn new() -> Self);
 #[pymethods]
 impl PyRigidBody {
     #[new]
-    pub fn new(body_type: &str, position: Option<PyRealIsometry>, translation: Option<PyRealVector>, linvel: Option<PyRealVector>) -> Self {
+    pub fn new(
+        body_type: &str,
+        position: Option<PyRealIsometry>,
+        translation: Option<PyRealVector>,
+        linvel: Option<PyRealVector>,
+    ) -> Self {
         let body_type = match body_type {
             "dynamic" => RigidBodyType::Dynamic,
             "kinematic_position_based" => RigidBodyType::KinematicPositionBased,
@@ -333,41 +347,45 @@ impl PyRigidBody {
 
 #[pymethods]
 impl PyPhysicsPipeline {
-    pub fn step(&mut self,
-                gravity: &PyRealVector,
-                integration_parameters: PyIntegrationParameters,
-                island_manager: &mut PyIslandManager,
-                broad_phase: &mut PyDefaultBroadPhase,
-                narrow_phase: &mut PyNarrowPhase,
-                bodies: &mut PyRigidBodySet,
-                colliders: &mut PyColliderSet,
-                impulse_joint_set: &mut PyImpulseJointSet,
-                multibody_joint_set: &mut PyMultibodyJointSet,
-                ccd_solver: &mut PyCCDSolver,
-                query_pipeline: Option<&mut PyQueryPipeline>) {
+    pub fn step(
+        &mut self,
+        gravity: &PyRealVector,
+        integration_parameters: PyIntegrationParameters,
+        island_manager: &mut PyIslandManager,
+        broad_phase: &mut PyDefaultBroadPhase,
+        narrow_phase: &mut PyNarrowPhase,
+        bodies: &mut PyRigidBodySet,
+        colliders: &mut PyColliderSet,
+        impulse_joint_set: &mut PyImpulseJointSet,
+        multibody_joint_set: &mut PyMultibodyJointSet,
+        ccd_solver: &mut PyCCDSolver,
+        query_pipeline: Option<&mut PyQueryPipeline>,
+    ) {
         let query_pipeline: Option<&mut QueryPipeline> = match query_pipeline {
             Some(qp) => Some(&mut qp.0),
             None => None,
         };
 
-        self.0.step(&gravity.0,
-                    &integration_parameters.0,
-                    &mut island_manager.0,
-                    &mut broad_phase.0,
-                    &mut narrow_phase.0,
-                    &mut bodies.0,
-                    &mut colliders.0,
-                    &mut impulse_joint_set.0,
-                    &mut multibody_joint_set.0,
-                    &mut ccd_solver.0,
-                    query_pipeline,
-                    &(),
-                    &());
+        self.0.step(
+            &gravity.0,
+            &integration_parameters.0,
+            &mut island_manager.0,
+            &mut broad_phase.0,
+            &mut narrow_phase.0,
+            &mut bodies.0,
+            &mut colliders.0,
+            &mut impulse_joint_set.0,
+            &mut multibody_joint_set.0,
+            &mut ccd_solver.0,
+            query_pipeline,
+            &(),
+            &(),
+        );
     }
 }
 
 #[pymodule]
-fn rapier2d_py<'py, 'a>(_py: Python<'py>, m: &'a pyo3::prelude::PyModule) -> Result<(), pyo3::PyErr> {
+fn rapier2d_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCollider>()?;
     m.add_class::<PyRealPoint>()?;
     m.add_class::<PyColliderSet>()?;

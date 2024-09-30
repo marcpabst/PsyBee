@@ -2,14 +2,12 @@
 //! geometry of a stimulus. This includes rectangles, circles, and
 //! transformations.
 
-use nalgebra::Matrix3;
-use pyo3::prelude::*;
-
-use crate::renderer::Colour;
+use nalgebra::{Matrix3, Vector3};
+use pyo3::{prelude::*, PyClass};
 
 #[pyclass]
 #[derive(Clone, Debug)]
-struct BoxedSize(Box<Size>);
+pub struct BoxedSize(Box<Size>);
 
 impl BoxedSize {
     pub fn new(size: Size) -> Self {
@@ -94,6 +92,35 @@ pub enum Size {
     Sum(BoxedSize, BoxedSize),
     /// Difference of two units
     Difference(BoxedSize, BoxedSize),
+}
+
+pub struct IntoSize(Size);
+
+impl From<IntoSize> for Size {
+    fn from(value: IntoSize) -> Self {
+        value.0
+    }
+}
+
+impl<'py> FromPyObject<'py> for IntoSize {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+        // try to extract a Size
+        if let Ok(value) = ob.extract::<Size>() {
+            return Ok(IntoSize(value));
+        }
+        // try to extract a float (-> Pixels)
+        else if let Ok(value) = ob.extract::<f32>() {
+            return Ok(IntoSize(Size::Pixels(value)));
+        } else if let Ok(value) = ob.extract::<i32>() {
+            return Ok(IntoSize(Size::Pixels(value as f32)));
+        }
+        // try to extract a string and use a regex to parse it
+        else if let Ok(value) = ob.extract::<String>() {
+            Ok(IntoSize(Size::from_str(&value).unwrap()))
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Size must be a float."));
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -226,10 +253,7 @@ impl Size {
     ///
     /// # Arguments
     ///
-    /// * `screenwidth_mm` - The width of the screen in millimeters.
-    /// * `width_px` - The width of the screen in pixels.
-    /// * `viewing_distance_mm` - The viewing distance in millimeters.
-    /// * `height_px` - The height of the screen in pixels.
+    /// * `props` - The physical properties of the window.
     ///
     /// # Returns
     ///
@@ -271,10 +295,46 @@ impl Size {
     pub fn new_default(value: f32) -> Size {
         Size::Pixels(value)
     }
+
+    pub fn from_str(string: &str) -> Result<Size, String> {
+        let string = string.trim();
+        // check if negative
+        let negative = string.starts_with('-');
+        let string = if negative { &string[1..] } else { string };
+
+        // extract the number and the unit
+        let (number, unit) = string.split_at(
+            string
+                .find(|c: char| !c.is_digit(10) && c != '.')
+                .unwrap_or(string.len()),
+        );
+        let number = number.parse::<f32>().map_err(|e| e.to_string())?;
+        let unit = unit.trim();
+
+        // match the unit
+        match unit {
+            "px" => Ok(Size::Pixels(if negative { -number } else { number })),
+            "sw" => Ok(Size::ScreenWidth(if negative { -number } else { number })),
+            "sh" => Ok(Size::ScreenHeight(if negative { -number } else { number })),
+            "deg" => Ok(Size::Degrees(if negative { -number } else { number })),
+            "mm" => Ok(Size::Millimeters(if negative { -number } else { number })),
+            "cm" => Ok(Size::Centimeters(if negative { -number } else { number })),
+            "in" => Ok(Size::Inches(if negative { -number } else { number })),
+            "pt" => Ok(Size::Points(if negative { -number } else { number })),
+            _ => Err(format!("Unknown unit: {}", unit)),
+        }
+    }
 }
 
 #[pymethods]
 impl Size {
+    // constructors
+    #[new]
+    fn __new__(string: String) -> PyResult<Size> {
+        let size = Size::from_str(&string).unwrap();
+        Ok(size)
+    }
+
     // printing
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
@@ -293,6 +353,13 @@ impl Size {
     // negation
     fn __neg__(&self) -> Size {
         -self.clone()
+    }
+
+    // evaluation
+    #[pyo3(name = "eval")]
+    fn py_eval(&self, window: &super::window::WrappedWindow) -> f32 {
+        let props = window.inner().physical_properties;
+        self.eval(&props)
     }
 }
 
@@ -387,7 +454,7 @@ impl Transformation2D {
 
     /// Convert to the corresponding (homogeneous) 2D transformation matrix.
     #[rustfmt::skip]
-    pub fn to_transformation_matrix(&self, props: &super::window::WindowPhysicalProperties) -> Matrix3<f32> {
+    pub fn eval(&self, props: &super::window::WindowPhysicalProperties) -> Matrix3<f32> {
         match self {
             Transformation2D::Identity() => Matrix3::identity(),
             Transformation2D::RotationCenter(_angle) => {
@@ -436,7 +503,6 @@ impl Transformation2D {
             }
             Transformation2D::Translation(x, y) => {
                 let x = x.eval(props) as f32;
-
                 let y = y.eval(props) as f32;
 
                 Matrix3::new(
@@ -451,11 +517,17 @@ impl Transformation2D {
             //Transformation2D::Homogeneous(matrix) => matrix.clone(),
             Transformation2D::Product(a,b) =>
             {
-                let a = a.to_transformation_matrix(props);
-                let b = b.to_transformation_matrix(props);
+                let a = a.eval(props);
+                let b = b.eval(props);
                 a * b
             }
         }
+    }
+
+    pub fn transform_point(&self, x: f32, y: f32, props: &super::window::WindowPhysicalProperties) -> (f32, f32) {
+        let matrix = self.eval(props).transpose();
+        let newpoint = matrix * Vector3::new(x, y, 1.0);
+        (newpoint.x, newpoint.y)
     }
 }
 
@@ -493,32 +565,4 @@ pub enum Shape {
         radius_x: Size,
         radius_y: Size,
     },
-}
-
-// stroke styles
-
-/// The line cap style.
-#[derive(Debug, Clone)]
-pub enum LineCap {
-    Butt,
-    Round,
-    Square,
-}
-
-/// The line join style.
-#[derive(Debug, Clone)]
-pub enum LineJoin {
-    Miter,
-    Round,
-    Bevel,
-}
-
-/// The stroke style.
-#[derive(Debug, Clone)]
-pub struct StrokeStyle {
-    pub colour: Colour,
-    pub width: Size,
-    pub line_cap: LineCap,
-    pub line_join: LineJoin,
-    pub miter_limit: f32,
 }

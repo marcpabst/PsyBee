@@ -1,10 +1,11 @@
+#![allow(unused)]
+#[macro_use]
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use async_channel::{bounded, Receiver, Sender};
-use async_lock::{Mutex, RwLock};
 use derive_debug::Dbg;
 use futures_lite::future::block_on;
 use futures_lite::Future;
@@ -15,20 +16,18 @@ use objc2_app_kit::{NSAlert, NSAlertStyle, NSTextField};
 #[cfg(target_os = "macos")]
 use objc2_foundation::{ns_string, CGPoint, CGSize, MainThreadMarker, NSRect};
 use pyo3::prelude::*;
-use visual::window::WindowPhysicalProperties;
-use wgpu::TextureFormat;
+use visual::window::{WindowPhysicalProperties, WrappedWindow};
+use wgpu::{MemoryHints, TextureFormat};
 use winit::event::{Event as WinitEvent, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoopBuilder, EventLoopWindowTarget};
 use winit::monitor::VideoMode;
 
 use crate::input::{Event, EventHandlingExt, EventKind, EventTryFrom};
-use crate::visual::color::ColorFormat;
 
 pub mod audio;
 pub mod errors;
 pub mod input;
 pub mod options;
-pub mod renderer;
 pub mod utils;
 pub mod visual;
 // re-export wgpu
@@ -49,7 +48,7 @@ pub(crate) type RenderThreadChannelPayload = Box<dyn FnOnce() -> Pin<Box<dyn Fut
 
 use std::thread;
 
-use crate::visual::window::{render_task, Frame, InternalWindowState, Window};
+use crate::visual::window::{Frame, InternalWindowState, Window};
 
 pub trait FutureReturnTrait: Future<Output = ()> + 'static + Send {}
 impl<F> FutureReturnTrait for F where F: Future<Output = ()> + 'static + Send {}
@@ -148,7 +147,7 @@ impl WindowOptions {
 #[derive(Dbg)]
 pub enum PsyEventLoopEvent {
     PromptEvent(String, Sender<String>),
-    CreateNewWindowEvent(WindowOptions, Sender<Window>),
+    CreateNewWindowEvent(WindowOptions, Sender<WrappedWindow>),
     NewWindowCreatedEvent(Window),
     RunOnMainThread(#[dbg(placeholder = "...")] Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>),
 }
@@ -176,9 +175,9 @@ pub struct MainLoop {
     /// thread.
     pub(crate) render_thread_channel_receiver: Receiver<RenderThreadChannelPayload>,
     /// Vector of currently open windows
-    pub(crate) windows: Vec<Window>,
+    pub(crate) windows: Vec<WrappedWindow>,
     /// The current GPU state
-    pub(crate) gpu_state: Arc<RwLock<GPUState>>,
+    pub(crate) gpu_state: Arc<Mutex<GPUState>>,
 }
 
 /// The ExperimentManager is available to the user in the experiment function.
@@ -213,7 +212,7 @@ impl ExperimentManager {
     /// a new UserEvent to the event loop and wait until the winit window
     /// has been created. Then it will setup the wgpu device and surface and
     /// return a new Window object.
-    pub fn create_window(&self, window_options: &WindowOptions) -> Window {
+    pub fn create_window(&self, window_options: &WindowOptions) -> WrappedWindow {
         // set up window by dispatching a new CreateNewWindowEvent to the event loop
         let (sender, receiver) = bounded(1);
         let user_event = PsyEventLoopEvent::CreateNewWindowEvent(window_options.clone(), sender);
@@ -233,7 +232,7 @@ impl ExperimentManager {
 
     /// Create a default window. This is a convenience function that creates a
     /// window with the default options.
-    pub fn create_default_window(&self) -> Window {
+    pub fn create_default_window(&self) -> WrappedWindow {
         // select monitor 1 if available
         // find all monitors available
         let monitors = self.get_available_monitors();
@@ -261,7 +260,7 @@ impl ExperimentManager {
 #[pymethods]
 impl ExperimentManager {
     #[pyo3(name = "create_default_window")]
-    fn py_create_default_window(&self) -> Window {
+    fn py_create_default_window(&self) -> WrappedWindow {
         self.create_default_window()
     }
 }
@@ -308,6 +307,7 @@ impl MainLoop {
                     required_features: wgpu::Features::empty(),
                     // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
                     required_limits: wgpu::Limits::default().using_resolution(adapter.limits()),
+                    memory_hints: MemoryHints::Performance,
                 },
                 None,
             )
@@ -319,7 +319,7 @@ impl MainLoop {
             render_thread_channel_sender: render_task_sender,
             render_thread_channel_receiver: render_task_receiver,
             windows: vec![],
-            gpu_state: Arc::new(RwLock::new(GPUState {
+            gpu_state: Arc::new(Mutex::new(GPUState {
                 instance,
                 adapter,
                 device,
@@ -333,7 +333,7 @@ impl MainLoop {
         &self,
         window_options: &WindowOptions,
         event_loop_target: &EventLoopWindowTarget<PsyEventLoopEvent>,
-    ) -> Window {
+    ) -> WrappedWindow {
         let fullscreen_mode = if window_options.fullscreen() {
             // get monitor
             let monitor_handle = if let Some(monitor) = window_options.monitor() {
@@ -441,7 +441,8 @@ impl MainLoop {
 
         let winit_window = Arc::new(winit_window);
 
-        let gpu_state = self.gpu_state.read_blocking();
+        let gpu_state = self.gpu_state.lock().unwrap();
+
         let instance = &gpu_state.instance;
         let adapter = &gpu_state.adapter;
         let device = &gpu_state.device;
@@ -497,16 +498,20 @@ impl MainLoop {
                 .unwrap();
         }
 
-        // create channel for frame submission
-        let (frame_sender, frame_receiver): (Sender<Arc<Mutex<Frame>>>, Receiver<Arc<Mutex<Frame>>>) = bounded(1);
+        // create the renderer
+        let mut renderer = {
+            let texture_format = wgpu::TextureFormat::Bgra8Unorm;
+            renderer::vello_backend::VelloRenderer::new(&device, texture_format)
+        };
 
-        let (frame_ok_sender, frame_ok_receiver): (Sender<bool>, Receiver<bool>) = bounded(1);
+        let winit_id = winit_window.id();
 
         // create a pwindow
         let window_state = InternalWindowState {
-            window: winit_window.clone(),
+            winit_window: winit_window.clone(),
             surface,
             config,
+            renderer,
         };
 
         // create channel for physical input
@@ -525,31 +530,26 @@ impl MainLoop {
         };
 
         // create handle
-        let window = Window {
-            state: Arc::new(RwLock::new(window_state)),
+        let window = WrappedWindow::new(Window {
+            winit_id: winit_id,
+            state: window_state,
             gpu_state: self.gpu_state.clone(),
-            mouse_position: Arc::new(Mutex::new(None)),
-            mouse_cursor_visible: Arc::new(AtomicBool::new(true)),
+            mouse_position: None,
+            mouse_cursor_visible: true,
             event_broadcast_receiver,
             event_broadcast_sender,
-            frame_channel_sender: frame_sender,
-            frame_channel_receiver: frame_receiver,
-            frame_consumed_channel_sender: frame_ok_sender,
-            frame_consumed_channel_receiver: frame_ok_receiver,
-            color_format: ColorFormat::SRGBA8,
-            render_task_sender: self.render_thread_channel_sender.clone(),
             stimuli: Arc::new(Mutex::new(vec![])),
-            event_handlers: Arc::new(RwLock::new(HashMap::new())),
+            event_handlers: Arc::new(Mutex::new(HashMap::new())),
             options: Arc::new(Mutex::new(options::GlobalOptions::default())),
             physical_properties,
-        };
+        });
 
         let win_clone = window.clone();
         // add a default event handler for mouse move events, which updates the mouse
         // position
         window.add_event_handler(EventKind::CursorMoved, move |event| {
             if let Some(pos) = event.position() {
-                win_clone.mouse_position.lock_blocking().replace(pos.clone());
+                win_clone.inner().mouse_position = Some(pos.clone());
             };
             false
         });
@@ -721,33 +721,13 @@ impl MainLoop {
                             log::debug!("Event loop received CreateNewWindowEvent - creating new window");
 
                             let window = self.create_window(&window_options, win_target);
-
-                            // start renderer for window
-                            {
-                                let win_handle = window.clone();
-                                #[cfg(target_arch = "wasm32")]
-                                spawn_async_task(render_task(window));
-                                #[cfg(not(target_arch = "wasm32"))]
-                                thread::spawn(move || {
-                                    smol::block_on(render_task(win_handle.clone()));
-                                });
-                            }
-
+                            println!("Window created");
                             // push window to list of windows
                             self.windows.push(window.clone());
 
                             sender
                                 .send_blocking(window)
                                 .expect("Failed to send window to sender. This is likely a bug, please report it.");
-                        }
-                        PsyEventLoopEvent::PromptEvent(message, sender) => {
-                            log::debug!("Event loop received PromptEvent - showing prompt");
-
-                            let result = self.prompt(&message);
-
-                            sender
-                                .send_blocking(result)
-                                .expect("Failed to send result to sender. This is likely a bug, please report it.");
                         }
                         PsyEventLoopEvent::NewWindowCreatedEvent(_window) => {
                             log::debug!("Event loop received NewWindowCreatedEvent");
@@ -758,21 +738,24 @@ impl MainLoop {
                             log::debug!("Running task on main thread");
                             let _ = block_on(task());
                         }
+                        _ => {
+                            log::debug!("Event loop received unhandled event");
+                        }
                     }
                 }
                 WinitEvent::WindowEvent {
                     window_id: id,
                     event: WindowEvent::Resized(new_size),
                 } => {
-                    log::debug!("Window {:?} resized to {:?}", id, new_size);
-
-                    if let Some(mut window) = self.get_window_by_id(id) {
+                    if let Some(mut window) = self.get_window_by_id(id).clone() {
                         // update window size
-                        window.physical_properties.width = new_size.width;
-                        window.physical_properties.height = new_size.height;
+                        println!("Window resizing to {:?}", new_size);
+                        let mut win_inner = window.inner();
+                        win_inner.physical_properties.width = new_size.width;
+                        win_inner.physical_properties.height = new_size.height;
 
-                        let mut window_state = window.write_window_state_blocking();
-                        let gpu_state = self.gpu_state.read_blocking();
+                        let mut window_state = &mut win_inner.state;
+                        let gpu_state = self.gpu_state.lock().unwrap();
 
                         window_state.config.width = new_size.width.max(1);
                         window_state.config.height = new_size.height.max(1);
@@ -780,26 +763,33 @@ impl MainLoop {
                         window_state.surface.configure(&gpu_state.device, &window_state.config);
 
                         // on macos, the window size is not updated automatically
-                        window_state.window.request_redraw();
+                        window_state.winit_window.request_redraw();
+
+                        println!("Window resized to {:?}", new_size);
                     }
                 }
 
                 // handle window events
                 WinitEvent::WindowEvent { window_id: id, event } => {
                     if let Some(window) = self.get_window_by_id(id) {
+                        //println!("Window found");
                         if let Some(input) = Event::try_from_winit(event.clone(), &window).ok() {
                             // if escape key was pressed, close window
                             if input.key_pressed("\u{1b}") {
                                 win_target.exit();
                             }
 
+                            // check if the window mutex is locked (for debugging)
+                            //window.0.try_lock().expect("Window mutex is locked");
+
                             // broadcast event to window
-                            window.event_broadcast_sender.try_broadcast(input.clone());
+                            window.inner().event_broadcast_sender.try_broadcast(input.clone());
 
                             // dispatch_event to window
                             // note: this should be done in a separate thread using the winndow's event_broadcast channel
                             window.dispatch_event(input);
                         }
+                        //println!("Window event handled");
                     }
                 }
                 // handle close event
@@ -808,9 +798,9 @@ impl MainLoop {
         });
     }
 
-    pub fn get_window_by_id(&self, id: winit::window::WindowId) -> Option<Window> {
+    pub fn get_window_by_id(&self, id: winit::window::WindowId) -> Option<WrappedWindow> {
         for window in &self.windows {
-            if window.read_window_state_blocking().window.id() == id {
+            if window.winit_id() == id {
                 return Some(window.clone());
             }
         }
@@ -876,10 +866,13 @@ fn psybee(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MainLoop>()?;
     m.add_class::<ExperimentManager>()?;
     m.add_class::<visual::stimuli::gabor::PyGaborStimulus>()?;
+    m.add_class::<visual::stimuli::text::PyTextStimulus>()?;
     m.add_class::<visual::stimuli::image::PyImageStimulus>()?;
     m.add_class::<visual::stimuli::sprite::PySpriteStimulus>()?;
     m.add_class::<visual::geometry::Size>()?;
     m.add_class::<visual::geometry::Transformation2D>()?;
+    m.add_class::<visual::color::Rgba>()?;
+    m.add_class::<visual::stimuli::WrappedImage>()?;
 
     Ok(())
 }
