@@ -112,8 +112,6 @@ class BubbleSimulation:
     def add_bubble(self):
         # to place a bubble in an appropriate position, we draw a random position
         # and check if it is not too close to any other bubble
-
-
         initial_position = RealVector(0.0, 0.0)
         while True:
             # draw a random position
@@ -125,10 +123,6 @@ class BubbleSimulation:
 
             # check if it is too close to any other bubble
             too_close = False
-            # for bubble in self.bubbles:
-            #     if (initial_position - self.rigid_body_set.get(bubble).translation()).norm() < 200:
-            #         too_close = True
-            #         break
 
             if not too_close:
                 break
