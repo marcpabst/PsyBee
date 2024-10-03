@@ -39,7 +39,7 @@ impl TextStimulus {
     pub fn new(x: Size, y: Size, text: String, font_size: Size, fill: Rgba, transform: Transformation2D) -> Self {
         // load font
         let font_data =
-            include_bytes!("/Users/marc/psybee/bubblesdemo/src/bubblesdemo/resources/TradeWinds-Regular.ttf");
+            include_bytes!("../../../../bubblesdemo/src/bubblesdemo/resources/TradeWinds-Regular.ttf");
         let font = VelloFont::from_bytes(font_data);
 
         Self {
