@@ -1,0 +1,104 @@
+[package]
+name = "psybee"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Marc Pabst"]
+description = "Psychological and Behavioral Experiment Engine"
+repository = "https://github.com/marcpabst/psybee"
+license = "MPL-2.0"
+keywords = [
+    "psychophysics",
+    "psychology",
+    "experiments",
+    "stimuli",
+    "perception",
+]
+categories = [
+    "science",
+    "science::neuroscience",
+    "graphics",
+    "gui",
+    "multimedia",
+]
+
+[lib]
+name = "psybee"
+crate-type = ["cdylib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# General dependencies
+[dependencies]
+winapi = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+wgpu = { version = "22" }
+renderer = { path = "../../renderer" }
+psybee-proc = { path = "../psybee-proc" }
+
+raw-window-handle = "0.6"
+winit = { version = "0.29" }
+rand = "0.8.5"
+bytemuck = { version = "1.14.0", features = ["derive"] }
+nalgebra = "0.33.0"
+web-time = "1.0.0"
+image = "0.24.7"
+rodio = "0.18.0"
+fontdb = "0.16.0"
+fastrand = "2.0.1"
+async-broadcast = "=0.7.0"
+futures-lite = "2.1.0"
+async-executor = "1.8.0"
+async-channel = "2.1.1"
+log = "0.4.20"
+atomic_float = "0.1.0"
+num-traits = "0.2.17"
+half = { version = "2.3.1", features = ["bytemuck"] }
+palette = "0.7.3"
+async-lock = "3.2.0"
+async-trait = "0.1.75"
+byte-slice-cast = "1.2.2"
+csv = "1.3.0"
+thiserror = "1.0.56"
+derive_more = "0.99.17"
+paste = "1.0.15"
+derive-debug = "0.1.2"
+downcast-rs = "1.2.1"
+dyn-clone = "1.0.17"
+enum-fields = "0.1.0"
+strum = { version = "0.26", features = ["derive"] }
+uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
+
+pyo3 = { version = "0.22.3", features = [
+    "extension-module",
+    "abi3-py312",
+    "multiple-pymethods",
+] }
+send_wrapper = "0.6.0"
+regex = "1.10.6"
+numpy = "0.22.1"
+
+# MacOS dependencies
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5.1"
+objc2-app-kit = { version = "0.2.0", features = [
+    "NSAlert",
+    "NSApplication",
+    "NSTextField",
+    "NSControl",
+    "NSResponder",
+    "NSView",
+    "NSButton",
+] }
+objc2-foundation = "0.2.0"
+
+# Non-wasm32 dependencies
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+smol = "1.3.0"
+
+# Desktop dependencies (macOS, Linux, Windows)
+[target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
+glib = "0.19.5"
+gst = { package = "gstreamer", version = "0.22.3" }
+gst-app = { package = "gstreamer-app", version = "0.22.0" }
+gst-video = { package = "gstreamer-video", version = "0.22.3" }
