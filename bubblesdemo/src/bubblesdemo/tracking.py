@@ -7,18 +7,22 @@ import numpy as np
 
 import pandas as pd
 import random
-from rubicon.objc import ObjCClass
 from .arkit_eyetracking import ARKitEyeTracker
 from .image_filters import log_gabor_filter
 
-NSFileManager = ObjCClass("NSFileManager")
+try:
+    from rubicon.objc import ObjCClass
 
+    NSFileManager = ObjCClass("NSFileManager")
+
+    # find the path to document using URL.documentsDirectory
+    documents_path = NSFileManager.defaultManager.URLsForDirectory_inDomains_(9, 1)[0].path
+except:
+    print("cant load objc")
+    documents_path = "."
 
 # find the path to the resources
 resources_path = str(pathlib.Path(__file__).parent / "resources")
-
-# find the path to document using URL.documentsDirectory
-documents_path = NSFileManager.defaultManager.URLsForDirectory_inDomains_(9, 1)[0].path
 
 sprites = {
     "fishes": [

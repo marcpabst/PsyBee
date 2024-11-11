@@ -486,20 +486,20 @@ impl MainLoop {
         // set fullscreen mode
         winit_window.set_fullscreen(fullscreen_mode);
 
-        // for DX12, use SetFullscreenState
-        #[cfg(target_os = "windows")]
-        unsafe {
-            let hal_surface_callback = |sf: Option<&wgpu::hal::dx12::Surface>| {
-                // get the surface
-                let swap_chain = sf.unwrap().swap_chain.as_raw();
-                // call SetFullscreenState
-                swap_chain.SetFullscreenState(true, std::ptr::null());
-            };
-
-            surface
-                .as_hal::<wgpu::core::api::Dx12, _, _>(hal_surface_callback)
-                .unwrap();
-        }
+//         // for DX12, use SetFullscreenState
+//         #[cfg(target_os = "windows")]
+//         unsafe {
+//             let hal_surface_callback = |sf: Option<&wgpu::hal::dx12::Surface>| {
+//                 // get the surface
+//                 let swap_chain = sf.unwrap().swap_chain.as_raw();
+//                 // call SetFullscreenState
+//                 swap_chain.SetFullscreenState(true, std::ptr::null());
+//             };
+//
+//             surface
+//                 .as_hal::<wgpu::core::api::Dx12, _, _>(hal_surface_callback)
+//                 .unwrap();
+//         }
 
         // create the renderer
         let mut renderer = {

@@ -1,7 +1,9 @@
-from rubicon.objc import ObjCClass, NSObject, send_super, ObjCInstance, objc_method, ObjCProtocol, objc_property, py_from_ns
 import pandas as pd
 
 try:
+    from rubicon.objc import ObjCClass, NSObject, send_super, ObjCInstance, objc_method, ObjCProtocol, objc_property, \
+        py_from_ns
+
     ARSession = ObjCClass("ARSession")
     ARConfiguration = ObjCClass("ARConfiguration")
     ARFaceTrackingConfiguration = ObjCClass("ARFaceTrackingConfiguration")
