@@ -32,7 +32,7 @@ sprites = {
         Image.from_spritesheet(resources_path + "/fish/fish_puffer_deflated.png", 4, 3),
         ],
     "bubbles": Image.from_spritesheet(resources_path + "/misc/bubbles.png", 4, 2),
-    "octopus": Image.from_spritesheet(resources_path + "/fish/shark2.png", 4,3),
+    "octopus": Image.from_spritesheet(resources_path + "/fish/octopus.png", 4,4),
 }
 
 def my_experiment(exp_manager: ExperimentManager) -> None:
@@ -80,7 +80,7 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
     for i in range(len(sprites["octopus"])):
         sprites["octopus"][i].move_to_gpu(window)
 
-    octopus_stim = SpriteStimulus(sprites["octopus"], 15, 0, 0, "0.4sw", "0.3sw")
+    octopus_stim = SpriteStimulus(sprites["octopus"], 15, 0, 0, "0.4sw", "0.35sw")
 
     random_image_stim = ImageStimulus(random_image, 0, 0, "1sw", "1sw")
 
