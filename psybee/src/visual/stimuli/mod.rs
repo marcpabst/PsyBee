@@ -530,8 +530,9 @@ impl WrappedImage {
 
     /// Move the image to the GPU.
     #[pyo3(name = "move_to_gpu")]
-    fn py_to_gpu(&mut self, window: &WrappedWindow) {
+    fn py_to_gpu(&mut self, window: &WrappedWindow) -> Self {
         self.to_gpu(window);
+        self.clone()
     }
 }
 
