@@ -22,6 +22,8 @@ pub struct ImageParams {
     pub width: Size,
     pub height: Size,
     pub opacity: f64,
+    pub image_x: Size,
+    pub image_y: Size,
 }
 
 #[derive(Clone, Debug)]
@@ -31,7 +33,7 @@ pub struct ImageStimulus {
     params: ImageParams,
 
     image: super::WrappedImage,
-
+    image_fit_mode: ImageFitMode,
     transformation: Transformation2D,
     animations: Vec<Animation>,
     visible: bool,
@@ -45,6 +47,7 @@ impl ImageStimulus {
             animations: Vec::new(),
             visible: true,
             image: image,
+            image_fit_mode: ImageFitMode::Fill,
             params,
         }
     }
@@ -87,6 +90,8 @@ impl PyImageStimulus {
                     y: y.into(),
                     width: width.into(),
                     height: height.into(),
+                    image_x: 0.0.into(),
+                    image_y: 0.0.into(),
                     opacity,
                 },
             )))),
@@ -112,6 +117,9 @@ impl Stimulus for ImageStimulus {
         let width = self.params.width.eval(&window.physical_properties) as f64;
         let height = self.params.height.eval(&window.physical_properties) as f64;
 
+        let image_offset_x = self.params.image_x.eval(&window.physical_properties) as f64;
+        let image_offset_y = self.params.image_y.eval(&window.physical_properties) as f64;
+
         let trans_mat = self.transformation.eval(&window.physical_properties);
 
         scene.draw(Geom::new_image(
@@ -121,7 +129,10 @@ impl Stimulus for ImageStimulus {
             width,
             height,
             trans_mat.into(),
+            image_offset_x,
+            image_offset_y,
             ImageFitMode::Fill,
+            Extend::Pad,
         ));
     }
 

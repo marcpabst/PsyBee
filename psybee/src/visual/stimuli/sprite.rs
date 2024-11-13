@@ -134,7 +134,10 @@ impl Stimulus for SpriteStimulus {
             width,
             height,
             trans_mat.into(),
+            0.0,
+            0.0,
             ImageFitMode::Fill,
+            Extend::Repeat,
         ));
     }
 

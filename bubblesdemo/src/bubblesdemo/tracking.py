@@ -107,6 +107,7 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
 
         # calculate the phase based on current time
         gabor_stim["phase"] = ((time.time() - start_time) * 1.0 * np.pi) % (np.pi)
+        random_image_stim["image_x"] = (time.time() - start_time) * 50.0
 
         # calculate the size of the gabor stimulus
         new_size_cm =object_size_m * 400
@@ -116,8 +117,6 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
         # draw the gabor stimulus
         # frame.draw(gabor_stim)
         frame.draw(text_stim)
-
-
 
         # draw the random noise image
         frame.draw(random_image_stim)
