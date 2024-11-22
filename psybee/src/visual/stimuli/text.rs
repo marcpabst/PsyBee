@@ -111,7 +111,7 @@ impl Stimulus for TextStimulus {
         self.animations.push(animation);
     }
 
-    fn draw(&self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
         if !self.visible {
             return;
         }

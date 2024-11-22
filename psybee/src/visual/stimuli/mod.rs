@@ -24,8 +24,11 @@ use renderer::{image::GenericImageView, VelloScene};
 pub mod animations;
 pub mod gabor;
 pub mod image;
+pub mod vector;
 pub mod sprite;
 pub mod text;
+pub mod grid;
+pub mod shape;
 
 pub type WrappedStimulus = Arc<Mutex<dyn Stimulus>>;
 
@@ -97,7 +100,7 @@ pub trait StimulusParams {
 /// The stimulus trait.
 pub trait Stimulus: Send + Sync + downcast_rs::Downcast + std::fmt::Debug {
     /// Draw the stimulus onto the scene.
-    fn draw(&self, scene: &mut VelloScene, window: &Window);
+    fn draw(&mut self, scene: &mut VelloScene, window: &Window);
 
     /// Check if the stimulus contains a specific Point.
     fn contains(&self, x: Size, y: Size, window: &WrappedWindow) -> bool {
@@ -130,7 +133,6 @@ pub trait Stimulus: Send + Sync + downcast_rs::Downcast + std::fmt::Debug {
     }
 
     /// Show the stimulus. This is a convenience method that calls
-    /// `set_visible(true)`.
     fn show(&mut self) -> () {
         self.set_visible(true);
     }
@@ -431,7 +433,7 @@ macro_rules! impl_pystimulus_for_wrapper {
                     from.into(),
                     to.into(),
                     duration,
-                    Repeat::Loop(1),
+                    Repeat::Loop(20),
                     TransitionFunction::None,
                 );
                 Ok(())
