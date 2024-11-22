@@ -71,7 +71,7 @@ uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
 
 pyo3 = { version = "0.22.3", features = [
     "extension-module",
-    "abi3-py312",
+    "abi3-py310",
     "multiple-pymethods",
 ] }
 send_wrapper = "0.6.0"
