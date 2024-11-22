@@ -172,7 +172,7 @@ impl Stimulus for GaborStimulus {
         self.id
     }
 
-    fn draw(&self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
         if !self.visible {
             return;
         }

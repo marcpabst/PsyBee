@@ -20,6 +20,7 @@ pub enum TransitionFunction {
     None,
     /// A linear transition function.
     Linear(f64, f64),
+    /// A cubic bezier transition function.
     CubicBezier(f64, f64, f64, f64),
 }
 
@@ -113,7 +114,7 @@ impl Animation {
         &self.paramter
     }
 
-    ///Returns the current value of the animated parameter at the specified time (f64).
+    /// Returns the current value of the animated parameter at the specified time (f64).
     pub fn value_f64(from: f64, to: f64, elapsed: f64, duration: f64, easing: TransitionFunction) -> f64 {
         let t = elapsed / duration;
         let t = match easing {
@@ -137,11 +138,29 @@ impl Animation {
         if self.finished(time) {
             return self.to.clone();
         }
-        let elapsed = time.duration_since(self.start_time).as_secs_f64();
+
+        // let elapsed = time.duration_since(self.start_time).as_secs_f64();
+        let elapsed = match self.repeat {
+            Repeat::Loop(n) => {
+                let elapsed = time.duration_since(self.start_time).as_secs_f64();
+                elapsed % self.duration
+            }
+            Repeat::PingPong(n) => {
+                let elapsed = time.duration_since(self.start_time).as_secs_f64();
+                let elapsed = elapsed % (self.duration * 2.0);
+                if elapsed > self.duration {
+                    self.duration - (elapsed - self.duration)
+                } else {
+                    elapsed
+                }
+            }
+        };
+        
         let duration = self.duration;
         let easing = self.easing.clone();
         let from = self.from.clone();
         let to = self.to.clone();
+
         match (from, to) {
             (StimulusParamValue::f64(f), StimulusParamValue::f64(t)) => {
                 StimulusParamValue::f64(Self::value_f64(f, t, elapsed, duration, easing))
@@ -158,7 +177,15 @@ impl Animation {
 
     /// Returns whether the animation has finished.
     pub fn finished(&self, time: Instant) -> bool {
-        let elapsed = time.duration_since(self.start_time).as_secs_f64();
-        elapsed >= self.duration
+        match self.repeat {
+            Repeat::Loop(n) => {
+                let elapsed = time.duration_since(self.start_time).as_secs_f64();
+                elapsed >= self.duration * n as f64
+            }
+            Repeat::PingPong(n) => {
+                let elapsed = time.duration_since(self.start_time).as_secs_f64();
+                elapsed >= self.duration * n as f64 * 2.0
+            }
+        }
     }
 }

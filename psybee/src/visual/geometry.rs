@@ -94,7 +94,7 @@ pub enum Size {
     Difference(BoxedSize, BoxedSize),
 }
 
-pub struct IntoSize(Size);
+pub struct IntoSize(pub Size);
 
 impl From<IntoSize> for Size {
     fn from(value: IntoSize) -> Self {

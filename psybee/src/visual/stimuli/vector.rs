@@ -16,57 +16,55 @@ use renderer::prelude::*;
 use uuid::Uuid;
 
 #[derive(StimulusParams, Clone, Debug)]
-pub struct ImageParams {
+pub struct VectorParams {
     pub x: Size,
     pub y: Size,
     pub width: Size,
     pub height: Size,
     pub opacity: f64,
-    pub image_x: Size,
-    pub image_y: Size,
 }
 
 #[derive(Clone, Debug)]
-pub struct ImageStimulus {
+pub struct VectorStimulus {
     id: uuid::Uuid,
 
-    params: ImageParams,
+    params: VectorParams,
 
-    image: super::WrappedImage,
-    image_fit_mode: ImageFitMode,
+    vector: renderer::prerenderd_scene::PrerenderedScene,
     transformation: Transformation2D,
     animations: Vec<Animation>,
     visible: bool,
 }
 
-impl ImageStimulus {
-    pub fn from_image(image: super::WrappedImage, params: ImageParams) -> Self {
+impl VectorStimulus {
+    pub fn from_svg_str(svg_str: &str, params: VectorParams) -> Self {
+        let vector = renderer::prerenderd_scene::PrerenderedScene::from_svg_string(svg_str, Affine::identity());
+
         Self {
             id: Uuid::new_v4(),
             transformation: crate::visual::geometry::Transformation2D::Identity(),
             animations: Vec::new(),
             visible: true,
-            image: image,
-            image_fit_mode: ImageFitMode::Fill,
+            vector,
             params,
         }
     }
 
-    pub fn from_path(src: String, params: ImageParams) -> Self {
-        let image = super::WrappedImage::from_path(src).unwrap();
-        Self::from_image(image, params)
+    pub fn from_svg_path(svg_path: &str, params: VectorParams) -> Self {
+        let svg_str = std::fs::read_to_string(svg_path).unwrap();
+        Self::from_svg_str(&svg_str, params)
     }
 }
 
 #[derive(Debug, Clone)]
-#[pyclass(name = "ImageStimulus", extends=PyStimulus)]
-pub struct PyImageStimulus();
+#[pyclass(name = "VectorStimulus", extends=PyStimulus)]
+pub struct PyVectorStimulus();
 
 #[pymethods]
-impl PyImageStimulus {
+impl PyVectorStimulus {
     #[new]
     #[pyo3(signature = (
-        image,
+        svg_path,
         x,
         y,
         width,
@@ -74,7 +72,7 @@ impl PyImageStimulus {
         opacity = 1.0
     ))]
     fn __new__(
-        image: &super::WrappedImage,
+        svg_path: &str,
         x: IntoSize,
         y: IntoSize,
         width: IntoSize,
@@ -83,15 +81,13 @@ impl PyImageStimulus {
     ) -> (Self, PyStimulus) {
         (
             Self(),
-            PyStimulus(Arc::new(std::sync::Mutex::new(ImageStimulus::from_image(
-                image.clone(),
-                ImageParams {
+            PyStimulus(Arc::new(std::sync::Mutex::new(VectorStimulus::from_svg_path(
+                svg_path,
+                VectorParams {
                     x: x.into(),
                     y: y.into(),
                     width: width.into(),
                     height: height.into(),
-                    image_x: 0.0.into(),
-                    image_y: 0.0.into(),
                     opacity,
                 },
             )))),
@@ -99,9 +95,9 @@ impl PyImageStimulus {
     }
 }
 
-impl_pystimulus_for_wrapper!(PyImageStimulus, ImageStimulus);
+impl_pystimulus_for_wrapper!(PyVectorStimulus, VectorStimulus);
 
-impl Stimulus for ImageStimulus {
+impl Stimulus for VectorStimulus {
     fn uuid(&self) -> Uuid {
         self.id
     }
@@ -114,26 +110,22 @@ impl Stimulus for ImageStimulus {
         // convert physical units to pixels
         let x = self.params.x.eval(&window.physical_properties) as f64;
         let y = self.params.y.eval(&window.physical_properties) as f64;
+
         let width = self.params.width.eval(&window.physical_properties) as f64;
         let height = self.params.height.eval(&window.physical_properties) as f64;
 
-        let image_offset_x = self.params.image_x.eval(&window.physical_properties) as f64;
-        let image_offset_y = self.params.image_y.eval(&window.physical_properties) as f64;
+        // create a transformation matrix that scales the vector to the correct size
+        let vector_width = self.vector.width;
+        let vector_height = self.vector.height;
 
-        let trans_mat = self.transformation.eval(&window.physical_properties);
+        let transformation_mat :Affine = self.transformation.eval(&window.physical_properties).into();
+        let translation_mat = Affine::translate(x, y);
+        let scale_mat = Affine::scale_xy(width / vector_width, height / vector_height);
 
-        scene.draw(Geom::new_image(
-            self.image.inner().clone(),
-            x,
-            y,
-            width,
-            height,
-            trans_mat.into(),
-            image_offset_x,
-            image_offset_y,
-            ImageFitMode::Fill,
-            Extend::Pad,
-        ));
+        // set the transformation matrix
+        &self.vector.set_transform((scale_mat * translation_mat * transformation_mat).into());
+
+        scene.draw(&self.vector);
     }
 
     fn set_visible(&mut self, visible: bool) {
