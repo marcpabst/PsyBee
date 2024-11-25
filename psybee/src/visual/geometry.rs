@@ -566,3 +566,51 @@ pub enum Shape {
         radius_y: Size,
     },
 }
+
+
+#[pymethods]
+impl Shape {
+    #[staticmethod]
+    fn rectangle(x: IntoSize, y: IntoSize, width: IntoSize, height: IntoSize) -> Shape {
+        Shape::Rectangle {
+            x: x.into(),
+            y: y.into(),
+            width: width.into(),
+            height: height.into(),
+        }
+    }
+
+    #[staticmethod]
+    fn circle(x: IntoSize, y: IntoSize, radius: IntoSize) -> Shape {
+        Shape::Circle {
+            x: x.into(),
+            y: y.into(),
+            radius: radius.into(),
+        }
+    }
+
+    #[staticmethod]
+    fn line(x1: IntoSize, y1: IntoSize, x2: IntoSize, y2: IntoSize) -> Shape {
+        Shape::Line {
+            x1: x1.into(),
+            y1: y1.into(),
+            x2: x2.into(),
+            y2: y2.into(),
+        }
+    }
+
+    #[staticmethod]
+    fn ellipse(x: IntoSize, y: IntoSize, radius_x: IntoSize, radius_y: IntoSize) -> Shape {
+        Shape::Ellipse {
+            x: x.into(),
+            y: y.into(),
+            radius_x: radius_x.into(),
+            radius_y: radius_y.into(),
+        }
+    }
+
+    // for printing
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+}

@@ -74,11 +74,11 @@ impl ShapeStimulus {
 }
 
 #[derive(Debug, Clone)]
-#[pyclass(name = "GridStimulus", extends=PyStimulus)]
-pub struct PyGridStimulus();
+#[pyclass(name = "ShapeStimulus", extends=PyStimulus)]
+pub struct PyShapeStimulus();
 
 #[pymethods]
-impl PyGridStimulus {
+impl PyShapeStimulus {
     #[new]
     #[pyo3(signature = (
         shape,
@@ -98,7 +98,7 @@ impl PyGridStimulus {
         fill_color: Option<Rgba>,
         stroke_style: Option<StrokeStyle>,
         stroke_color: Option<Rgba>,
-        stroke_width: Option<Size>,
+        stroke_width: Option<IntoSize>,
         alpha: Option<f64>,
         transform: Transformation2D,
     ) -> (Self, PyStimulus) {
@@ -111,16 +111,16 @@ impl PyGridStimulus {
                 fill_color,
                 stroke_style,
                 stroke_color,
-                stroke_width,
+                stroke_width.map(|s| s.into()),
                 alpha,
                 transform,
             ))))
         )
-        
+
     }
 }
 
-impl_pystimulus_for_wrapper!(PyGridStimulus, ShapeStimulus);
+impl_pystimulus_for_wrapper!(PyShapeStimulus, ShapeStimulus);
 
 impl Stimulus for ShapeStimulus {
     fn uuid(&self) -> Uuid {
@@ -143,7 +143,24 @@ impl Stimulus for ShapeStimulus {
         let x = self.params.x.eval(&window.physical_properties) as f64;
         let y = self.params.y.eval(&window.physical_properties) as f64;
 
-        // let stroke_style = self.params.stroke_style.clone();
+        let fill_brush = super::helpers::create_fill_brush(
+            &self.params.fill_color,
+            &self.params.stroke_style,
+            &self.params.stroke_color,
+            &self.params.stroke_width,
+            &None,
+        );
+
+        let stroke_color = self.params.stroke_color.clone().unwrap_or(Rgba::new(0.0, 0.0, 0.0, 0.0));
+
+        let stroke_brush = renderer::brushes::Brush::Solid(stroke_color.into());
+
+        let stroke_width = self.params.stroke_width.clone().unwrap_or(Size::Pixels(0.0));
+        let stroke_width = stroke_width.eval(&window.physical_properties) as f64;
+
+        let stroke_options = renderer::styles::StrokeOptions::new(stroke_width);
+
+
 
         match &self.params.shape {
             Shape::Circle { x, y, radius } => {
@@ -156,15 +173,22 @@ impl Stimulus for ShapeStimulus {
                     radius: radius,
                 };
 
-                let geom = Geom {
+                scene.draw( Geom {
                     style: Style::Fill(FillStyle::NonZero),
-                    shape: shape,
-                    brush: Brush::Solid(RGBA::new(0.0, 0.0, 0.0, 1.0)),
+                    shape: shape.clone(),
+                    brush: fill_brush,
                     transform: Affine::identity(),
                     brush_transform: None,
-                };
+                });
 
-                scene.draw(geom);
+                scene.draw( Geom {
+                    style: Style::Stroke(stroke_options),
+                    shape: shape,
+                    brush: stroke_brush,
+                    transform: Affine::identity(),
+                    brush_transform: None,
+                });
+
             }
             Shape::Rectangle { x, y, width, height } => {
                 let x = x.eval(&window.physical_properties) as f64;
@@ -180,7 +204,7 @@ impl Stimulus for ShapeStimulus {
                 let geom = Geom {
                     style: Style::Fill(FillStyle::NonZero),
                     shape: shape,
-                    brush: Brush::Solid(RGBA::new(0.0, 0.0, 0.0, 1.0)),
+                    brush: fill_brush,
                     transform: Affine::identity(),
                     brush_transform: None,
                 };
