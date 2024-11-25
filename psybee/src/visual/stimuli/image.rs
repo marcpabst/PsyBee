@@ -34,6 +34,7 @@ pub struct ImageStimulus {
 
     image: super::WrappedImage,
     image_fit_mode: ImageFitMode,
+
     transformation: Transformation2D,
     animations: Vec<Animation>,
     visible: bool,

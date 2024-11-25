@@ -20,6 +20,7 @@ use super::{
 use pyo3::{exceptions::PyValueError, prelude::*};
 
 use renderer::{image::GenericImageView, VelloScene};
+use strum_macros::{Display, EnumString};
 
 pub mod animations;
 pub mod gabor;
@@ -41,6 +42,37 @@ pub enum StimulusParamValue {
     bool(bool),
     i64(i64),
     Rgba(Rgba),
+    Shape(super::geometry::Shape),
+    StrokeStyle(StrokeStyle),
+}
+
+
+#[derive(Debug, Clone, EnumString, Display)]
+pub enum StrokeStyle {
+    None,
+    Solid,
+    Dashed,
+    Dotted,
+    DashDot,
+    Dashes(Vec<f64>),
+}
+
+// implement IntoPy for StrokeStyle (by converting it to a string)
+impl IntoPy<PyObject> for StrokeStyle {
+    fn into_py(self, py: Python) -> PyObject {
+        self.to_string().into_py(py)
+    }
+}
+
+// implement FromPyObject for StrokeStyle (by parsing it from a string)
+impl<'p> FromPyObject<'p> for StrokeStyle {
+    fn extract_bound(ob: &Bound<'p, PyAny>) -> PyResult<Self> {
+        let s = ob.extract::<String>()?;
+        match TryFrom::try_from(s.as_str()) {
+            Ok(style) => Ok(style),
+            Err(_) => Err(PyValueError::new_err("invalid stroke style")),
+        }
+    }
 }
 
 macro_rules! is_variant {
@@ -85,6 +117,9 @@ impl<'py> FromPyObject<'py> for IntoStimulusParamValue {
         }
         if let Ok(value) = ob.extract::<Size>() {
             return Ok(Self(StimulusParamValue::Size(value)));
+        }
+        if let Ok(value) = ob.extract::<super::geometry::Shape>() {
+            return Ok(Self(StimulusParamValue::Shape(value)));
         }
         Err(pyo3::exceptions::PyTypeError::new_err(
             "Could not convert the value to a StimulusParamValue",
@@ -311,6 +346,8 @@ macro_rules! impl_pystimulus_for_wrapper {
                     Some(StimulusParamValue::bool(val)) => Ok(val.into_py(py)),
                     Some(StimulusParamValue::i64(val)) => Ok(val.into_py(py)),
                     Some(StimulusParamValue::Rgba(val)) => Ok(val.into_py(py)),
+                    Some(StimulusParamValue::Shape(val)) => Ok(val.into_py(py)),
+                    Some(StimulusParamValue::StrokeStyle(val)) => Ok(val.into_py(py)),
                     None => Err(PyValueError::new_err("parameter not found")),
                 }
             }

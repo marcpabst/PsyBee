@@ -1,29 +1,41 @@
 use std::sync::Arc;
 
-use super::{animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams, WrappedStimulus};
+use super::{animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams, StrokeStyle, WrappedStimulus};
 use crate::{
     prelude::{Size, Transformation2D},
     visual::window::Window,
 };
 use psybee_proc::StimulusParams;
 use pyo3::{exceptions::PyValueError, prelude::*};
-use renderer::prelude::*;
+use renderer::affine::Affine;
+use renderer::brushes::Brush;
+use renderer::colors::RGBA;
+use renderer::geoms::Geom;
+use renderer::prelude::{FillStyle, Style};
 use uuid::Uuid;
 
 use renderer::vello_backend::VelloFont;
-
+use renderer::VelloScene;
+use crate::visual::geometry::Shape;
 use super::Rgba;
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct ShapeParams {
+    pub shape: Shape,
     pub x: Size,
     pub y: Size,
+    pub fill_color: Option<Rgba>,
+    pub stroke_style: Option<StrokeStyle>,
+    pub stroke_color: Option<Rgba>,
+    pub stroke_width: Option<Size>,
+    pub alpha: Option<f64>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ShapeStimulus {
     id: uuid::Uuid,
     params: ShapeParams,
+
     transform: Transformation2D,
     animations: Vec<Animation>,
     visible: bool,
@@ -34,13 +46,25 @@ impl ShapeStimulus {
         shape: Shape,
         x: Size,
         y: Size,
+        fill_color: Option<Rgba>,
+        stroke_style: Option<StrokeStyle>,
+        stroke_color: Option<Rgba>,
+        stroke_width: Option<Size>,
+        alpha: Option<f64>,
+
         transform: Transformation2D,
     ) -> Self {
         Self {
             id: Uuid::new_v4(),
             params: ShapeParams {
+                shape,
                 x,
                 y,
+                fill_color,
+                stroke_style,
+                stroke_color,
+                stroke_width,
+                alpha,
             },
             transform,
             animations: Vec::new(),
@@ -57,49 +81,48 @@ pub struct PyGridStimulus();
 impl PyGridStimulus {
     #[new]
     #[pyo3(signature = (
-        elements,
+        shape,
         x = IntoSize(Size::Pixels(0.0)),
         y = IntoSize(Size::Pixels(0.0)),
-        width = IntoSize(Size::ScreenWidth(1.0)),
-        height = IntoSize(Size::ScreenHeight(1.0)),
-        cols = None,
-        rows = None,
-        anchor = (0.5, 0.5),
+        fill_color = None,
+        stroke_style = None,
+        stroke_color = None,
+        stroke_width = None,
+        alpha = None,
         transform = Transformation2D::Identity()
     ))]
     fn __new__(
-        elements: Vec<PyStimulus>,
+        shape: Shape,
         x: IntoSize,
         y: IntoSize,
-        width: IntoSize,
-        height: IntoSize,
-        cols: Option<usize>,
-        rows: Option<usize>,
-        anchor: (f64, f64),
+        fill_color: Option<Rgba>,
+        stroke_style: Option<StrokeStyle>,
+        stroke_color: Option<Rgba>,
+        stroke_width: Option<Size>,
+        alpha: Option<f64>,
         transform: Transformation2D,
     ) -> (Self, PyStimulus) {
-
-        let elements = elements.into_iter().map(|e| e.0).collect();
-    (
-    Self(),
-    PyStimulus(Arc::new(std::sync::Mutex::new(GridStimulus::new(
-        elements,
-        x.into(),
-        y.into(),
-        width.into(),
-        height.into(),
-        cols,
-        rows,
-        anchor,
-        transform,
-    )))),
-    )
+        (
+            Self(),
+            PyStimulus(Arc::new(std::sync::Mutex::new(ShapeStimulus::new(
+                shape,
+                x.into(),
+                y.into(),
+                fill_color,
+                stroke_style,
+                stroke_color,
+                stroke_width,
+                alpha,
+                transform,
+            ))))
+        )
+        
     }
 }
 
-impl_pystimulus_for_wrapper!(PyGridStimulus, GridStimulus);
+impl_pystimulus_for_wrapper!(PyGridStimulus, ShapeStimulus);
 
-impl Stimulus for GridStimulus {
+impl Stimulus for ShapeStimulus {
     fn uuid(&self) -> Uuid {
         self.id
     }
@@ -113,38 +136,65 @@ impl Stimulus for GridStimulus {
     }
 
     fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
-        // work out number of columns and rows if not specified
-        // if only one is specified, calculate the other based on the number of elements
-        // if neither are specified, calculate the number of columns based on the number of elements,
-        // so that the grid is as square as possible
-        let cols = self.cols.unwrap_or_else(|| {
-            self.rows
-                .map(|r| (self.elements.len() as f64 / r as f64).ceil() as usize)
-                .unwrap_or_else(|| {
-                    (self.elements.len() as f64).sqrt().ceil() as usize
-                })
-        });
-        let rows = self.rows.unwrap_or_else(|| {
-            (self.elements.len() as f64 / cols as f64).ceil() as usize
-        });
-
-        // calculate the width and height of each cell
-        let cell_width = self.params.width.eval(&window.physical_properties) / cols as f32;
-        let cell_height = self.params.height.eval(&window.physical_properties) / rows as f32;
-
-        // draw each element in the grid
-        for (i, element) in self.elements.iter_mut().enumerate() {
-            let col = i % cols;
-            let row = i / cols;
-
-            let x = self.params.x.eval(&window.physical_properties) + col as f32 * cell_width;
-            let y = self.params.y.eval(&window.physical_properties) + row as f32 * cell_height;
-        
-            let mut stimulus = element.lock().unwrap();
-            stimulus.draw(scene, window);
+        if !self.visible {
+            return;
         }
-    }
 
+        let x = self.params.x.eval(&window.physical_properties) as f64;
+        let y = self.params.y.eval(&window.physical_properties) as f64;
+
+        // let stroke_style = self.params.stroke_style.clone();
+
+        match &self.params.shape {
+            Shape::Circle { x, y, radius } => {
+                let x = x.eval(&window.physical_properties) as f64;
+                let y = y.eval(&window.physical_properties) as f64;
+                let radius = radius.eval(&window.physical_properties) as f64;
+
+                let shape = renderer::shapes::Circle {
+                    center: renderer::shapes::Point { x, y },
+                    radius: radius,
+                };
+
+                let geom = Geom {
+                    style: Style::Fill(FillStyle::NonZero),
+                    shape: shape,
+                    brush: Brush::Solid(RGBA::new(0.0, 0.0, 0.0, 1.0)),
+                    transform: Affine::identity(),
+                    brush_transform: None,
+                };
+
+                scene.draw(geom);
+            }
+            Shape::Rectangle { x, y, width, height } => {
+                let x = x.eval(&window.physical_properties) as f64;
+                let y = y.eval(&window.physical_properties) as f64;
+                let width = width.eval(&window.physical_properties) as f64;
+                let height = height.eval(&window.physical_properties) as f64;
+
+                let shape = renderer::shapes::Rectangle {
+                    a: renderer::shapes::Point { x, y },
+                    b: renderer::shapes::Point { x: x + width, y: y + height },
+                };
+
+                let geom = Geom {
+                    style: Style::Fill(FillStyle::NonZero),
+                    shape: shape,
+                    brush: Brush::Solid(RGBA::new(0.0, 0.0, 0.0, 1.0)),
+                    transform: Affine::identity(),
+                    brush_transform: None,
+                };
+
+                scene.draw(geom);
+            }
+            Shape::Ellipse { x, y, radius_x, radius_y } => {
+                todo!("Render ellipse")
+            }
+            Shape::Line { x1, y1, x2, y2 } => {
+                todo!("Render line")
+            }
+        };
+    }
     fn set_visible(&mut self, visible: bool) {
         self.visible = visible;
     }
