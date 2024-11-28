@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use renderer::vello_backend::VelloFont;
 
-use super::Rgba;
+use crate::visual::color::Rgba;
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct TextParams {

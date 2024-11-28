@@ -17,7 +17,7 @@ use uuid::Uuid;
 use renderer::vello_backend::VelloFont;
 use renderer::VelloScene;
 use crate::visual::geometry::Shape;
-use super::Rgba;
+use crate::visual::color::Rgba;
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct ShapeParams {
@@ -201,15 +201,21 @@ impl Stimulus for ShapeStimulus {
                     b: renderer::shapes::Point { x: x + width, y: y + height },
                 };
 
-                let geom = Geom {
+                scene.draw(Geom {
                     style: Style::Fill(FillStyle::NonZero),
-                    shape: shape,
+                    shape: shape.clone(),
                     brush: fill_brush,
                     transform: Affine::identity(),
                     brush_transform: None,
-                };
+                });
 
-                scene.draw(geom);
+                scene.draw(Geom {
+                    style: Style::Stroke(stroke_options),
+                    shape: shape,
+                    brush: stroke_brush,
+                    transform: Affine::identity(),
+                    brush_transform: None,
+                });
             }
             Shape::Ellipse { x, y, radius_x, radius_y } => {
                 todo!("Render ellipse")

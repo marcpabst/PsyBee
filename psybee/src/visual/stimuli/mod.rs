@@ -11,11 +11,12 @@ use uuid::Uuid;
 use dyn_clone::DynClone;
 
 use super::{
-    color::Rgba,
     geometry::{IntoSize, Size, Transformation2D},
     window::Window,
     window::WrappedWindow,
 };
+
+use crate::visual::color::Rgba;
 
 use pyo3::{exceptions::PyValueError, prelude::*};
 
@@ -330,6 +331,7 @@ macro_rules! impl_pystimulus_for_wrapper {
         use crate::visual::stimuli::Repeat;
         use crate::visual::stimuli::TransitionFunction;
         use crate::visual::window::WrappedWindow;
+
         use std::mem;
 
         #[pymethods]
@@ -384,11 +386,11 @@ macro_rules! impl_pystimulus_for_wrapper {
                         downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::i64(value));
                         return Ok(());
                     }
-                    // StimulusParamValue::Rgba(_) => {
-                    //     let value = value.extract::<Rgba>(py)?;
-                    //     downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::Rgba(value));
-                    //     return Ok(());
-                    // }
+                    StimulusParamValue::Rgba(_) => {
+                        let value = value.extract::<crate::visual::color::Rgba>(py)?;
+                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::Rgba(value));
+                        return Ok(());
+                    }
                     _ => {}
                 }
 
@@ -463,7 +465,7 @@ macro_rules! impl_pystimulus_for_wrapper {
                     StimulusParamValue::i64(_) => {
                         StimulusParamValue::i64(to.extract::<i64>(slf.py()).expect("invalid value"))
                     }
-                    _ => return Err(PyValueError::new_err("invalid value type")),
+                    _ => return Err(PyValueError::new_err("invalid value type for animation")),
                 };
 
                 downcast_stimulus_mut!(slf, $name).animate(

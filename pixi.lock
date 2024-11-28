@@ -1297,22 +1297,6 @@ packages:
   depends:
   - python >=3.8
   license: MIT
-  purls:
-  - pkg:pypi/wheel?source=hash-mapping
-  size: 62755
-  timestamp: 1731120002488
-- kind: conda
-  name: wheel
-  version: 0.45.0
-  build: pyhd8ed1ab_0
-  subdir: noarch
-  noarch: python
-  url: https://conda.anaconda.org/conda-forge/noarch/wheel-0.45.0-pyhd8ed1ab_0.conda
-  sha256: 8a51067f8e1a2cb0b5e89672dbcc0369e344a92e869c38b2946584aa09ab7088
-  md5: f9751d7c71df27b2d29f5cab3378982e
-  depends:
-  - python >=3.8
-  license: MIT
   license_family: MIT
   purls:
   - pkg:pypi/wheel?source=hash-mapping

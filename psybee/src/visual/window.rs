@@ -136,15 +136,9 @@ impl Window {
             ..wgpu::TextureViewDescriptor::default()
         });
 
-        let mut encoder = gpu_state
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
         &win_state
             .renderer
-            .render_to_surface(device, queue, &suface_texture, &frame.scene);
-
-        let _ = gpu_state.queue.submit(Some(encoder.finish()));
+            .render_to_surface2(device, queue, &suface_texture, &frame.scene);
 
         // present the frame
         suface_texture.present();

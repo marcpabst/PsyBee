@@ -504,7 +504,7 @@ impl MainLoop {
         // create the renderer
         let mut renderer = {
             let texture_format = wgpu::TextureFormat::Bgra8Unorm;
-            renderer::vello_backend::VelloRenderer::new(&device, texture_format)
+            renderer::vello_backend::VelloRenderer::new(&device, texture_format, size.width, size.height)
         };
 
         let winit_id = winit_window.id();
@@ -767,6 +767,9 @@ impl MainLoop {
 
                         // on macos, the window size is not updated automatically
                         window_state.winit_window.request_redraw();
+
+                        // resize renderer
+                        window_state.renderer.resize(&gpu_state.device, new_size.width, new_size.height);
 
                         println!("Window resized to {:?}", new_size);
                     }
