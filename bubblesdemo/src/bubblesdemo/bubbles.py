@@ -97,7 +97,6 @@ def my_experiment(exp_manager: ExperimentManager) -> None:
 
     # create a window
     window = exp_manager.create_default_window()
-    print("Window created (py)")
 
     bg = ImageStimulus(resources_path + "/bg/underwater2.png", 0, 0, "1sw", "1sh")
 

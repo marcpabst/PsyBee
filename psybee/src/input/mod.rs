@@ -270,7 +270,7 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
                 device_id: _, event, ..
             } => {
                 let key_str = event.logical_key.to_text();
-                println!("key_str: {:?}", key_str);
+
                 let key_str = match key_str {
                     Some(key) => key,
                     None => return Err("Failed to convert key to string"),

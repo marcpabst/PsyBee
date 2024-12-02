@@ -58,10 +58,19 @@ impl<F> FutureReturnTrait for F where F: Future<Output = ()> + 'static + Send {}
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[pyclass]
 pub struct Monitor {
+    #[pyo3(get, set)]
     pub name: String,
+    #[pyo3(get, set)]
+    pub resolution: (u32, u32),
     handle: winit::monitor::MonitorHandle,
 }
 
+#[pymethods]
+impl Monitor {
+    pub fn __repr__(&self) -> String {
+        format!("Monitor({})", self.name)
+    }
+}
 /// Options for creating a window. The ExperimentManager will try to find a
 /// video mode that satisfies the provided constraints. See documentation of the
 /// variants for more information.
@@ -250,10 +259,8 @@ impl ExperimentManager {
         })
     }
 
-    /// Retrive available monitors. This reflects the state of the monitors at
-    /// the time of the creation of the WindowManager. If a monitor is
-    /// connected or disconnected after the WindowManager has been created, this
-    /// will not be reflected here!
+    /// Retrive available monitors.
+    /// TODO: update available monitors when a monitor is connected or disconnected
     pub fn get_available_monitors(&self) -> Vec<Monitor> {
         self.available_monitors.clone()
     }
@@ -265,6 +272,11 @@ impl ExperimentManager {
     #[pyo3(signature = (monitor = None))]
     fn py_create_default_window(&self, monitor: Option<u32>) -> WrappedWindow {
         self.create_default_window(monitor)
+    }
+
+    #[pyo3(name = "get_available_monitors")]
+    fn py_get_available_monitors(&self) -> Vec<Monitor> {
+        self.get_available_monitors()
     }
 }
 
@@ -443,7 +455,7 @@ impl MainLoop {
 
         winit_window.focus_window();
 
-        log::debug!("Window created: {:?}", winit_window);
+        // log::debug!("Window created: {:?}", winit_window);
 
         let winit_window = Arc::new(winit_window);
 
@@ -607,17 +619,18 @@ impl MainLoop {
         todo!();
     }
 
-    pub fn get_available_monitors(&mut self) -> Vec<Monitor> {
-        let mut monitors = vec![];
-        let event_loop = self.event_loop.as_ref().unwrap();
-        for (i, handle) in event_loop.available_monitors().enumerate() {
-            monitors.push(Monitor {
-                name: handle.name().unwrap_or(format!("Unnamed monitor {}", i)),
-                handle: handle,
-            });
-        }
-        monitors
-    }
+    // pub fn get_available_monitors(&mut self) -> Vec<Monitor> {
+    //     let mut monitors = vec![];
+    //     let event_loop = self.event_loop.as_ref().unwrap();
+    //     for (i, handle) in event_loop.available_monitors().enumerate() {
+    //         monitors.push(Monitor {
+    //             name: handle.name().unwrap_or(format!("Unnamed monitor {}", i)),
+    //             resolution: (handle.size().width, handle.size().height),
+    //             handle: handle,
+    //         });
+    //     }
+    //     monitors
+    // }
 
     /// Starts the experiment. This will block until the experiment.
     ///
@@ -648,6 +661,7 @@ impl MainLoop {
             .available_monitors()
             .map(|monitor| Monitor {
                 name: monitor.name().unwrap_or("Unnamed monitor".to_string()),
+                resolution: (monitor.size().width, monitor.size().height),
                 handle: monitor,
             })
             .collect();
@@ -705,7 +719,7 @@ impl MainLoop {
                             log::debug!("Event loop received CreateNewWindowEvent - creating new window");
 
                             let window = self.create_window(&window_options, win_target);
-                            println!("Window created");
+
                             // push window to list of windows
                             self.windows.push(window.clone());
 
@@ -733,7 +747,7 @@ impl MainLoop {
                 } => {
                     if let Some(mut window) = self.get_window_by_id(id).clone() {
                         // update window size
-                        println!("Window resizing to {:?}", new_size);
+
                         let mut win_inner = window.inner();
                         win_inner.physical_properties.width = new_size.width;
                         win_inner.physical_properties.height = new_size.height;
@@ -752,7 +766,6 @@ impl MainLoop {
                         // resize renderer
                         window_state.renderer.resize(&gpu_state.device, new_size.width, new_size.height);
 
-                        println!("Window resized to {:?}", new_size);
                     }
                 }
 
