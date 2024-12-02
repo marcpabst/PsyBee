@@ -87,6 +87,7 @@ glib = { version = "0.20.6", optional = true }
 gstreamer = { version = "0.23.3", optional = true }
 gstreamer-app = { version = "0.23.3", optional = true }
 gstreamer-video = { version = "0.23.3", optional = true }
+tupleops = "0.1.1"
 
 # MacOS dependencies
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -103,5 +104,4 @@ objc2-app-kit = { version = "0.2.0", features = [
 objc2-foundation = "0.2.0"
 
 [features]
-default = ["gst"]
 gst = ["dep:glib", "dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video"]

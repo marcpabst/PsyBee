@@ -47,7 +47,9 @@ pub mod prelude {
 pub(crate) type RenderThreadChannelPayload = Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
 
 use std::thread;
-
+use pyo3::types::{PyList, PyType};
+use pyo3::types::PyTuple;
+use pyo3::types::PyDict;
 use crate::visual::window::{Frame, InternalWindowState, Window};
 
 pub trait FutureReturnTrait: Future<Output = ()> + 'static + Send {}
@@ -232,13 +234,13 @@ impl ExperimentManager {
 
     /// Create a default window. This is a convenience function that creates a
     /// window with the default options.
-    pub fn create_default_window(&self) -> WrappedWindow {
+    pub fn create_default_window(&self, monitor: Option<u32>) -> WrappedWindow {
         // select monitor 1 if available
         // find all monitors available
         let monitors = self.get_available_monitors();
         // get the second monitor if available, otherwise use the first one
         let monitor = monitors
-            .get(1)
+            .get(monitor.unwrap_or(0) as usize)
             .unwrap_or(monitors.first().expect("No monitor found - this should not happen"));
 
         log::debug!("Creating default window on monitor {:?}", monitor);
@@ -260,8 +262,9 @@ impl ExperimentManager {
 #[pymethods]
 impl ExperimentManager {
     #[pyo3(name = "create_default_window")]
-    fn py_create_default_window(&self) -> WrappedWindow {
-        self.create_default_window()
+    #[pyo3(signature = (monitor = None))]
+    fn py_create_default_window(&self, monitor: Option<u32>) -> WrappedWindow {
+        self.create_default_window(monitor)
     }
 }
 
@@ -616,8 +619,7 @@ impl MainLoop {
         monitors
     }
 
-    /// Starts the experiment. This will block until the experiment is finished
-    /// and exit the program afterwards.
+    /// Starts the experiment. This will block until the experiment.
     ///
     /// # Arguments
     ///
@@ -633,27 +635,6 @@ impl MainLoop {
         #[cfg(not(target_arch = "wasm32"))]
         {
             smol::block_on(self.run_event_loop(event_loop, experiment_fn));
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            let winit_window = winit::window::Window::new(&event_loop).unwrap();
-            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init().expect("could not initialize logger");
-            use winit::platform::web::WindowExtWebSys;
-            // On wasm, append the canvas to the document body
-            web_sys::window()
-                .and_then(|win| win.document())
-                .and_then(|doc| doc.body())
-                .and_then(|body| body.append_child(&web_sys::Element::from(winit_window.canvas())).ok())
-                .expect("couldn't append canvas to document body");
-
-            // set canvas size
-            let _canvas = winit_window.canvas();
-            let document = web_sys::window().unwrap().document().unwrap();
-            let width = document.body().unwrap().client_width();
-            let height = document.body().unwrap().client_height();
-            winit_window.set_inner_size(winit::dpi::LogicalSize::new(width as f64, height as f64));
-            wasm_bindgen_futures::spawn_local(run(event_loop, winit_window, experiment_fn));
         }
     }
 
@@ -829,12 +810,34 @@ impl MainLoop {
     /// ----------
     /// experiment_fn : callable
     ///    The function that runs your experiment. This function should take a single argument, an instance of `ExperimentManager`, and should not return nothing.
-    #[pyo3(name = "run_experiment")]
-    fn py_run_experiment(&mut self, py: Python, experiment_fn: Py<PyAny>) {
-        let rust_experiment_fn = move |wm: ExperimentManager| -> Result<(), errors::PsybeeError> {
-            Python::with_gil(|py| -> PyResult<()> {
-                experiment_fn.call1(py, (wm,)).expect("Error calling experiment_fn");
-                Ok(())
+    #[pyo3(name = "run_experiment", signature = (experiment_fn, *args, **kwargs))]
+    fn py_run_experiment(&mut self, py: Python, experiment_fn: Py<PyAny>, args: Py<PyTuple>, kwargs: Option<Py<PyDict>>) {
+
+
+        let rust_experiment_fn = move |em: ExperimentManager| -> Result<(), errors::PsybeeError> {
+            Python::with_gil(|py| -> _ {
+
+                // bind kwargs
+                let kwargs = if let Some(kwargs) = kwargs {
+                    kwargs.into_bound(py)
+                } else {
+                    PyDict::new_bound(py)
+                };
+
+
+                // TODO: There must be a better way to do this
+                let args = args.bind(py);
+                let args_as_seq = args.to_list();
+                let args_as_seq = args_as_seq.as_sequence();
+                let em = em.into_py(py);
+                let em_as_seq = PyList::new_bound(py, vec![em]);
+                let em_as_seq = em_as_seq.as_sequence();
+
+                let args = em_as_seq.concat(args_as_seq).unwrap();
+                let args = args.to_tuple().unwrap();
+
+                experiment_fn.call_bound(py, args, Some(&kwargs))
+
             })
             .unwrap();
             Ok(())
