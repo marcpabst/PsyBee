@@ -21,7 +21,7 @@ use send_wrapper::SendWrapper;
 use uuid::Uuid;
 use winit::window::WindowId;
 
-use super::color::Rgba;
+use super::color::LinRgba;
 use super::geometry::Size;
 use super::stimuli::{Stimulus, WrappedStimulus};
 use crate::input::{Event, EventHandler, EventHandlerId, EventHandlingExt, EventKind, EventReceiver};
@@ -243,7 +243,7 @@ impl WrappedWindow {
         let width = props.width;
         let height = props.height;
 
-        let bg = super::color::Rgba {
+        let bg = super::color::LinRgba {
             r: 0.5,
             g: 0.5,
             b: 0.5,
@@ -257,7 +257,13 @@ impl WrappedWindow {
             window: self.clone(),
         };
 
-        return frame;
+        frame
+    }
+    
+    fn get_frames(&self) -> FrameIterator {
+        FrameIterator {
+            window: self.clone(),
+        }
     }
 }
 
@@ -267,6 +273,11 @@ impl WrappedWindow {
     fn py_get_frame(&self, py: Python) -> Frame {
         let f = self.get_frame();
         f
+    }
+    
+    #[pyo3(name = "get_frames")]
+    fn py_get_frames(&self, py: Python) -> FrameIterator {
+        self.get_frames()
     }
 
     #[pyo3(name = "present")]
@@ -315,6 +326,12 @@ impl WrappedWindow {
 
         py.allow_threads(move || self_wrapper.add_event_handler(kind.into(), rust_callback_fn));
     }
+    
+    /// Create a new EventReceiver that will receive events from the window.
+    #[pyo3(name = "create_event_receiver")]
+    fn py_create_event_receiver(&self) -> EventReceiver {
+        self.create_event_receiver()
+    }
 }
 
 impl EventHandlingExt for WrappedWindow {
@@ -361,11 +378,32 @@ impl EventHandlingExt for WrappedWindow {
     }
 }
 
+/// FrameIterator is an iterator that yields frames.
+#[derive(Debug, Clone)]
+#[pyclass]
+pub struct FrameIterator {
+    /// The window that the frames are associated with.
+    window: WrappedWindow,
+}
+
+#[pymethods]
+impl FrameIterator {
+    fn __iter__(slf: PyRef<Self>) -> PyResult<Py<FrameIterator>> {
+        Ok(slf.into())
+    }
+    
+    fn __next__(mut slf: PyRefMut<Self>) -> PyResult<Option<Frame>> {
+        let frame = slf.window.get_frame();
+        Ok(Some(frame))
+    }
+}
+
+
 #[derive(Dbg)]
 #[pyclass]
 #[pyo3(unsendable)]
 pub struct Frame {
-    pub bg_color: super::color::Rgba,
+    pub bg_color: super::color::LinRgba,
     #[dbg(placeholder = "...")]
     scene: VelloScene,
     /// The window that the frame is associated with.
@@ -374,7 +412,7 @@ pub struct Frame {
 
 impl Frame {
     /// Set the background color of the frame.
-    pub fn set_bg_color(&mut self, bg_color: Rgba) {
+    pub fn set_bg_color(&mut self, bg_color: LinRgba) {
         self.bg_color = bg_color;
     }
 
@@ -395,12 +433,12 @@ impl Frame {
     }
 
     #[getter(bg_color)]
-    fn py_get_bg_color(&self) -> super::color::Rgba {
+    fn py_get_bg_color(&self) -> super::color::LinRgba {
         self.bg_color
     }
 
     #[setter(bg_color)]
-    fn py_set_bg_color(&mut self, bg_color: super::color::Rgba) {
+    fn py_set_bg_color(&mut self, bg_color: super::color::LinRgba) {
         self.bg_color = bg_color;
     }
 }

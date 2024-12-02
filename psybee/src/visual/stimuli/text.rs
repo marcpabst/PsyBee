@@ -14,7 +14,8 @@ use uuid::Uuid;
 
 use renderer::vello_backend::VelloFont;
 
-use crate::visual::color::Rgba;
+use crate::visual::color::LinRgba;
+use crate::visual::color::IntoLinRgba;
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct TextParams {
@@ -22,7 +23,7 @@ pub struct TextParams {
     pub y: Size,
     pub text: String,
     pub font_size: Size,
-    pub fill: Rgba,
+    pub fill: LinRgba,
 }
 
 #[derive(Clone, Debug)]
@@ -36,7 +37,7 @@ pub struct TextStimulus {
 }
 
 impl TextStimulus {
-    pub fn new(x: Size, y: Size, text: String, font_size: Size, fill: Rgba, transform: Transformation2D) -> Self {
+    pub fn new(x: Size, y: Size, text: String, font_size: Size, fill: LinRgba, transform: Transformation2D) -> Self {
         // load font
         let font_data =
             include_bytes!("IBMPlexSans-Medium.ttf");
@@ -71,7 +72,7 @@ impl PyTextStimulus {
         y,
         text,
         font_size,
-        fill = Rgba::new(0.0, 0.0, 0.0, 1.0),
+        fill = IntoLinRgba::new(0.0, 0.0, 0.0, 1.0),
         transform = Transformation2D::Identity()
     ))]
     fn __new__(
@@ -79,7 +80,7 @@ impl PyTextStimulus {
         y: IntoSize,
         text: String,
         font_size: IntoSize,
-        fill: Rgba,
+        fill: IntoLinRgba,
         transform: Transformation2D,
     ) -> (Self, PyStimulus) {
         (
@@ -89,7 +90,7 @@ impl PyTextStimulus {
                 y.into(),
                 text,
                 font_size.into(),
-                fill,
+                fill.into(),
                 transform,
             )))),
         )

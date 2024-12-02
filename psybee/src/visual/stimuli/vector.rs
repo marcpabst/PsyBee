@@ -65,10 +65,10 @@ impl PyVectorStimulus {
     #[new]
     #[pyo3(signature = (
         svg_path,
-        x,
-        y,
-        width,
-        height,
+        x = IntoSize(Size::Pixels(0.0)),
+        y = IntoSize(Size::Pixels(0.0)),
+        width = IntoSize(Size::Pixels(100.0)),
+        height = IntoSize(Size::Pixels(100.0)),
         opacity = 1.0
     ))]
     fn __new__(

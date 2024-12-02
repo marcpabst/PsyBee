@@ -16,17 +16,18 @@ use uuid::Uuid;
 
 use renderer::vello_backend::VelloFont;
 use renderer::VelloScene;
+use crate::prelude::color::IntoLinRgba;
 use crate::visual::geometry::Shape;
-use crate::visual::color::Rgba;
+use crate::visual::color::LinRgba;
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct ShapeParams {
     pub shape: Shape,
     pub x: Size,
     pub y: Size,
-    pub fill_color: Option<Rgba>,
+    pub fill_color: Option<LinRgba>,
     pub stroke_style: Option<StrokeStyle>,
-    pub stroke_color: Option<Rgba>,
+    pub stroke_color: Option<LinRgba>,
     pub stroke_width: Option<Size>,
     pub alpha: Option<f64>,
 }
@@ -46,9 +47,9 @@ impl ShapeStimulus {
         shape: Shape,
         x: Size,
         y: Size,
-        fill_color: Option<Rgba>,
+        fill_color: Option<LinRgba>,
         stroke_style: Option<StrokeStyle>,
-        stroke_color: Option<Rgba>,
+        stroke_color: Option<LinRgba>,
         stroke_width: Option<Size>,
         alpha: Option<f64>,
 
@@ -95,9 +96,9 @@ impl PyShapeStimulus {
         shape: Shape,
         x: IntoSize,
         y: IntoSize,
-        fill_color: Option<Rgba>,
+        fill_color: Option<IntoLinRgba>,
         stroke_style: Option<StrokeStyle>,
-        stroke_color: Option<Rgba>,
+        stroke_color: Option<IntoLinRgba>,
         stroke_width: Option<IntoSize>,
         alpha: Option<f64>,
         transform: Transformation2D,
@@ -108,9 +109,9 @@ impl PyShapeStimulus {
                 shape,
                 x.into(),
                 y.into(),
-                fill_color,
+                fill_color.map(|f| f.into()),
                 stroke_style,
-                stroke_color,
+                stroke_color.map(|s| s.into()),
                 stroke_width.map(|s| s.into()),
                 alpha,
                 transform,
@@ -151,7 +152,7 @@ impl Stimulus for ShapeStimulus {
             &None,
         );
 
-        let stroke_color = self.params.stroke_color.clone().unwrap_or(Rgba::new(0.0, 0.0, 0.0, 0.0));
+        let stroke_color = self.params.stroke_color.clone().unwrap_or(LinRgba::new(0.0, 0.0, 0.0, 0.0));
 
         let stroke_brush = renderer::brushes::Brush::Solid(stroke_color.into());
 
@@ -222,6 +223,9 @@ impl Stimulus for ShapeStimulus {
             }
             Shape::Line { x1, y1, x2, y2 } => {
                 todo!("Render line")
+            }
+            Shape::Polygon { points } => {
+                todo!("Render polygon")
             }
         };
     }

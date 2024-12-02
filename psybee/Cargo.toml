@@ -79,6 +79,14 @@ regex = "1.10.6"
 numpy = "0.22.1"
 strum_macros = "0.26.4"
 expand = "0.3.0"
+csscolorparser = "0.7.0"
+smol = "1.3.0"
+
+# Gstreamer dependencies
+glib = { version = "0.20.6", optional = true }
+gstreamer = { version = "0.23.3", optional = true }
+gstreamer-app = { version = "0.23.3", optional = true }
+gstreamer-video = { version = "0.23.3", optional = true }
 
 # MacOS dependencies
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -94,13 +102,6 @@ objc2-app-kit = { version = "0.2.0", features = [
 ] }
 objc2-foundation = "0.2.0"
 
-# Non-wasm32 dependencies
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-smol = "1.3.0"
-
-# Desktop dependencies (macOS, Linux, Windows)
-[target.'cfg(all(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
-glib = "0.19.5"
-gst = { package = "gstreamer", version = "0.22.3" }
-gst-app = { package = "gstreamer-app", version = "0.22.0" }
-gst-video = { package = "gstreamer-video", version = "0.22.3" }
+[features]
+default = ["gst"]
+gst = ["dep:glib", "dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video"]

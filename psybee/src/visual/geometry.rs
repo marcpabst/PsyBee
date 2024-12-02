@@ -565,12 +565,18 @@ pub enum Shape {
         radius_x: Size,
         radius_y: Size,
     },
+
+    /// A polygon.
+    Polygon {
+        points: Vec<(Size, Size)>,
+    },
 }
 
 
 #[pymethods]
 impl Shape {
     #[staticmethod]
+    /// Create a new rectangle.
     fn rectangle(x: IntoSize, y: IntoSize, width: IntoSize, height: IntoSize) -> Shape {
         Shape::Rectangle {
             x: x.into(),
@@ -581,6 +587,7 @@ impl Shape {
     }
 
     #[staticmethod]
+    /// Create a new circle.
     fn circle(x: IntoSize, y: IntoSize, radius: IntoSize) -> Shape {
         Shape::Circle {
             x: x.into(),
@@ -590,6 +597,7 @@ impl Shape {
     }
 
     #[staticmethod]
+    /// Create a new line.
     fn line(x1: IntoSize, y1: IntoSize, x2: IntoSize, y2: IntoSize) -> Shape {
         Shape::Line {
             x1: x1.into(),
@@ -600,6 +608,7 @@ impl Shape {
     }
 
     #[staticmethod]
+    /// Create a new ellipse.
     fn ellipse(x: IntoSize, y: IntoSize, radius_x: IntoSize, radius_y: IntoSize) -> Shape {
         Shape::Ellipse {
             x: x.into(),
@@ -608,6 +617,25 @@ impl Shape {
             radius_y: radius_y.into(),
         }
     }
+
+    // #[staticmethod]
+    // /// Create a new pentagon.
+    // fn pentagon(x: IntoSize, y: IntoSize, radius: IntoSize) -> Shape {
+    //     let radius: Size = radius.into();
+    //     let x: Size = x.into();
+    //     let y: Size = y.into();
+    //     let mut points = Vec::new();
+    //
+    //     for i in 0..5 {
+    //         let angle = 2.0 * std::f32::consts::PI / 5.0 * i as f32;
+    //         let rotation = Transformation2D::RotationPoint(angle, x.clone(), y.clone());
+    //         let x = &x + &radius;
+    //         let y = &y + &radius;
+    //
+    //         points.push((x, y));
+    //     }
+    //     Shape::Polygon { points }
+    // }
 
     // for printing
     fn __repr__(&self) -> PyResult<String> {

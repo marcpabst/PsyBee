@@ -245,6 +245,10 @@ impl Event {
     fn py_window(&self) -> Option<WrappedWindow> {
         self.window().cloned()
     }
+    
+    #[getter]
+    #[pyo3(name = "key")]
+    fn py_key(&self) -> Option<String> { self.key().cloned() }
 }
 
 // Custom conversion from winit events to InputEvents.
@@ -265,7 +269,12 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
             winit_event::WindowEvent::KeyboardInput {
                 device_id: _, event, ..
             } => {
-                let key_str = event.logical_key.to_text().unwrap_or_default();
+                let key_str = event.logical_key.to_text();
+                println!("key_str: {:?}", key_str);
+                let key_str = match key_str {
+                    Some(key) => key,
+                    None => return Err("Failed to convert key to string"),
+                };
 
                 let key_code = u32::default();
 
@@ -422,12 +431,14 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
 
 /// Receives physical input events.
 #[derive(Debug)]
+#[pyclass]
 pub struct EventReceiver {
     pub(crate) receiver: async_broadcast::Receiver<Event>,
 }
 
 /// Contains a vector of events.
 #[derive(Debug, Clone)]
+#[pyclass]
 pub struct EventVec(Vec<Event>);
 
 // convenience methods for KeyEventVec
@@ -442,6 +453,27 @@ impl EventVec {
     /// `Released` state (convenience method).
     pub fn key_released(&self, key: &str) -> bool {
         self.iter().any(|key_event| key_event.key_released(key))
+    }
+}
+
+#[pymethods]
+impl EventVec {
+    /// Check if the given KeyEventVec contains the provided key in the
+    /// `Pressed` state (convenience method).
+    #[pyo3(name = "key_pressed")]
+    pub fn py_key_pressed(&self, key: &str) -> bool {
+        self.key_pressed(key)
+    }
+
+    /// Check if the given KeyEventVec contains the provided key in the
+    /// `Released` state (convenience method).
+    #[pyo3(name = "key_released")]
+    pub fn py_key_released(&self, key: &str) -> bool {
+        self.key_released(key)
+    }
+
+    pub fn events(&self) -> Vec<Event> {
+        self.0.clone()
     }
 }
 
@@ -471,14 +503,28 @@ impl EventReceiver {
     }
 }
 
+#[pymethods]
+impl EventReceiver {
+    /// Polls the receiver for new events.
+    #[pyo3(name = "poll")]
+    pub fn py_poll(&mut self) -> EventVec {
+        self.poll()
+    }
+
+    /// Flushes the internal buffer of key events for this receiver without
+    /// returning them. This is slightly more efficient than calling
+    /// `poll` and ignoring the result.
+    #[pyo3(name = "flush")]
+    pub fn py_flush(&mut self) {
+        self.flush()
+    }
+}
+
 pub(crate) type EventHandlerId = usize;
 pub(crate) type EventHandler = Box<dyn Fn(Event) -> bool + Send + Sync>;
 
 /// Extension for tvpes
 pub trait EventHandlingExt {
-    // /// Create a new event receiver for this object.
-    // fn create_event_receiver(&self) -> EventReceiver;
-
     /// Add an event handler to handle a specific event type.
     fn add_event_handler<F>(&self, kind: EventKind, handler: F) -> EventHandlerId
     where

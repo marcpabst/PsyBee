@@ -17,12 +17,12 @@ use uuid::Uuid;
 use renderer::vello_backend::VelloFont;
 use renderer::VelloScene;
 use crate::visual::geometry::Shape;
-use super::Rgba;
+use super::LinRgba;
 
 pub(crate) fn create_fill_brush(
-    fill_color: &Option<Rgba>,
+    fill_color: &Option<LinRgba>,
     stroke_style: &Option<StrokeStyle>,
-    stroke_color: &Option<Rgba>,
+    stroke_color: &Option<LinRgba>,
     stroke_width: &Option<Size>,
     gradient: &Option<Gradient>,
     // image: Option<Image>,

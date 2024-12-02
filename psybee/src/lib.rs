@@ -882,7 +882,7 @@ fn psybee(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<visual::geometry::Transformation2D>()?;
     m.add_class::<visual::geometry::Shape>()?;
     m.add_class::<visual::geometry::Size>()?;
-    m.add_class::<visual::color::Rgba>()?;
+    m.add_class::<visual::color::LinRgba>()?;
     m.add_class::<visual::stimuli::WrappedImage>()?;
 
     Ok(())

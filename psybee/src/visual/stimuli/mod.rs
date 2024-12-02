@@ -16,7 +16,7 @@ use super::{
     window::WrappedWindow,
 };
 
-use crate::visual::color::Rgba;
+use crate::visual::color::LinRgba;
 
 use pyo3::{exceptions::PyValueError, prelude::*};
 
@@ -43,7 +43,7 @@ pub enum StimulusParamValue {
     String(String),
     bool(bool),
     i64(i64),
-    Rgba(Rgba),
+    LinRgba(LinRgba),
     Shape(super::geometry::Shape),
     StrokeStyle(StrokeStyle),
 }
@@ -114,8 +114,8 @@ impl<'py> FromPyObject<'py> for IntoStimulusParamValue {
         if let Ok(value) = ob.extract::<i64>() {
             return Ok(Self(StimulusParamValue::i64(value)));
         }
-        if let Ok(value) = ob.extract::<Rgba>() {
-            return Ok(Self(StimulusParamValue::Rgba(value)));
+        if let Ok(value) = ob.extract::<LinRgba>() {
+            return Ok(Self(StimulusParamValue::LinRgba(value)));
         }
         if let Ok(value) = ob.extract::<Size>() {
             return Ok(Self(StimulusParamValue::Size(value)));
@@ -348,7 +348,7 @@ macro_rules! impl_pystimulus_for_wrapper {
                     Some(StimulusParamValue::String(val)) => Ok(val.into_py(py)),
                     Some(StimulusParamValue::bool(val)) => Ok(val.into_py(py)),
                     Some(StimulusParamValue::i64(val)) => Ok(val.into_py(py)),
-                    Some(StimulusParamValue::Rgba(val)) => Ok(val.into_py(py)),
+                    Some(StimulusParamValue::LinRgba(val)) => Ok(val.into_py(py)),
                     Some(StimulusParamValue::Shape(val)) => Ok(val.into_py(py)),
                     Some(StimulusParamValue::StrokeStyle(val)) => Ok(val.into_py(py)),
                     None => Err(PyValueError::new_err("parameter not found")),
@@ -386,9 +386,9 @@ macro_rules! impl_pystimulus_for_wrapper {
                         downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::i64(value));
                         return Ok(());
                     }
-                    StimulusParamValue::Rgba(_) => {
-                        let value = value.extract::<crate::visual::color::Rgba>(py)?;
-                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::Rgba(value));
+                    StimulusParamValue::LinRgba(_) => {
+                        let value = value.extract::<crate::visual::color::LinRgba>(py)?;
+                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::LinRgba(value));
                         return Ok(());
                     }
                     _ => {}
