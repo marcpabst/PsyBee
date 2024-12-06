@@ -32,7 +32,7 @@ pub mod text;
 pub mod grid;
 pub mod shape;
 mod helpers;
-mod video;
+pub mod video;
 
 pub type WrappedStimulus = Arc<Mutex<dyn Stimulus>>;
 
