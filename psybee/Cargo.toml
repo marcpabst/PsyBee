@@ -33,7 +33,7 @@ crate-type = ["cdylib"]
 winapi = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 wgpu = { version = "22" }
-renderer = { path = "../../renderer" }
+renderer = { path = "../renderer" }
 psybee-proc = { path = "../psybee-proc" }
 
 raw-window-handle = "0.6"
@@ -93,15 +93,15 @@ anyhow = "1.0.93"
 # MacOS dependencies
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5.1"
-objc2-app-kit = { version = "0.2.0", features = [
-    "NSAlert",
-    "NSApplication",
-    "NSTextField",
-    "NSControl",
-    "NSResponder",
-    "NSView",
-    "NSButton",
-] }
+#objc2-app-kit = { version = "0.2.0", features = [
+#    "NSAlert",
+#    "NSApplication",
+#    "NSTextField",
+#    "NSControl",
+#    "NSResponder",
+#    "NSView",
+#    "NSButton",
+#] }
 objc2-foundation = "0.2.0"
 
 [features]

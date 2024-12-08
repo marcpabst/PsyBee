@@ -1,0 +1,32 @@
+[package]
+name = "renderer"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# The dependencies here are independent from the workspace versions
+[dependencies]
+# When using this example outside of the original Vello workspace,
+# remove the path property of the following Vello dependency requirement.
+# vello = { version = "0.2.0", git = "https://github.com/linebender/vello", rev = "a00cd9f" }
+# velato = { version = "0.3.0", git = "https://github.com/linebender/velato", rev = "2a3b0a3" }
+anyhow = "1.0.86"
+pollster = "0.3.0"
+image = { version = "0.23.14", features = ["png", "jpeg"] }
+itertools = "0.13.0"
+wgpu = { version = "22.0.0" }
+nalgebra = "0.33.0"
+vello = {git = "https://github.com/linebender/vello", rev = "9819261"}
+vello_svg = {git = "https://github.com/linebender/vello_svg", rev = "b9992cf"}
+custom_debug = "0.6.1"
+bytemuck = "1.20.0"
+
+
+[dev-dependencies]
+winit = "0.30.3"
+
+# # # patch for velato to use the same version of vello as this crate
+[patch.crates-io]
+vello = { git = "https://github.com/linebender/vello", rev = "9819261" } # patch for velato to use the same version of vello as this crate

@@ -9,12 +9,12 @@ use async_channel::{bounded, Receiver, Sender};
 use derive_debug::Dbg;
 use futures_lite::future::block_on;
 use futures_lite::Future;
-#[cfg(target_os = "macos")]
-use objc2::rc::Id;
-#[cfg(target_os = "macos")]
-use objc2_app_kit::{NSAlert, NSAlertStyle, NSTextField};
-#[cfg(target_os = "macos")]
-use objc2_foundation::{ns_string, CGPoint, CGSize, MainThreadMarker, NSRect};
+// #[cfg(target_os = "macos")]
+// use objc2::rc::Id;
+// #[cfg(target_os = "macos")]
+// use objc2_app_kit::{NSAlert, NSAlertStyle, NSTextField};
+// #[cfg(target_os = "macos")]
+// use objc2_foundation::{ns_string, CGPoint, CGSize, MainThreadMarker, NSRect};
 use pyo3::prelude::*;
 use visual::window::{WindowPhysicalProperties, WrappedWindow};
 use wgpu::{MemoryHints, TextureFormat};
@@ -575,50 +575,7 @@ impl MainLoop {
         return window;
     }
 
-    /// Prompt for text input. On Windows/macOS/Linux, this will prompt on
-    /// `stdout`. On iOS, this will prompt using a native dialog.
-    /// Currently not supported on WASM (but should use `window.prompt` in the
-    /// future) and not supported on Android.
-    pub fn prompt(&self, _message: &str) -> String {
-        // temporary MacOS implementation using NSAlert
-        #[cfg(target_os = "macos")]
-        {
-            // we need to use run_on_main_thread here because NSAlert is not thread safe
-
-            let mtm = unsafe { MainThreadMarker::new_unchecked() };
-            let alert = unsafe { NSAlert::new(mtm) };
-
-            unsafe { alert.setMessageText(ns_string!("Please povide a subject id")) };
-            // set button text
-            unsafe { alert.addButtonWithTitle(ns_string!("OK")) };
-            // set style to informational
-            unsafe { alert.setAlertStyle(NSAlertStyle::Warning) };
-
-            // add a text field
-            let textfield = MainThreadMarker::alloc(mtm);
-            // initialize the textfield
-            let rect = NSRect::new(CGPoint::new(0.0, 0.0), CGSize::new(200.0, 24.0));
-            let textfield = unsafe { NSTextField::initWithFrame(textfield, rect) };
-
-            let textfield_v = Id::into_super(textfield.clone());
-            let textfield_v = Id::into_super(textfield_v);
-
-            unsafe { alert.setAccessoryView(Some(&textfield_v)) };
-
-            // show the alert
-            let _response = unsafe { alert.runModal() };
-
-            // get the text from the textfield
-            let text = unsafe { textfield.stringValue() };
-            let text = text.to_string();
-
-            // return the text
-            return text;
-        }
-
-        todo!();
-    }
-
+ 
     // pub fn get_available_monitors(&mut self) -> Vec<Monitor> {
     //     let mut monitors = vec![];
     //     let event_loop = self.event_loop.as_ref().unwrap();
