@@ -39,6 +39,8 @@ jobs:
         uses: pypa/cibuildwheel@v2.22.0
         with:
           package-dir: psybee
+        env:
+          CIBW_ARCHS: "native"
 
       - uses: actions/upload-artifact@v4
         with:
