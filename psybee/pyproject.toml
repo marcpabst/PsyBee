@@ -1,20 +1,20 @@
 [build-system]
-requires = ["maturin>=1.4,<2.0"]
+requires = ["maturin>=1.4,<=1.7.5"]
 build-backend = "maturin"
 
 [project]
-Name = "psybee"
-Version = "0.1.2"
-Authors = [{ name = "Marc Pabst", email = "mail@xxxxxxx.com" }]
-Description = "Python bindings for PsyBee"
-License = "MPL-2.0"
-Requires-python = ">=3.10"
-Classifiers = [
+name = "psybee"
+version = "0.1.2"
+authors = [{ name = "Marc Pabst", email = "mail@xxxxxxx.com" }]
+description = "Python bindings for PsyBee"
+license = "MPL-2.0"
+requires-python = ">=3.10"
+classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-#dynamic = ["version"]
+dynamic = ["version"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
