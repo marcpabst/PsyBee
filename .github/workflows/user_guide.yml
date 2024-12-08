@@ -1,16 +1,16 @@
 name: user-guide
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - user-guide/**
-  pull_request:
-    branches:
-      - main
-    paths:
-      - user-guide/**
+#on:
+#  push:
+#    branches:
+#      - main
+#    paths:
+#      - user-guide/**
+#  pull_request:
+#    branches:
+#      - main
+#    paths:
+#      - user-guide/**
 
 permissions:
   contents: write
