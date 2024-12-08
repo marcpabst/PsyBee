@@ -48,7 +48,7 @@ jobs:
             cd {dest_dir} &&
             mkdir -p psybee &&
             mkdir -p psybee/.dylibs &&
-            GST_PLUUGINS = ("libgstcoreelements" "libgstvideoconvertscale" "libgstplayback" "libgstapp" "libgstlibav")
+            GST_PLUUGINS = ("libgstcoreelements" "libgstvideoconvertscale" "libgstplayback" "libgstapp" "libgstlibav") &&
             for lib in $GST_PLUGINS; do
               ln /Library/Frameworks/GStreamer.framework/Libraries/$lib.dylib psybee/.dylibs/$lib.dylib
             done &&
