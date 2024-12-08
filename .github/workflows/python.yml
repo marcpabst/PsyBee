@@ -27,8 +27,8 @@ jobs:
       fail-fast: false
       matrix:
         # macos-13 is an intel runner, macos-14 is apple silicon
-#        os: [ubuntu-22.04, windows-latest, macos-14]
-        params: [{os: ubuntu-22.04, gst_version: 1.24.10}, {os: windows-latest, gst_version: 1.24.10}, {os: macos-14, gst_version: 1.24.10}]
+        #        os: [ubuntu-22.04, windows-latest, macos-14]
+        params: [{os: windows-latest, gst_version: 1.24.10}, {os: macos-14, gst_version: 1.24.10}]
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -40,8 +40,10 @@ jobs:
         with:
           package-dir: psybee
         env:
+          GST_LIB_DIR_MACOS: "/Library/Frameworks/GStreamer.framework/"
           CIBW_ARCHS: "native"
-          CIBW_REPAIR_WHEEL_COMMAND_MACOS: "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel} --ignore-missing-dependencies"
+          CIBW_REPAIR_WHEEL_COMMAND_MACOS: 'DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:$GST_LIB_DIR_MACOS"
+          delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}'
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel}"
       - uses: actions/upload-artifact@v4
