@@ -19,3 +19,4 @@ dynamic = ["version"]
 [tool.maturin]
 features = ["pyo3/extension-module"]
 cargo-extra-args = "--features extension-module"
+
