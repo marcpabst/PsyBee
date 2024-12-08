@@ -47,9 +47,8 @@ jobs:
             DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/Library/Frameworks/GStreamer.framework/Libraries" python -m delocate.cmd.delocate_wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel} &&
             cd /Library/Frameworks/GStreamer.framework/Libraries &&
             for lib in *.dylib; do
-              zip -u -n . {dest_dir}/*.whl /.dylibs/$lib
-            done &&
-            unzip -vl {dest_dir}/*.whl
+              zip -u -n . {dest_dir}/*.whl /psybee/.dylibs/$lib
+            done
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel}"
       - uses: actions/upload-artifact@v4
