@@ -372,8 +372,8 @@ impl MainLoop {
                 monitor_handle
                     .video_modes()
                     .filter(|video_mode| {
-                        video_mode.size().width as u32 == resolution.0
-                            && video_mode.size().height as u32 == resolution.1
+                        video_mode.size().width == resolution.0
+                            && video_mode.size().height == resolution.1
                     })
                     .collect()
             } else {
