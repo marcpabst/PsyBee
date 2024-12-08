@@ -4,10 +4,10 @@ build-backend = "maturin"
 
 [project]
 name = "psybee"
-authors = [{ name = "Marc Pabst", email = "mail@marcpabst.com" }]
-description = "Python bindings for the PsyBee library"
+authors = [{ name = "Marc Pabst", email = "mail@xxxxxxx.com" }]
+description = "Python bindings for PsyBee"
 license = "MPL-2.0"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
