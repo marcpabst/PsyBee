@@ -26,7 +26,7 @@ jobs:
     name: Build wheels on ${{ matrix.params.os }}
     runs-on: ${{ matrix.params.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         # macos-13 is an intel runner, macos-14 is apple silicon
         #        os: [ubuntu-22.04, windows-latest, macos-14]
@@ -49,7 +49,7 @@ jobs:
             mkdir -p psybee &&
             mkdir -p psybee/.dylibs &&
             for lib in /Library/Frameworks/GStreamer.framework/Libraries/*.dylib; do
-              ln $lib psybee/.dylibs/$lib
+              ln $lib psybee/.dylibs/$(basename $lib);
             done &&
             zip -u {dest_dir}/*.whl psybee/.dylibs/*.dylib &&
             rm -rf psybee
