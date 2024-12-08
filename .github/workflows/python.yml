@@ -34,7 +34,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: marcpabst/setup-gstreamer@v.1.5.3
         with:
-          version: ${{ matrix.params.gst_version }}python.yml
+          version: ${{ matrix.params.gst_version }}
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.22.0
         with:
