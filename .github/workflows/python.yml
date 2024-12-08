@@ -50,7 +50,7 @@ jobs:
             mkdir -p psybee/.dylibs &&
             for lib in libgstcoreelements libgstvideoconvertscale libgstplayback libgstapp libgstlibav; do
               echo "Copying $lib.dylib" &&
-              ln /Library/Frameworks/GStreamer.framework/Libraries/$lib.dylib psybee/.dylibs/$lib.dylib
+              cp /Library/Frameworks/GStreamer.framework/Libraries/$lib.dylib psybee/.dylibs/ &&
             done &&
             zip -u -r ./*.whl psybee/.dylibs/ &&
             rm -rf psybee
