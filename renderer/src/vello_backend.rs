@@ -71,7 +71,7 @@ impl VelloRenderer {
 
 
         // create a render pipeline
-        let render_pipeline = Self::create_render_pipelie(width, height, device, surface_format);
+        let render_pipeline = Self::create_render_pipelie(device, surface_format);
         let texture = Self::create_texture(device, width, height);
         let gamma_buffer = Self::create_uniform_buffer(device);
         let bind_group = Self::create_bind_group(device, &texture);
@@ -112,7 +112,7 @@ impl VelloRenderer {
                 .override_image(image, Some(wgpu_texture.clone()));
         }
         self.renderer
-            .render_to_surface(device, queue, vello_scene, surface, &render_params);
+            .render_to_surface(device, queue, vello_scene, surface, &render_params).expect("Failed to render to surface");
     }
 
     /// Render the scene to a WGPU texture.
@@ -278,7 +278,7 @@ impl VelloRenderer {
         })
     }
 
-    fn create_render_pipelie(width: u32, height: u32, device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+    fn create_render_pipelie(device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Render Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("assets/shaders/render.wgsl").into()),
@@ -453,7 +453,7 @@ impl<S: IntoVelloShape + Shape> Drawable<VelloBackend> for Geom<S> {
         if let Brush::Image { image, .. } = &self.brush {
             if let Some(gpu_texture) = &image.gpu_texture {
                 scene.backend.gpu_images.push((
-                    new_brush.clone().try_into().unwrap(),
+                    new_brush.try_into().unwrap(),
                     wgpu::ImageCopyTextureBase {
                         texture: gpu_texture.clone(),
                         mip_level: 0,
@@ -573,7 +573,7 @@ impl From<StrokeOptions> for vello::kurbo::Stroke {
 impl<'a> Brush {
     fn as_brush_or_brushref(&'a self) -> VelloBrushOrBrushRef<'a> {
         match self {
-            Brush::Image { image, fit_mode, edge_mode, x, y } => {
+            Brush::Image { image, fit_mode: _, edge_mode, x: _, y: _ } => {
                 // note that offsets and fit mode are already applied when the geom is created and part
                 // of the brush transform
 

@@ -1,6 +1,4 @@
-use shapes::Point;
 
-use super::shapes;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Affine(pub [f64; 6]);

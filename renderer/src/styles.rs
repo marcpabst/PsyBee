@@ -1,4 +1,3 @@
-use super::scenes::Scene;
 
 #[derive(Debug, Clone)]
 pub enum Style {

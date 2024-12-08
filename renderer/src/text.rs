@@ -1,4 +1,4 @@
-use super::{affine::Affine, colors::RGBA, shapes::Point};
+use super::{affine::Affine, colors::RGBA};
 
 /// A piece of formatted text.
 #[derive(Debug, Clone)]
