@@ -6,15 +6,8 @@
 name: Build Python wheels
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [ "master" ]
-    paths:
-      - "psybee/**"
-  pull_request:
-    branches: [ "master" ]
-    paths:
-      - "psybee/**"
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -28,7 +21,7 @@ jobs:
       matrix:
         # macos-13 is an intel runner, macos-14 is apple silicon
 #        os: [ubuntu-22.04, windows-latest, macos-14]
-        params: [{os: ubuntu-22.04, gst_version: 1.24.10}, {os: windows-latest, gst_version: 1.24.10}, {os: macos-14, gst_version: 1.24.10}]
+        params: [{os: windows-latest, gst_version: 1.24.10}, {os: macos-14, gst_version: 1.24.10}]
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -48,3 +41,19 @@ jobs:
         with:
           name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
           path: ./wheelhouse/*.whl
+
+  upload_all:
+    needs: [build_wheels]
+    environment: pypi
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cibw-*
+          path: dist
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
