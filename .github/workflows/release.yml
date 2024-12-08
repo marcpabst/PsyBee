@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci github --manifest-path ./psybee-py/Cargo.toml
 #
-name: Build Python wheels
+name: Release Python wheels
 
 on:
   release:
@@ -50,10 +50,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download wheels from build jobs
+        uses: actions/download-artifact@v4
         with:
           pattern: cibw-*
           path: dist
           merge-multiple: true
-
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

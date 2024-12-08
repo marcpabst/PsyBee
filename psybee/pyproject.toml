@@ -4,6 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "psybee"
+version = "0.1.2"
 authors = [{ name = "Marc Pabst", email = "mail@xxxxxxx.com" }]
 description = "Python bindings for PsyBee"
 license = "MPL-2.0"
