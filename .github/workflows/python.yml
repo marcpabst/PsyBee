@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: blinemedical/setup-gstreamer@v1.4.0
+      - uses: marcpabst/setup-gstreamer@v1.5
         with:
           version: '1.24.10'
       - name: Build wheels
