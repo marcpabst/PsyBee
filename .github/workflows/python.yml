@@ -51,7 +51,7 @@ jobs:
             for lib in libgstcoreelements libgstvideoconvertscale libgstplayback libgstapp libgstlibav; do
               ln -s /Library/Frameworks/GStreamer.framework/Libraries/$lib.dylib psybee/.dylibs/$lib.dylib
             done &&
-            zip -u {dest_dir}/*.whl psybee/.dylibs/*.dylib &&
+            zip -u ./*.whl psybee/.dylibs/*.dylib &&
             rm -rf psybee
 
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
