@@ -858,6 +858,7 @@ impl MainLoop {
 
         let mut self_wrapper = send_wrapper::SendWrapper::new(self);
 
+
         py.allow_threads(move || self_wrapper.run_experiment(rust_experiment_fn));
     }
 }
