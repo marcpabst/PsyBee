@@ -51,8 +51,7 @@ jobs:
             for lib in *.dylib; do
               ln $lib psybee/.dylibs/$lib
             done
-            
-           zip -u {dest_dir}/*.whl psybee/.dylibs/*.dylib
+            zip -u {dest_dir}/*.whl psybee/.dylibs/*.dylib
 
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel}"
