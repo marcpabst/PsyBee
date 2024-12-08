@@ -50,8 +50,10 @@ jobs:
             mkdir -p psybee/.dylibs
             for lib in *.dylib; do
               ln $lib psybee/.dylibs/$lib
-              zip -u {dest_dir}/*.whl psybee/.dylibs/$lib
             done
+            
+           zip -u {dest_dir}/*.whl psybee/.dylibs/*.dylib
+
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel}"
       - uses: actions/upload-artifact@v4
