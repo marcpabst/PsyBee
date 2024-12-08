@@ -42,7 +42,7 @@ jobs:
         env:
           CIBW_ARCHS: "native"
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: >
-            DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/Library/Frameworks/GStreamer.framework/Libraries" python -m delocate.delocate_wheel -w {dest_dir} -v {wheel}
+            DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/Library/Frameworks/GStreamer.framework/Libraries" python -m delocate.cmd.delocate_wheel -w {dest_dir} -v {wheel}
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel}"
       - uses: actions/upload-artifact@v4
