@@ -53,8 +53,8 @@ impl ImageStimulus {
         }
     }
 
-    pub fn from_path(src: String, params: ImageParams) -> Self {
-        let image = super::WrappedImage::from_path(src).unwrap();
+    pub fn from_path(src: String, params: ImageParams, is_srgb: bool) -> Self {
+        let image = super::WrappedImage::from_path(src, is_srgb).unwrap();
         Self::from_image(image, params)
     }
 }

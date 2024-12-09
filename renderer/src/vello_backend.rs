@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::brushes::Extend;
+use crate::brushes::{Extend, ImageColor};
 use image::GenericImageView;
 use vello::peniko::BlendMode;
 use vello::RendererOptions;
@@ -382,8 +382,8 @@ impl Scene<VelloBackend> {
 // Textures
 impl Image {
     /// Create a new texture from an image::DynamicImage.
-    pub fn new(image: &image::DynamicImage) -> Self {
-        // create a peniko image
+    pub fn new(image: &image::DynamicImage, color_space: ImageColor) -> Self {
+
         let data = Arc::new(image.clone().into_rgba8().into_vec());
 
         return Self {
@@ -391,11 +391,16 @@ impl Image {
             data,
             width: image.width(),
             height: image.height(),
+            color_space,
         };
     }
 
     /// Move the texture to the GPU.
     pub fn to_gpu(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        if self.gpu_texture.is_some() {
+            return;
+        }
+        println!("Creating texture with color space: {:?}", self.color_space);
         let data = &self.data;
         // create a new wgpu texture
         let wgpu_tetxure = device.create_texture(&wgpu::TextureDescriptor {
@@ -407,7 +412,11 @@ impl Image {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: if self.color_space == ImageColor::LinearRGB {
+                wgpu::TextureFormat::Rgba8Unorm
+            } else {
+                wgpu::TextureFormat::Rgba8UnormSrgb
+            },
             usage: wgpu::TextureUsages::COPY_DST
                 | wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_SRC,

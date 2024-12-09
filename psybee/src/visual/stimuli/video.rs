@@ -67,7 +67,7 @@ impl VideoStimulus {
         let buffer = Arc::new(Mutex::new(None));
         let pipeline = Self::create_pipeline(path, status_tx, buffer.clone()).unwrap();
         Self::start_pipeline(pipeline.clone());
-        pipeline.set_state(gstreamer::State::Paused).unwrap();
+
 
         Self {
             id: Uuid::new_v4(),
@@ -86,12 +86,38 @@ impl VideoStimulus {
 
     }
 
+    pub fn is_playing(&self) -> bool {
+        self.pipeline.current_state() == gstreamer::State::Playing
+    }
+
     pub fn play(&self) {
         self.pipeline.set_state(gstreamer::State::Playing).unwrap();
     }
 
     pub fn pause(&self) {
         self.pipeline.set_state(gstreamer::State::Paused).unwrap();
+    }
+
+    pub fn seek(&self, to: f64, accurate: bool, flush: bool, block: bool) {
+
+        // combine the flags
+        let mut flags = gstreamer::SeekFlags::empty();
+        if accurate {
+            flags |= gstreamer::SeekFlags::ACCURATE;
+        }
+        if flush && self.is_playing() {
+            flags |= gstreamer::SeekFlags::FLUSH;
+        }
+
+        self.pipeline.seek_simple(
+            flags,
+            gstreamer::ClockTime::from_seconds(to as u64),
+        ).expect("Failed to seek in video pipeline");
+
+        // if block is true, block until the seek is done
+        if block {
+            self.pipeline.state(gstreamer::ClockTime::from_seconds(5)).0.expect("Failed to block until seek is done");
+        }
     }
 
 
@@ -282,13 +308,11 @@ impl VideoStimulus {
             }
         });
 
-
-
         Ok(pipeline)
     }
 
     fn start_pipeline(pipeline: gstreamer::Pipeline) {
-        pipeline.set_state(gstreamer::State::Playing).unwrap();
+        // pipeline.set_state(gstreamer::State::Playing).unwrap();
 
         let bus = pipeline
             .bus()
@@ -364,6 +388,12 @@ impl PyVideoStimulus {
     fn pause(mut slf: PyRef<'_, Self>) {
         downcast_stimulus!(slf, VideoStimulus).pause();
     }
+
+
+    #[pyo3(signature = (to, accurate = true, flush = true, block = true))]
+    fn seek(mut slf: PyRef<'_, Self>, to: f64, accurate: bool, flush: bool, block: bool) {
+        downcast_stimulus!(slf, VideoStimulus).seek(to, accurate, flush, block);
+    }
 }
 
 impl_pystimulus_for_wrapper!(PyVideoStimulus, VideoStimulus);
@@ -420,7 +450,7 @@ impl Stimulus for VideoStimulus {
             let buffer = self.buffer.lock().unwrap();
             let image = buffer.as_ref().unwrap();
             let image = image.clone();
-            self.image = Some(super::WrappedImage::from_dynamic_image(renderer::image::DynamicImage::ImageRgb8(image)));
+            self.image = Some(super::WrappedImage::from_dynamic_image(renderer::image::DynamicImage::ImageRgb8(image), true));
         } else if self.image.is_none() {
             return;
         }

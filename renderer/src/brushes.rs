@@ -18,6 +18,14 @@ pub enum Brush {
     },
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ImageColor {
+    /// linear RGB color
+    LinearRGB,
+    /// sRGB color
+    SRGB,
+}
+
 #[derive(Debug, Clone)]
 pub struct Image {
     /// Data of the image.
@@ -28,6 +36,8 @@ pub struct Image {
     pub width: u32,
     /// The height of the image.
     pub height: u32,
+    /// The color space of the image.
+    pub color_space: ImageColor,
 }
 
 #[derive(Debug, Clone)]

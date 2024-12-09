@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{mem, sync::{Arc, Mutex}, time::Instant};
 
 use animations::{Animation, Repeat, TransitionFunction};
 use numpy::PyUntypedArrayMethods;
@@ -490,15 +487,15 @@ pub struct WrappedImage(Arc<Mutex<renderer::brushes::Image>>);
 
 impl WrappedImage {
     /// Create a new WrappedImage from a DynamicImage.
-    pub fn from_dynamic_image(image: renderer::image::DynamicImage) -> Self {
-        let vello_image = renderer::brushes::Image::new(&image);
+    pub fn from_dynamic_image(image: renderer::image::DynamicImage, is_srgb: bool) -> Self {
+        let vello_image = renderer::brushes::Image::new(&image, if is_srgb { renderer::brushes::ImageColor::SRGB } else { renderer::brushes::ImageColor::LinearRGB });
         WrappedImage(Arc::new(Mutex::new(vello_image)))
     }
 
     /// Create a new WrappedImage from a file path.
-    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Result<Self, renderer::image::ImageError> {
+    pub fn from_path<P: AsRef<std::path::Path>>(path: P, is_srgb: bool) -> Result<Self, renderer::image::ImageError> {
         let image = renderer::image::open(path)?;
-        Ok(Self::from_dynamic_image(image))
+        Ok(Self::from_dynamic_image(image, is_srgb))
     }
 
     pub fn inner(&self) -> std::sync::MutexGuard<renderer::brushes::Image> {
@@ -514,7 +511,7 @@ impl WrappedImage {
         image.to_gpu(&device, &queue);
     }
 
-    pub fn from_spritesheet_path(src: String, nx: u32, ny: u32) -> Vec<Self> {
+    pub fn from_spritesheet_path(src: String, nx: u32, ny: u32, is_srgb: bool) -> Vec<Self> {
         let image = renderer::image::open(src).expect("Failed to load image");
         // split the image into nx * ny sprites
         let (w, h) = (image.width() / nx as u32, image.height() / ny as u32);
@@ -528,7 +525,7 @@ impl WrappedImage {
                 let sprite = image.view(x * w, y * h, w, h).to_image();
                 images.push(WrappedImage::from_dynamic_image(
                     renderer::image::DynamicImage::ImageRgba8(sprite),
-                ));
+                    is_srgb));
             }
         }
         images
@@ -538,22 +535,25 @@ impl WrappedImage {
 #[pymethods]
 impl WrappedImage {
     #[new]
-    fn __new__(path: &str) -> PyResult<Self> {
-        Self::from_path(path).map_err(|e| PyValueError::new_err(e.to_string()))
+    #[pyo3(signature = (path, is_srgb = true))]
+    fn __new__(path: &str, is_srgb: bool) -> PyResult<Self> {
+        Self::from_path(path, is_srgb).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// Create a new a List of WrappedImage from a spritesheet.
     #[staticmethod]
     #[pyo3(name = "from_spritesheet")]
-    pub fn py_from_spritesheet(src: &str, nx: u32, ny: u32) -> PyResult<Vec<Self>> {
-        let images = WrappedImage::from_spritesheet_path(src.to_string(), nx, ny);
+    #[pyo3(signature = (src, nx, ny, is_srgb = true))]
+    pub fn py_from_spritesheet(src: &str, nx: u32, ny: u32, is_srgb: bool) -> PyResult<Vec<Self>> {
+        let images = WrappedImage::from_spritesheet_path(src.to_string(), nx, ny, is_srgb);
         Ok(images)
     }
 
     /// Create a new WrappedImage from a 2D numpy array.
     #[staticmethod]
     #[pyo3(name = "from_numpy")]
-    pub fn py_from_numpy(array: numpy::PyArrayLike<f32, numpy::Ix3, numpy::AllowTypeChange>) -> Self {
+    #[pyo3(signature = (array, is_srgb = true))]
+    pub fn py_from_numpy(array: numpy::PyArrayLike<f32, numpy::Ix3, numpy::AllowTypeChange>, is_srgb: bool) -> Self {
         let array = array.as_array();
         let image = renderer::image::DynamicImage::ImageRgb8(
             renderer::image::RgbImage::from_raw(
@@ -568,7 +568,7 @@ impl WrappedImage {
             )
             .expect("failed to create image"),
         );
-        WrappedImage::from_dynamic_image(image)
+        WrappedImage::from_dynamic_image(image, is_srgb)
     }
 
     /// Move the image to the GPU.
