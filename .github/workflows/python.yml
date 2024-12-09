@@ -48,7 +48,7 @@ jobs:
             cd {dest_dir} &&
             mkdir -p psybee &&
             mkdir -p psybee/gstreamer &&
-            cp /Library/Frameworks/GStreamer.framework/Versions/Current/GStreamer psybee/gstreamer/ &&
+            cp -R /Library/Frameworks/GStreamer.framework/Versions/Current/ psybee/gstreamer/ &&
             zip -u -r ./*.whl psybee/gstreamer/ &&
             rm -rf psybee
 
