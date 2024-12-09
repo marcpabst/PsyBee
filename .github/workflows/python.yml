@@ -50,7 +50,7 @@ jobs:
             mkdir -p psybee/gstreamer &&
             for lib in $(find "/Library/Frameworks/GStreamer.framework/Versions/1.0/lib" -name "*.dylib" -maxdepth 1); do
               echo "Copying $lib" &&
-              cp $lib psybee/gstreamer/$(basename $lib) &&
+              cp $lib psybee/gstreamer/$(basename $lib)
             done &&
             cp -r /Library/Frameworks/GStreamer.framework/Versions/1.0/libexec/* psybee/gstreamer/libexec &&
             zip -u -r ./*.whl psybee/gstreamer &&
