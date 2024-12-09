@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/psybee/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/pywrap/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rapier2d-py/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/renderer/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.pixi/envs/default/libexec/conda" />
       <excludeFolder url="file://$MODULE_DIR$/psybee/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
