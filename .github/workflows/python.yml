@@ -48,8 +48,11 @@ jobs:
             cd {dest_dir} &&
             mkdir -p psybee &&
             mkdir -p psybee/gstreamer &&
-            cp -R /Library/Frameworks/GStreamer.framework/Versions/Current/ psybee/gstreamer/ &&
-            zip -u -r ./*.whl psybee/gstreamer/ &&
+            for lib in $(find "/Library/Frameworks/GStreamer.framework/Versions/1.0/lib" -name "*.dylib"); do
+              echo "Copying $lib" &&
+              cp $lib.dylib psybee/.dylibs/$lib.dylib
+            done &&
+            zip -u -r ./*.whl psybee/.dylibs/ &&
             rm -rf psybee
 
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
