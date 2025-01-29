@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use crate::brushes::{Extend, ImageColor};
 use image::GenericImageView;
+use skrifa::raw::FileRef;
 use vello::peniko::BlendMode;
+use vello::peniko::color::ColorSpaceTag;
 use vello::RendererOptions;
 use wgpu::util::DeviceExt;
 
@@ -323,13 +325,13 @@ impl VelloRenderer {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: &"vs_main",
+                entry_point: Some(&"vs_main"),
                 buffers: &[],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: &"fs_main",
+                entry_point:  Some(&"fs_main"),
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
@@ -588,7 +590,7 @@ impl<'a> Brush {
 
                 // create peniko::Image
                 let blob = vello::peniko::Blob::new(image.data.clone());
-                let image = vello::peniko::Image::new(blob, vello::peniko::Format::Rgba8, image.width, image.height);
+                let image = vello::peniko::Image::new(blob, vello::peniko::ImageFormat::Rgba8, image.width, image.height);
                 let image = image.with_extend(edge_mode.into());
 
                 VelloBrushOrBrushRef::Brush(vello::peniko::Brush::Image(image))
@@ -664,14 +666,28 @@ impl IntoVelloShape for Circle {
 }
 
 // Colors
-impl From<RGBA> for vello::peniko::Color {
+impl From<RGBA> for vello::peniko::color::AlphaColor<vello::peniko::color::Srgb> {
     fn from(color: RGBA) -> Self {
-        vello::peniko::Color::rgba(
-            color.r as f64,
-            color.g as f64,
-            color.b as f64,
-            color.a as f64,
+        vello::peniko::Color::from_rgba8(
+            (color.r * 255.0) as u8,
+            (color.g * 255.0) as u8,
+            (color.b * 255.0) as u8,
+            (color.a * 255.0) as u8,
         )
+    }
+}
+
+
+impl From<RGBA> for vello::peniko::color::DynamicColor {
+    fn from(color: RGBA) -> Self {
+        let ac = vello::peniko::Color::from_rgba8(
+            (color.r * 255.0) as u8,
+            (color.g * 255.0) as u8,
+            (color.b * 255.0) as u8,
+            (color.a * 255.0) as u8,
+        );
+
+    vello::peniko::color::DynamicColor::from_alpha_color(ac)
     }
 }
 
@@ -771,10 +787,16 @@ impl From<GradientKind> for vello::peniko::GradientKind {
 // Gradient
 impl From<Gradient> for vello::peniko::Gradient {
     fn from(gradient: Gradient) -> Self {
+
+        let stops: Vec<vello::peniko::ColorStop> = gradient.stops.into_iter().map(|stop| stop.into()).collect();
+        let stops = vello::peniko::ColorStops::from(stops.as_slice());
+
         vello::peniko::Gradient {
             kind: gradient.kind.into(),
-            stops: gradient.stops.into_iter().map(|stop| stop.into()).collect(),
+            stops: stops,
             extend: gradient.extend.into(),
+            interpolation_cs: ColorSpaceTag::LinearSrgb,
+            hue_direction: Default::default(),
         }
     }
 }
@@ -798,19 +820,19 @@ impl Drawable<VelloBackend> for FormatedText<VelloFont> {
             (self.transform * scene.backend.global_transform).into();
 
         let font = &self.font.0;
-        let font_size = vello::skrifa::instance::Size::new(self.size);
+        let font_size = skrifa::instance::Size::new(self.size);
         let text = &self.text;
 
         let font_ref = vello_font_to_font_ref(font).expect("Failed to load font");
-        let axes = vello::skrifa::MetadataProvider::axes(&font_ref);
+        let axes = skrifa::MetadataProvider::axes(&font_ref);
         let variations = [("wght", 100.0), ("wdth", 500.0)];
         let var_loc = axes.location(variations.iter().copied());
 
-        let charmap = vello::skrifa::MetadataProvider::charmap(&font_ref);
-        let metrics = vello::skrifa::MetadataProvider::metrics(&font_ref, font_size, &var_loc);
+        let charmap = skrifa::MetadataProvider::charmap(&font_ref);
+        let metrics = skrifa::MetadataProvider::metrics(&font_ref, font_size, &var_loc);
         let line_height = metrics.ascent - metrics.descent + metrics.leading;
         let glyph_metrics =
-            vello::skrifa::MetadataProvider::glyph_metrics(&font_ref, font_size, &var_loc);
+            skrifa::MetadataProvider::glyph_metrics(&font_ref, font_size, &var_loc);
 
         let mut pen_x = (self.x * 2.0) as f32;
         let mut pen_y = (self.y * 2.0) as f32;
@@ -861,15 +883,15 @@ impl Drawable<VelloBackend> for FormatedText<VelloFont> {
             .font_size(self.size)
             .transform(transform)
             .glyph_transform(self.glyph_transform.map(|t| t.into()))
-            .normalized_coords(var_loc.coords())
+            .normalized_coords(bytemuck::cast_slice(var_loc.coords()))
             .brush(brush_color)
             .hint(false)
             .draw(vello::peniko::Fill::NonZero, glyphs.into_iter());
     }
 }
 
-fn vello_font_to_font_ref(font: &vello::peniko::Font) -> Option<vello::skrifa::FontRef<'_>> {
-    use vello::skrifa::raw::FileRef;
+fn vello_font_to_font_ref(font: &vello::peniko::Font) -> Option<skrifa::FontRef<'_>> {
+    use skrifa::raw::FileRef;
     let file_ref = FileRef::new(font.data.as_ref()).ok()?;
     match file_ref {
         FileRef::Font(font) => Some(font),

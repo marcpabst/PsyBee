@@ -450,7 +450,7 @@ impl Stimulus for VideoStimulus {
             let buffer = self.buffer.lock().unwrap();
             let image = buffer.as_ref().unwrap();
             let image = image.clone();
-            self.image = Some(super::WrappedImage::from_dynamic_image(renderer::image::DynamicImage::ImageRgb8(image), true));
+            self.image = Some(super::WrappedImage::from_dynamic_image(renderer::image::DynamicImage::ImageRgb8(image)));
         } else if self.image.is_none() {
             return;
         }

@@ -1,20 +1,33 @@
 use super::affine::Affine;
 use super::brushes::{Brush, Image};
 pub use super::scenes::Scene;
-use super::shapes::{Point, Rectangle, Shape};
 use super::styles::{FillStyle, ImageFitMode, Style};
+
+#[derive(Debug, Clone, Copy)]
+pub struct Point {
+    pub x: f64,
+    pub y: f64,
+}
+
+#[derive(Debug, Clone)]
+pub enum Shape {
+    Circle { center: Point, radius: f64 },
+    Rectangle { a: Point, b: Point },
+    RoundedRectangle { a: Point, b: Point, radius: f64 },
+    Polygon { points: Vec<Point> },
+}
 
 // A geometric object that can be rendered, consisting of a shape and a brush.
 #[derive(Debug, Clone)]
-pub struct Geom<S: Shape> {
+pub struct Geom {
     pub style: Style,
-    pub shape: S,
+    pub shape: Shape,
     pub brush: Brush,
     pub transform: Affine,
     pub brush_transform: Option<Affine>,
 }
 
-pub trait GeomTrait {
+impl Geom {
     fn new_image(
         image: Image, // the image to render
         x: f64, // top left x coordinate of the image geom
@@ -26,8 +39,8 @@ pub trait GeomTrait {
         image_y: f64, // y offset of the image
         fit_mode: ImageFitMode, // how to fit the image
         edge_mode: crate::brushes::Extend,  // how to handle edges
-    ) -> Geom<Rectangle> {
-        let shape = Rectangle {
+    ) -> Geom {
+        let shape = Shape::Rectangle {
             a: Point {
                 x: x - width / 2.0,
                 y: y - height / 2.0,
@@ -75,5 +88,3 @@ pub trait GeomTrait {
         }
     }
 }
-
-impl GeomTrait for Geom<Rectangle> {}

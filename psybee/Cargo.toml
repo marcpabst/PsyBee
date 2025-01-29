@@ -32,7 +32,7 @@ crate-type = ["cdylib"]
 [dependencies]
 winapi = "0.3"
 serde = { version = "1.0", features = ["derive"] }
-wgpu = { version = "22" }
+wgpu = { version = "23" }
 renderer = { path = "../renderer" }
 psybee-proc = { path = "../psybee-proc" }
 

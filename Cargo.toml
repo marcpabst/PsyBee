@@ -4,4 +4,4 @@ members = ["psybee", "psybee-proc", "rapier2d-py", "renderer"]
 
 # # # patch for velato to use the same version of vello as this crate
 [patch.crates-io]
-vello = { git = "https://github.com/linebender/vello", rev = "9819261" } # patch for velato to use the same version of vello as this crate
+#vello = { git = "https://github.com/linebender/vello", rev = "9819261" } # patch for velato to use the same version of vello as this crate

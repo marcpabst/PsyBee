@@ -16,12 +16,13 @@ anyhow = "1.0.86"
 pollster = "0.3.0"
 image = { version = "0.23.14", features = ["png", "jpeg"] }
 itertools = "0.13.0"
-wgpu = { version = "22.0.0" }
+wgpu = { version = "23.0.0" }
 nalgebra = "0.33.0"
-vello = {git = "https://github.com/linebender/vello", rev = "9819261"}
-vello_svg = {git = "https://github.com/linebender/vello_svg", rev = "b9992cf"}
 custom_debug = "0.6.1"
 bytemuck = "1.20.0"
+vello = "0.4.0"
+vello_svg = "0.6.0"
+skrifa = "0.26.5"
 
 
 [dev-dependencies]
