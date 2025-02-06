@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use super::{animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams, StrokeStyle, WrappedStimulus};
+use super::{
+    animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
+    StrokeStyle, WrappedStimulus,
+};
 use crate::{
     prelude::{Size, Transformation2D},
     visual::window::Window,
@@ -10,15 +13,15 @@ use pyo3::{exceptions::PyValueError, prelude::*};
 use renderer::affine::Affine;
 use renderer::brushes::Brush;
 use renderer::colors::RGBA;
-use renderer::geoms::Geom;
 use renderer::prelude::{FillStyle, Style};
+use renderer::shapes::Geom;
 use uuid::Uuid;
 
+use crate::prelude::color::IntoLinRgba;
+use crate::visual::color::LinRgba;
+use crate::visual::geometry::Shape;
 use renderer::vello_backend::VelloFont;
 use renderer::VelloScene;
-use crate::prelude::color::IntoLinRgba;
-use crate::visual::geometry::Shape;
-use crate::visual::color::LinRgba;
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct ShapeParams {
@@ -115,9 +118,8 @@ impl PyShapeStimulus {
                 stroke_width.map(|s| s.into()),
                 alpha,
                 transform,
-            ))))
+            )))),
         )
-
     }
 }
 
@@ -152,7 +154,11 @@ impl Stimulus for ShapeStimulus {
             &None,
         );
 
-        let stroke_color = self.params.stroke_color.clone().unwrap_or(LinRgba::new(0.0, 0.0, 0.0, 0.0));
+        let stroke_color = self
+            .params
+            .stroke_color
+            .clone()
+            .unwrap_or(LinRgba::new(0.0, 0.0, 0.0, 0.0));
 
         let stroke_brush = renderer::brushes::Brush::Solid(stroke_color.into());
 
@@ -160,8 +166,6 @@ impl Stimulus for ShapeStimulus {
         let stroke_width = stroke_width.eval(&window.physical_properties) as f64;
 
         let stroke_options = renderer::styles::StrokeOptions::new(stroke_width);
-
-
 
         match &self.params.shape {
             Shape::Circle { x, y, radius } => {
@@ -174,7 +178,7 @@ impl Stimulus for ShapeStimulus {
                     radius: radius,
                 };
 
-                scene.draw( Geom {
+                scene.draw(Geom {
                     style: Style::Fill(FillStyle::NonZero),
                     shape: shape.clone(),
                     brush: fill_brush,
@@ -182,14 +186,13 @@ impl Stimulus for ShapeStimulus {
                     brush_transform: None,
                 });
 
-                scene.draw( Geom {
+                scene.draw(Geom {
                     style: Style::Stroke(stroke_options),
                     shape: shape,
                     brush: stroke_brush,
                     transform: Affine::identity(),
                     brush_transform: None,
                 });
-
             }
             Shape::Rectangle { x, y, width, height } => {
                 let x = x.eval(&window.physical_properties) as f64;
@@ -199,7 +202,10 @@ impl Stimulus for ShapeStimulus {
 
                 let shape = renderer::shapes::Rectangle {
                     a: renderer::shapes::Point { x, y },
-                    b: renderer::shapes::Point { x: x + width, y: y + height },
+                    b: renderer::shapes::Point {
+                        x: x + width,
+                        y: y + height,
+                    },
                 };
 
                 scene.draw(Geom {
@@ -218,7 +224,12 @@ impl Stimulus for ShapeStimulus {
                     brush_transform: None,
                 });
             }
-            Shape::Ellipse { x, y, radius_x, radius_y } => {
+            Shape::Ellipse {
+                x,
+                y,
+                radius_x,
+                radius_y,
+            } => {
                 todo!("Render ellipse")
             }
             Shape::Line { x1, y1, x2, y2 } => {

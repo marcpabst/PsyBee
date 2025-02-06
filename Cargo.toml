@@ -2,6 +2,6 @@
 resolver = "2"
 members = ["psybee", "psybee-proc", "rapier2d-py", "renderer"]
 
-# # # patch for velato to use the same version of vello as this crate
+# patch wgpu to git d9e9c3a
 [patch.crates-io]
-#vello = { git = "https://github.com/linebender/vello", rev = "9819261" } # patch for velato to use the same version of vello as this crate
+wgpu = { git = "https://github.com/marcpabst/wgpu.git" }

@@ -1,20 +1,43 @@
+use crate::affine::Affine;
+use crate::bitmaps::DynamicBitmap;
+use crate::colors::RGBA;
+use crate::shapes::{Point, Shape};
+use crate::styles::ImageFitMode;
+use custom_debug::CustomDebug;
 use std::sync::Arc;
-use crate::styles::{ImageFitMode};
-use super::{colors::RGBA, shapes::Point};
 
-#[derive(Debug, Clone)]
-pub enum Brush {
+#[derive(Debug)]
+pub enum Brush<'a> {
     /// Solid color brush.
     Solid(RGBA),
     /// Gradient brush.
     Gradient(Gradient),
     /// GPU texture brush.
-    Image{
-        image: Image,
-        x: f64,
-        y: f64,
+    Image {
+        /// The image to use as a brush.
+        image: &'a DynamicBitmap,
+        /// The starting point of the image. TODO: maybe rename to offset or translate?
+        start: Point,
+        /// The fit mode of the image.
         fit_mode: ImageFitMode,
-        edge_mode: Extend,
+        /// The sampling mode of the image.
+        sampling: ImageSampling,
+        /// The edge mode of the image.
+        edge_mode: (Extend, Extend),
+        /// Optional affine transform to apply to the image. This will be applied after the
+        /// fit mode and start point.
+        transform: Option<Affine>,
+        /// Optional alpha value to apply to the image.
+        alpha: Option<f32>,
+    },
+    /// A brush that fills an area with a repeating pattern of shapes.
+    ShapePattern {
+        /// The shape to use for the pattern.
+        shape: Shape,
+        /// The lattic to use for the pattern.
+        latice: Affine,
+        /// The brush to use for the pattern.
+        brush: &'a Brush<'a>,
     },
 }
 
@@ -26,19 +49,16 @@ pub enum ImageColor {
     SRGB,
 }
 
-#[derive(Debug, Clone)]
-pub struct Image {
-    /// Data of the image.
-    pub data: Arc<Vec<u8>>,
-    /// Gpu buffer (if available).
-    pub gpu_texture: Option<Arc<wgpu::Texture>>,
-    /// The width of the image.
-    pub width: u32,
-    /// The height of the image.
-    pub height: u32,
-    /// The color space of the image.
-    pub color_space: ImageColor,
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+pub enum ImageSampling {
+    /// Nearest neighbor sampling.
+    #[default]
+    Nearest,
+    /// Linear sampling.
+    Linear,
 }
+
+pub trait ImageData {}
 
 #[derive(Debug, Clone)]
 pub struct Gradient {
@@ -57,15 +77,11 @@ impl Gradient {
                 color: *color,
             })
             .collect();
-        Self {
-            extend,
-            kind,
-            stops,
-        }
+        Self { extend, kind, stops }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Extend {
     /// Extends the image by repeating the edge color of the brush.
     Pad,
@@ -94,14 +110,10 @@ pub enum GradientKind {
     },
     /// Gradient that transitions between two or more colors that radiate from an origin.
     Radial {
-        /// Center of start circle.
-        start_center: Point,
-        /// Radius of start circle.
-        start_radius: f32,
-        /// Center of end circle.
-        end_center: Point,
-        /// Radius of end circle.
-        end_radius: f32,
+        /// Center of circle.
+        center: Point,
+        /// Radius of circle.
+        radius: f32,
     },
     /// Gradient that transitions between two or more colors that rotate around a center
     /// point.
@@ -113,4 +125,11 @@ pub enum GradientKind {
         /// End angle of the sweep, counter-clockwise of the x-axis.
         end_angle: f32,
     },
+}
+
+// allow Extend to be converted into (Extend, Extend)
+impl From<Extend> for (Extend, Extend) {
+    fn from(extend: Extend) -> Self {
+        (extend, extend)
+    }
 }

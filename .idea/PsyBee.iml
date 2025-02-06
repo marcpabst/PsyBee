@@ -7,9 +7,12 @@
       <sourceFolder url="file://$MODULE_DIR$/pywrap/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rapier2d-py/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/renderer/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/renderer/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/renderer/examples" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.pixi/envs/default/libexec/conda" />
       <excludeFolder url="file://$MODULE_DIR$/psybee/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/renderer/target" />
     </content>
     <orderEntry type="jdk" jdkName="default" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

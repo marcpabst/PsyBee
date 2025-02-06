@@ -16,18 +16,19 @@ anyhow = "1.0.86"
 pollster = "0.3.0"
 image = { version = "0.23.14", features = ["png", "jpeg"] }
 itertools = "0.13.0"
-wgpu = { version = "23.0.0" }
+wgpu = { git = "https://github.com/marcpabst/wgpu.git" }
 nalgebra = "0.33.0"
 custom_debug = "0.6.1"
 bytemuck = "1.20.0"
-vello = "0.4.0"
+vello = { git = "https://github.com/linebender/vello.git", rev = "4ec6b24" }
 vello_svg = "0.6.0"
 skrifa = "0.26.5"
-
+psybee-proc = { path = "../psybee-proc" }
+skia-safe = { version = "0.81.0", features = ["metal"] }
+foreign-types-shared = "0.3.1"
+metal = "0.31.0"
+cosmic-text = "0.12.1"
 
 [dev-dependencies]
-winit = "0.30.3"
+winit = "0.30.8"
 
-# # # patch for velato to use the same version of vello as this crate
-[patch.crates-io]
-vello = { git = "https://github.com/linebender/vello", rev = "9819261" } # patch for velato to use the same version of vello as this crate

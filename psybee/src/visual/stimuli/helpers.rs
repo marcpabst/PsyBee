@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use super::{animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams, StrokeStyle, WrappedStimulus};
+use super::{
+    animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
+    StrokeStyle, WrappedStimulus,
+};
 use crate::{
     prelude::{Size, Transformation2D},
     visual::window::Window,
@@ -10,14 +13,14 @@ use pyo3::{exceptions::PyValueError, prelude::*};
 use renderer::affine::Affine;
 use renderer::brushes::{Brush, Gradient};
 use renderer::colors::RGBA;
-use renderer::geoms::Geom;
 use renderer::prelude::{FillStyle, Style};
+use renderer::shapes::Geom;
 use uuid::Uuid;
 
+use super::LinRgba;
+use crate::visual::geometry::Shape;
 use renderer::vello_backend::VelloFont;
 use renderer::VelloScene;
-use crate::visual::geometry::Shape;
-use super::LinRgba;
 
 pub(crate) fn create_fill_brush(
     fill_color: &Option<LinRgba>,
@@ -36,4 +39,4 @@ pub(crate) fn create_fill_brush(
         Brush::Solid(RGBA::new(0.0, 0.0, 0.0, 0.0))
     }
 }
-    // if let Some(image) = image {
+// if let Some(image) = image {

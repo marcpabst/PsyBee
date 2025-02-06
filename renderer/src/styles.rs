@@ -1,10 +1,3 @@
-
-#[derive(Debug, Clone)]
-pub enum Style {
-    Fill(FillStyle),
-    Stroke(StrokeOptions),
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum FillStyle {
     NonZero,
@@ -12,7 +5,7 @@ pub enum FillStyle {
 }
 
 #[derive(Debug, Clone)]
-pub struct StrokeOptions {
+pub struct StrokeStyle {
     pub width: f64,
     pub join: Join,
     pub miter_limit: f64,
@@ -22,7 +15,7 @@ pub struct StrokeOptions {
     pub dash_offset: f64,
 }
 
-impl StrokeOptions {
+impl StrokeStyle {
     pub fn new(width: f64) -> Self {
         Self {
             width,
@@ -56,25 +49,13 @@ pub type Dashes = Vec<[f64; 4]>;
 pub enum ImageFitMode {
     // Original size of the image buffer.
     Original,
-    // Stretch the image to fill the shape.
-    Fill,
     // Use exact width and height.
-    Exact {
-        width: f64,
-        height: f64,
-    },
+    Exact { width: f64, height: f64 },
 }
 
-
-#[derive(Debug, Clone, Copy)]
-pub enum MixMode {
-    Normal,
-    Clip,
-    Multiply,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum CompositeMode {
+#[derive(Debug, Clone, Copy, Default)]
+pub enum BlendMode {
+    #[default]
     SourceOver,
     DestinationOver,
     SourceIn,
@@ -86,4 +67,6 @@ pub enum CompositeMode {
     Lighter,
     Copy,
     Xor,
+    Multiply,
+    Modulate,
 }
