@@ -2,21 +2,18 @@ use crate::affine::Affine;
 use crate::brushes::Extend;
 use crate::brushes::{Brush, Gradient, GradientKind};
 use crate::colors::RGBA;
-use crate::prelude::{BlendMode, FillStyle, StrokeStyle};
+use crate::prelude::{BlendMode, DynamicFontFace, StrokeStyle};
 use crate::renderer::Renderer;
 use crate::scenes::Scene;
 use crate::shapes::Shape;
 use foreign_types_shared::ForeignType;
-use foreign_types_shared::ForeignTypeRef;
-use skia_safe::{Drawable, PictureRecorder, SamplingOptions};
+use skia_safe::{PictureRecorder, SamplingOptions};
 use std::any::Any;
-use std::ops::Deref;
-use std::pin::pin;
-use wgpu::hal::DynResource;
-use wgpu::{Device, Queue, Texture, TextureView};
+use cosmic_text::fontdb::FaceInfo;
+use wgpu::{Device, Queue, Texture};
 
 use skia_safe::{
-    gpu::{self, backend_render_targets, mtl, SurfaceOrigin},
+    gpu::{self, mtl, SurfaceOrigin},
     scalar, ColorType,
 };
 
@@ -29,12 +26,9 @@ use skia_safe::AlphaType as SkAlphaType;
 
 use skia_safe::BlendMode as SkBlendMode;
 
-use skia_safe::TileMode as SkTileMode;
-
 use crate::bitmaps::{Bitmap, DynamicBitmap};
 use crate::styles::ImageFitMode;
 use skia_safe::gradient_shader::GradientShaderColors as SkGradientShaderColors;
-use skia_safe::wrapper::RefWrapper;
 
 #[derive(Debug)]
 pub struct SkiaScene {
@@ -311,6 +305,11 @@ impl Renderer for SkiaRenderer {
 
         DynamicBitmap(Box::new(image))
     }
+
+    fn load_font_face(&self, face_info: &FaceInfo) -> DynamicFontFace {
+        // load the font face using skia
+        todo!("load the font face using skia")
+    }
 }
 
 impl SkiaRenderer {
@@ -432,8 +431,8 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                 let local_matrix = match fit_mode {
                     ImageFitMode::Original => None,
                     ImageFitMode::Exact { width, height } => {
-                        let scale_x = width / skia_image.width() as f64;
-                        let scale_y = height / skia_image.height() as f64;
+                        let scale_x = width / skia_image.width() as f32;
+                        let scale_y = height / skia_image.height() as f32;
                         Some(skia_safe::Matrix::scale((scale_x as scalar, scale_y as scalar)))
                     }
                 };
@@ -472,10 +471,10 @@ impl From<&Brush<'_>> for skia_safe::Paint {
 
                 let path = shape.into();
                 let latice = &(*latice).into();
-                
+
                 // create a path effect
                 let path_effect = skia_safe::PathEffect::path_2d(latice, &path);
-                
+
                 paint.set_path_effect(path_effect);
                 paint
             }

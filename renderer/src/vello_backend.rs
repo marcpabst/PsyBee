@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::sync::Arc;
-
+use cosmic_text::fontdb::FaceInfo;
 use crate::brushes::{Extend, ImageColor};
 use image::{DynamicImage, GenericImageView};
 use skrifa::raw::FileRef;
@@ -23,6 +23,7 @@ use crate::renderer::Renderer;
 use crate::shapes::{Point, Shape};
 use crate::styles::{BlendMode, FillStyle, StrokeStyle};
 use crate::{affine::Affine, scenes::Scene};
+use crate::prelude::DynamicFontFace;
 
 pub struct VelloScene {
     /// The Vello scene.
@@ -151,6 +152,10 @@ impl Renderer for vello::Renderer {
     }
 
     fn create_bitmap(&self, data: DynamicImage) -> DynamicBitmap {
+        todo!()
+    }
+
+    fn load_font_face(&self, face_info: &FaceInfo) -> DynamicFontFace {
         todo!()
     }
 }

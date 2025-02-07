@@ -1,10 +1,11 @@
 use super::affine::Affine;
 use super::colors;
-use super::styles::{BlendMode, StrokeStyle};
-use crate::brushes::Brush;
+use super::styles::{BlendMode, ImageFitMode, StrokeStyle};
+use crate::bitmaps::DynamicBitmap;
+use crate::brushes::{Brush, Extend};
 use crate::colors::RGBA;
 use crate::prelude::FillStyle;
-use crate::shapes::Shape;
+use crate::shapes::{Point, Shape};
 use std::any::Any;
 
 pub struct DynamicScene(pub Box<dyn Scene>);
@@ -97,54 +98,6 @@ pub trait Scene: Any {
         alpha: f32,
     );
     fn end_layer(&mut self);
-
-    // fn draw_in_layer(
-    //     &mut self,
-    //     mix_mode: MixMode,
-    //     composite_mode: CompositeMode,
-    //     clip: Shape,
-    //     clip_transform: Affine,
-    //     layer_transform: Option<Affine>,
-    //     alpha: f32,
-    //     draw_fn: Box<dyn FnOnce(&mut Self)>,
-    // ) {
-    //     self.start_layer(mix_mode, composite_mode, clip, clip_transform, layer_transform, alpha);
-    //     draw_fn(self);
-    //     self.end_layer();
-    // }
-
-    // fn draw_alpha_mask(
-    //     &mut self,
-    //     mask: impl FnOnce(&mut Self),
-    //     item: impl FnOnce(&mut Self),
-    //     clip: Shape,
-    //     clip_transform: Affine,
-    // ) {
-    //     self.start_layer(
-    //         MixMode::Normal,
-    //         CompositeMode::SourceOver,
-    //         clip.clone(),
-    //         clip_transform,
-    //         None,
-    //         1.0,
-    //     );
-    //     // mask(self.scene_mut());
-    //
-    //     self.start_layer(
-    //         MixMode::Multiply,
-    //         CompositeMode::SourceIn,
-    //         clip.clone(),
-    //         clip_transform,
-    //         None,
-    //         1.0,
-    //     );
-    //
-    //     // item(self.scene_mut());
-    //
-    //     self.end_layer();
-    //     self.end_layer();
-    // }
-
     fn draw_shape_fill(&mut self, shape: Shape, brush: Brush, transform: Option<Affine>, blend_mode: Option<BlendMode>);
     fn draw_shape_stroke(
         &mut self,
@@ -154,4 +107,33 @@ pub trait Scene: Any {
         transform: Option<Affine>,
         blend_mode: Option<BlendMode>,
     );
+    fn draw_image(
+        &mut self,
+        bitmap: &DynamicBitmap,
+        position: Point,
+        width: f32,
+        height: f32,
+        transform: Option<Affine>,
+        blend_mode: Option<BlendMode>,
+        alpha: Option<f32>,
+    ) {
+        let brush = Brush::Image {
+            image: &bitmap,
+            start: position,
+            fit_mode: ImageFitMode::Exact { width, height },
+            sampling: Default::default(),
+            edge_mode: (Extend::Pad, Extend::Pad),
+            transform,
+            alpha,
+        };
+        
+        self.draw_shape_fill(Shape::rectangle(position, width as f64, height as f64), brush, None, blend_mode);
+    }
+    // fn draw_glyphs(
+    //     &mut self,
+    //     glyphs: &dyn Iterator<Item = Glyph>,
+    //     brush: Brush,
+    //     transform: Option<Affine>,
+    //     blend_mode: Option<BlendMode>,
+    // );
 }

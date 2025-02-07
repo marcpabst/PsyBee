@@ -50,7 +50,7 @@ pub enum ImageFitMode {
     // Original size of the image buffer.
     Original,
     // Use exact width and height.
-    Exact { width: f64, height: f64 },
+    Exact { width: f32, height: f32 },
 }
 
 #[derive(Debug, Clone, Copy, Default)]
