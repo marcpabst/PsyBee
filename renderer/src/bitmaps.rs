@@ -1,7 +1,6 @@
+use std::{any::Any, fmt::Debug};
+
 pub use super::scenes::Scene;
-use crate::renderer::Renderer;
-use std::any::Any;
-use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct DynamicBitmap(pub Box<dyn Bitmap>);

@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
     time::Instant,
 };
 
@@ -9,32 +9,27 @@ use numpy::PyUntypedArrayMethods;
 use uuid::Uuid;
 
 use dyn_clone::DynClone;
+use pyo3::{exceptions::PyValueError, prelude::*};
+use renderer::image::GenericImageView;
+use strum_macros::{Display, EnumString};
 
 use super::{
     geometry::{IntoSize, Size, Transformation2D},
-    window::Window,
-    window::WrappedWindow,
+    window::{Frame, Window, WindowState},
 };
-
 use crate::visual::color::LinRgba;
 
-use pyo3::{exceptions::PyValueError, prelude::*};
-
-use renderer::{image::GenericImageView, VelloScene};
-use strum_macros::{Display, EnumString};
-
 pub mod animations;
-pub mod gabor;
-pub mod image;
-pub mod vector;
-pub mod sprite;
-pub mod text;
-pub mod grid;
-pub mod video;
-pub mod shape;
 mod helpers;
 
-pub type WrappedStimulus = Arc<Mutex<dyn Stimulus>>;
+pub mod gabor;
+// pub mod grid;
+pub mod image;
+pub mod shape;
+// pub mod sprite;
+// pub mod text;
+// pub mod vector;
+// pub mod video;
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
@@ -48,7 +43,6 @@ pub enum StimulusParamValue {
     Shape(super::geometry::Shape),
     StrokeStyle(StrokeStyle),
 }
-
 
 #[derive(Debug, Clone, EnumString, Display)]
 pub enum StrokeStyle {
@@ -136,12 +130,12 @@ pub trait StimulusParams {
 }
 
 /// The stimulus trait.
-pub trait Stimulus: Send + Sync + downcast_rs::Downcast + std::fmt::Debug {
-    /// Draw the stimulus onto the scene.
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window);
+pub trait Stimulus: downcast_rs::Downcast + std::fmt::Debug {
+    /// Draw the stimulus onto the frame.
+    fn draw(&mut self, scene: &mut Frame);
 
     /// Check if the stimulus contains a specific Point.
-    fn contains(&self, x: Size, y: Size, window: &WrappedWindow) -> bool {
+    fn contains(&self, x: Size, y: Size, window: &Window) -> bool {
         // by default, stimuli will report false for contains
         false
     }
@@ -166,17 +160,17 @@ pub trait Stimulus: Send + Sync + downcast_rs::Downcast + std::fmt::Debug {
 
     /// Hide the stimulus. This is a convenience method that calls
     /// `set_visible(false)`.
-    fn hide(&mut self) -> () {
+    fn hide(&mut self) {
         self.set_visible(false);
     }
 
     /// Show the stimulus. This is a convenience method that calls
-    fn show(&mut self) -> () {
+    fn show(&mut self) {
         self.set_visible(true);
     }
 
     /// Toggle the visibility of the stimulus.
-    fn toggle_visibility(&mut self) -> () {
+    fn toggle_visibility(&mut self) {
         self.set_visible(!self.visible());
     }
 
@@ -207,25 +201,25 @@ pub trait Stimulus: Send + Sync + downcast_rs::Downcast + std::fmt::Debug {
     }
 
     /// Update the object's state based on the current time. Finished animations are removed.
-    fn update_animations(&mut self, time: Instant, window: &Window) {
+    fn update_animations(&mut self, time: Instant, window_state: &WindowState) {
         let mut params_to_set = Vec::new();
 
         self.animations().retain_mut(|animation| {
             if animation.finished(time) {
                 return false;
             }
-            let value = animation.value(time, window);
+            let value = animation.value(time, window_state);
             params_to_set.push((animation.parameter().to_string(), value));
             true
         });
 
-        for (param, value) in params_to_set {
-            self.set_param(&param, value);
+        for (param, value) in params_to_set.iter() {
+            self.set_param(param, value.clone());
         }
     }
 
     /// Set the transformation.
-    fn set_transformation(&mut self, transformation: Transformation2D) -> ();
+    fn set_transformation(&mut self, transformation: Transformation2D);
 
     /// Add a transformation to the current transformation.
     fn add_transformation(&mut self, transformation: Transformation2D) {
@@ -254,29 +248,14 @@ pub trait Stimulus: Send + Sync + downcast_rs::Downcast + std::fmt::Debug {
     /// Transforms a point from the window coordinate system to the stimulus.
     /// coordinate system.
     fn transform_point(&self, x: f32, y: f32, window: &Window) -> (f32, f32) {
-        self.transformation().transform_point(x, y, &window.physical_properties)
-    }
-
-    /// Rotate the object around the center of the object by the given angle.
-    fn rotate_center(&mut self, angle: f32) {
-        self.set_transformation(Transformation2D::RotationCenter(angle));
+        // TODO
+        // self.transformation().transform_point(x, y, &window.physical_properties)
+        (x, y)
     }
 
     /// Rotate the object around the given point by the given angle.
     fn rotate_point(&mut self, angle: f32, x: Size, y: Size) {
         self.set_transformation(Transformation2D::RotationPoint(angle, x, y));
-    }
-
-    /// Scale the object around the center of the object by the given x and y
-    /// factors.
-    fn scale_center(&mut self, x: f32, y: f32) {
-        self.set_transformation(Transformation2D::ScaleCenter(x, y));
-    }
-
-    /// Shear the object around the center of the object by the given x and y
-    /// factors.
-    fn shear_center(&mut self, x: f32, y: f32) {
-        self.set_transformation(Transformation2D::ShearCenter(x, y));
     }
 
     /// Shear the object around the given point by the given x and y factors.
@@ -293,19 +272,44 @@ pub trait Stimulus: Send + Sync + downcast_rs::Downcast + std::fmt::Debug {
 
 downcast_rs::impl_downcast!(Stimulus);
 
+#[derive(Debug, Clone)]
+pub struct DynamicStimulus(Arc<Mutex<dyn Stimulus>>);
+
 /// Wraps a Stimulus. This class is used either as a base class for other
 /// stimulus classes or as a standalone class, when no specific runtume type
 /// information is available.
 #[pyclass(name = "Stimulus", subclass)]
+#[pyo3(unsendable)]
 #[derive(Debug, Clone)]
-pub struct PyStimulus(pub WrappedStimulus);
+pub struct PyStimulus(DynamicStimulus);
+
+// bing back WrappedStimulus
+
+impl DynamicStimulus {
+    pub fn new(stimulus: impl Stimulus + 'static) -> Self {
+        Self(Arc::new(Mutex::new(stimulus)))
+    }
+
+    pub fn lock(&self) -> MutexGuard<dyn Stimulus> {
+        self.0.lock().unwrap()
+    }
+}
+
+impl PyStimulus {
+    pub fn new(stimulus: impl Stimulus + 'static) -> Self {
+        Self(DynamicStimulus::new(stimulus))
+    }
+
+    pub fn as_super(&self) -> &DynamicStimulus {
+        &self.0
+    }
+}
 
 macro_rules! downcast_stimulus {
     ($slf:ident, $name:ident) => {
         $slf.as_super()
             .0
             .lock()
-            .unwrap()
             .downcast_ref::<$name>()
             .expect("downcast failed")
     };
@@ -316,7 +320,6 @@ macro_rules! downcast_stimulus_mut {
         $slf.as_super()
             .0
             .lock()
-            .unwrap()
             .downcast_mut::<$name>()
             .expect("downcast failed")
     };
@@ -325,15 +328,15 @@ macro_rules! downcast_stimulus_mut {
 // macro that implements pyo3 methods for a warapper Py$name
 macro_rules! impl_pystimulus_for_wrapper {
     ($wrapper:ident, $name:ident) => {
-        use crate::visual::geometry::IntoSize;
-        use crate::visual::stimuli::downcast_stimulus;
-        use crate::visual::stimuli::downcast_stimulus_mut;
-        use crate::visual::stimuli::IntoStimulusParamValue;
-        use crate::visual::stimuli::Repeat;
-        use crate::visual::stimuli::TransitionFunction;
-        use crate::visual::window::WrappedWindow;
-
         use std::mem;
+
+        use pyo3::{exceptions::PyValueError, prelude::*};
+
+        use crate::visual::{
+            geometry::IntoSize,
+            stimuli::{downcast_stimulus, downcast_stimulus_mut, IntoStimulusParamValue, Repeat, TransitionFunction},
+            window::Window,
+        };
 
         #[pymethods]
         impl $wrapper {
@@ -405,19 +408,19 @@ macro_rules! impl_pystimulus_for_wrapper {
             }
 
             /// Translate the stimulus.
-            fn translated<'a>(mut slf: PyRefMut<'a, Self>, x: IntoSize, y: IntoSize) -> PyRefMut<'a, Self> {
+            fn translated(mut slf: PyRefMut<'_, Self>, x: IntoSize, y: IntoSize) -> PyRefMut<'_, Self> {
                 downcast_stimulus_mut!(slf, $name).translate(x.into(), y.into());
                 slf
             }
 
             /// Scale the stimulus from a given point
-            fn scaled_at<'a>(
-                mut slf: PyRefMut<'a, Self>,
+            fn scaled_at(
+                mut slf: PyRefMut<'_, Self>,
                 sx: f32,
                 sy: f32,
                 x: IntoSize,
                 y: IntoSize,
-            ) -> PyRefMut<'a, Self> {
+            ) -> PyRefMut<'_, Self> {
                 downcast_stimulus_mut!(slf, $name).scale_point(sx, sy, x.into(), y.into());
                 slf
             }
@@ -439,7 +442,7 @@ macro_rules! impl_pystimulus_for_wrapper {
                 downcast_stimulus!(slf, $name).visible()
             }
 
-            fn contains(mut slf: PyRefMut<'_, Self>, x: IntoSize, y: IntoSize, window: &WrappedWindow) -> bool {
+            fn contains(mut slf: PyRefMut<'_, Self>, x: IntoSize, y: IntoSize, window: &Window) -> bool {
                 downcast_stimulus!(slf, $name).contains(x.into(), y.into(), window)
             }
 
@@ -483,103 +486,6 @@ macro_rules! impl_pystimulus_for_wrapper {
     };
 }
 
-#[derive(Debug, Clone)]
-#[pyclass]
-#[pyo3(name = "Image")]
-pub struct WrappedImage(Arc<Mutex<renderer::brushes::Image>>);
-
-impl WrappedImage {
-    /// Create a new WrappedImage from a DynamicImage.
-    pub fn from_dynamic_image(image: renderer::image::DynamicImage) -> Self {
-        let vello_image = renderer::brushes::Image::new(&image, ImageColor::LinearRGB);
-        WrappedImage(Arc::new(Mutex::new(vello_image)))
-    }
-
-    /// Create a new WrappedImage from a file path.
-    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Result<Self, renderer::image::ImageError> {
-        let image = renderer::image::open(path)?;
-        Ok(Self::from_dynamic_image(image))
-    }
-
-    pub fn inner(&self) -> std::sync::MutexGuard<renderer::brushes::Image> {
-        self.0.lock().unwrap()
-    }
-
-    pub fn to_gpu(&mut self, window: &WrappedWindow) {
-        let mut image = self.inner();
-        let win = window.inner();
-        let gpu_state = win.gpu_state.lock().unwrap();
-        let device = &gpu_state.device;
-        let queue = &gpu_state.queue;
-        image.to_gpu(&device, &queue);
-    }
-
-    pub fn from_spritesheet_path(src: String, nx: u32, ny: u32) -> Vec<Self> {
-        let image = renderer::image::open(src).expect("Failed to load image");
-        // split the image into nx * ny sprites
-        let (w, h) = (image.width() / nx as u32, image.height() / ny as u32);
-        // make sure the image is divisible by nx and ny
-        assert_eq!(image.width() % nx as u32, 0, "Image width is not divisible by nx");
-        assert_eq!(image.height() % ny as u32, 0, "Image height is not divisible by ny");
-
-        let mut images = Vec::new();
-        for y in 0..ny {
-            for x in 0..nx {
-                let sprite = image.view(x * w, y * h, w, h).to_image();
-                images.push(WrappedImage::from_dynamic_image(
-                    renderer::image::DynamicImage::ImageRgba8(sprite),
-                ));
-            }
-        }
-        images
-    }
-}
-
-#[pymethods]
-impl WrappedImage {
-    #[new]
-    fn __new__(path: &str) -> PyResult<Self> {
-        Self::from_path(path).map_err(|e| PyValueError::new_err(e.to_string()))
-    }
-
-    /// Create a new a List of WrappedImage from a spritesheet.
-    #[staticmethod]
-    #[pyo3(name = "from_spritesheet")]
-    pub fn py_from_spritesheet(src: &str, nx: u32, ny: u32) -> PyResult<Vec<Self>> {
-        let images = WrappedImage::from_spritesheet_path(src.to_string(), nx, ny);
-        Ok(images)
-    }
-
-    /// Create a new WrappedImage from a 2D numpy array.
-    #[staticmethod]
-    #[pyo3(name = "from_numpy")]
-    pub fn py_from_numpy(array: numpy::PyArrayLike<f32, numpy::Ix3, numpy::AllowTypeChange>) -> Self {
-        let array = array.as_array();
-        let image = renderer::image::DynamicImage::ImageRgb8(
-            renderer::image::RgbImage::from_raw(
-                array.shape()[1] as u32,
-                array.shape()[0] as u32,
-                array
-                    .as_slice()
-                    .expect("failed to get slice")
-                    .iter()
-                    .map(|&x| (x * 255.0) as u8)
-                    .collect(),
-            )
-            .expect("failed to create image"),
-        );
-        WrappedImage::from_dynamic_image(image)
-    }
-
-    /// Move the image to the GPU.
-    #[pyo3(name = "move_to_gpu")]
-    fn py_to_gpu(&mut self, window: &WrappedWindow) -> Self {
-        self.to_gpu(window);
-        self.clone()
-    }
-}
-
 pub(crate) use downcast_stimulus;
 pub(crate) use downcast_stimulus_mut;
 pub(crate) use impl_pystimulus_for_wrapper;
-use renderer::brushes::ImageColor;

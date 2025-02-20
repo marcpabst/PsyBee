@@ -1,0 +1,281 @@
+extern crate renderer;
+
+use std::{error::Error, sync::Arc};
+
+use renderer::{
+    affine::Affine,
+    bitmaps::DynamicBitmap,
+    brushes::{ColorStop, Extend, Gradient, GradientKind, ImageSampling},
+    prelude::{FillStyle, ImageFitMode},
+    styles::StrokeStyle,
+    wgpu::{BindGroup, Buffer, Device, Queue, RenderPipeline, Surface, Texture, TextureFormat, TextureUsages},
+    Backend, DynamicRenderer,
+};
+use vello::RendererOptions;
+use wgpu::{util::DeviceExt, InstanceDescriptor};
+use winit::{
+    application::ApplicationHandler,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    window::{Window, WindowId},
+};
+
+struct State {
+    wgpu_renderer: renderer::wgpu_renderer::WgpuRenderer,
+    renderer: DynamicRenderer,
+    window: Arc<Window>,
+    start_time: std::time::Instant,
+    image: DynamicBitmap,
+    formated_text: renderer::text::FormatedText,
+}
+
+struct App {
+    state: Option<State>,
+}
+
+impl State {
+    async fn new(window: Arc<Window>) -> State {
+        let mut wr = renderer::wgpu_renderer::WgpuRenderer::new(window.clone()).await;
+
+        let mut renderer = DynamicRenderer::new(
+            Backend::Skia,
+            &wr.device(),
+            wr.surface_format(),
+            wr.width(),
+            wr.height(),
+        );
+
+        // load image from file
+        let image = image::load_from_memory(include_bytes!("assets/images/dog.png")).unwrap();
+        let bitmap = renderer.create_bitmap(image);
+
+        // create a new FormatedText
+        let formated_text = renderer.create_text(
+            (500.0, 500.0).into(),
+            "This is Noto Sans®",
+            Some("Noto Sans"),
+            Some(800),
+            None,
+            None,
+            40.0,
+        );
+
+        Self {
+            wgpu_renderer: wr,
+            renderer,
+            window,
+            start_time: std::time::Instant::now(),
+            image: bitmap,
+            formated_text: formated_text,
+        }
+    }
+
+    pub fn render(&mut self) {
+        let device = self.wgpu_renderer.device();
+        let queue = &self.wgpu_renderer.queue();
+        let texture = &self.wgpu_renderer.texture();
+        let width = self.wgpu_renderer.width();
+        let height = self.wgpu_renderer.height();
+
+        // create scene
+        let mut scene = self.renderer.create_scene(width, height);
+
+        // get the elapsed time
+        let elapsed = self.start_time.elapsed().as_secs_f32();
+        let offset = elapsed.sin() * 100.0 + 200.0;
+
+        let mut lattice = Affine::scale_xy(20.0, 10.0);
+        lattice.pre_skew(0.5, 0.0);
+
+        scene.draw_shape_fill(
+            renderer::shapes::Shape::rectangle((0.0, 0.0), 1200.0, 1200.0),
+            renderer::brushes::Brush::ShapePattern {
+                shape: renderer::shapes::Shape::rectangle((0.0, 0.0), 10.0, 10.0),
+                latice: lattice,
+                brush: &renderer::brushes::Brush::Solid(renderer::colors::RGBA::new(1.0, 1.0, 0.0, 1.0)),
+            },
+            None,
+            None,
+        );
+
+        scene.draw_shape_fill(
+            renderer::shapes::Shape::rounded_rectangle((100.0, 100.0), 900.0, 900.0, offset as f64),
+            renderer::brushes::Brush::Gradient(Gradient {
+                extend: Extend::Reflect,
+                kind: GradientKind::Radial {
+                    center: (0.0, 0.0).into(),
+                    radius: 600.0,
+                },
+                stops: vec![
+                    ColorStop {
+                        offset: 0.0,
+                        color: renderer::colors::RGBA::new(1.0, 0.0, 0.0, 1.0),
+                    },
+                    ColorStop {
+                        offset: 0.5,
+                        color: renderer::colors::RGBA::new(0.0, 1.0, 0.0, 1.0),
+                    },
+                    ColorStop {
+                        offset: 1.0,
+                        color: renderer::colors::RGBA::new(0.0, 0.0, 1.0, 1.0),
+                    },
+                ],
+            }),
+            None,
+            None,
+        );
+
+        scene.start_layer(
+            renderer::styles::BlendMode::Modulate,
+            renderer::shapes::Shape::rectangle((0.0, 0.0), 1200.0, 1200.0),
+            Default::default(),
+            None,
+            1.0,
+        );
+
+        // the mask
+        scene.draw_shape_fill(
+            renderer::shapes::Shape::rectangle((000.0, 000.0), 1200.0, 1200.0),
+            renderer::brushes::Brush::Image {
+                image: &self.image,
+                start: (0.0, 0.0).into(),
+                fit_mode: ImageFitMode::Exact {
+                    width: 100.0,
+                    height: 100.0,
+                },
+                edge_mode: Extend::Repeat.into(),
+                sampling: ImageSampling::Linear,
+                transform: Some(Affine::scale((offset / 20.0) as f64)),
+                alpha: None,
+            },
+            None,
+            None,
+        );
+
+        scene.end_layer();
+        // scene.end_layer();
+
+        scene.draw_shape_fill(
+            renderer::shapes::Shape::ellipse((600.0, 600.0), 200.0, 600.0, offset as f64),
+            renderer::brushes::Brush::Solid(renderer::colors::RGBA::new(1.0, 1.0, 1.0, 1.0)),
+            None,
+            None,
+        );
+
+        scene.draw_shape_fill(
+            renderer::shapes::Shape::circle((600.0, 600.0), offset as f64),
+            renderer::brushes::Brush::Solid(renderer::colors::RGBA::new(1.0, 1.0, 0.0, 1.0)),
+            None,
+            None,
+        );
+
+        scene.draw_shape_stroke(
+            renderer::shapes::Shape::circle((600.0, 600.0), offset as f64),
+            renderer::brushes::Brush::Solid(renderer::colors::RGBA::new(0.0, 0.0, 1.0, 1.0)),
+            StrokeStyle::new(10.0),
+            None,
+            None,
+        );
+
+        scene.draw_shape_fill(
+            renderer::shapes::Shape::circle((600.0, 600.0), 100.0),
+            renderer::brushes::Brush::Solid(renderer::colors::RGBA::new(0.0, 1.0, 0.0, 1.0)),
+            None,
+            None,
+        );
+
+        scene.draw_formated_text(
+            &mut self.renderer.font_manager_mut(),
+            &self.formated_text,
+            renderer::brushes::Brush::Solid(renderer::colors::RGBA::new(0.0, 0.0, 0.0, 1.0)),
+            None,
+            None,
+        );
+
+        // render the scene
+        self.renderer
+            .render_to_texture(device, queue, &texture, scene.width(), scene.height(), &mut scene);
+
+        // render
+        self.wgpu_renderer.render();
+    }
+
+    /// Re-size the texture
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.wgpu_renderer.resize(width, height);
+    }
+
+    fn create_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+        device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::STORAGE_BINDING,
+            label: None,
+            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+        })
+    }
+}
+
+impl App {
+    fn create_window(&mut self, event_loop: &ActiveEventLoop) -> Window {
+        let window_attributes = Window::default_attributes()
+            .with_title("Winit window")
+            .with_transparent(false);
+
+        let window = event_loop.create_window(window_attributes).unwrap();
+
+        window
+    }
+}
+
+impl ApplicationHandler<()> for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        // create a window
+        let window = self.create_window(event_loop);
+        // create a new state
+        let state = pollster::block_on(State::new(Arc::new(window)));
+        // configure the surface
+        state.wgpu_renderer.configure_surface();
+        // set the state
+        self.state = Some(state);
+
+        println!("Resumed");
+    }
+
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        let state = self.state.as_mut().unwrap();
+        match event {
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            }
+            WindowEvent::RedrawRequested => {
+                state.render();
+                // Emits a new redraw requested event.
+                state.window.request_redraw();
+            }
+            WindowEvent::Resized(size) => {
+                // Reconfigures the size of the surface. We do not re-render
+                // here as this event is always folloed up by redraw request.
+                state.resize(size.width, size.height);
+            }
+            _ => (),
+        }
+    }
+}
+fn main() {
+    // create an application
+    let mut app = App { state: None };
+    // run the application
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(ControlFlow::Poll);
+    let _ = event_loop.run_app(&mut app);
+}

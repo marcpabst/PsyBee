@@ -1,27 +1,18 @@
 use std::sync::Arc;
 
-use super::{
-    animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
-    StrokeStyle, WrappedStimulus,
-};
-use crate::{
-    prelude::{Size, Transformation2D},
-    visual::window::Window,
-};
 use psybee_proc::StimulusParams;
-use pyo3::{exceptions::PyValueError, prelude::*};
-use renderer::affine::Affine;
-use renderer::brushes::Brush;
-use renderer::colors::RGBA;
-use renderer::prelude::{FillStyle, Style};
-use renderer::shapes::Geom;
+use renderer::{affine::Affine, brushes::Brush, colors::RGBA};
 use uuid::Uuid;
 
-use crate::prelude::color::IntoLinRgba;
-use crate::visual::color::LinRgba;
-use crate::visual::geometry::Shape;
-use renderer::vello_backend::VelloFont;
-use renderer::VelloScene;
+use super::{
+    animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
+    StrokeStyle,
+};
+use crate::visual::{
+    color::{IntoLinRgba, LinRgba},
+    geometry::{Shape, Size, Transformation2D},
+    window::Frame,
+};
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct ShapeParams {
@@ -108,7 +99,7 @@ impl PyShapeStimulus {
     ) -> (Self, PyStimulus) {
         (
             Self(),
-            PyStimulus(Arc::new(std::sync::Mutex::new(ShapeStimulus::new(
+            PyStimulus::new(ShapeStimulus::new(
                 shape,
                 x.into(),
                 y.into(),
@@ -118,7 +109,7 @@ impl PyShapeStimulus {
                 stroke_width.map(|s| s.into()),
                 alpha,
                 transform,
-            )))),
+            )),
         )
     }
 }
@@ -138,13 +129,18 @@ impl Stimulus for ShapeStimulus {
         self.animations.push(animation);
     }
 
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, frame: &mut Frame) {
         if !self.visible {
             return;
         }
 
-        let x = self.params.x.eval(&window.physical_properties) as f64;
-        let y = self.params.y.eval(&window.physical_properties) as f64;
+        let window = frame.window();
+        let window_state = window.lock_state();
+        let windows_size = window_state.size;
+        let screen_props = window_state.physical_screen;
+
+        let x = self.params.x.eval(windows_size, screen_props) as f64;
+        let y = self.params.y.eval(windows_size, screen_props) as f64;
 
         let fill_brush = super::helpers::create_fill_brush(
             &self.params.fill_color,
@@ -154,75 +150,42 @@ impl Stimulus for ShapeStimulus {
             &None,
         );
 
-        let stroke_color = self
-            .params
-            .stroke_color
-            .clone()
-            .unwrap_or(LinRgba::new(0.0, 0.0, 0.0, 0.0));
+        let stroke_color = self.params.stroke_color.unwrap_or(LinRgba::new(0.0, 0.0, 0.0, 0.0));
 
         let stroke_brush = renderer::brushes::Brush::Solid(stroke_color.into());
 
         let stroke_width = self.params.stroke_width.clone().unwrap_or(Size::Pixels(0.0));
-        let stroke_width = stroke_width.eval(&window.physical_properties) as f64;
+        let stroke_width = stroke_width.eval(windows_size, screen_props) as f64;
 
-        let stroke_options = renderer::styles::StrokeOptions::new(stroke_width);
+        let stroke_options = renderer::styles::StrokeStyle::new(stroke_width);
 
         match &self.params.shape {
             Shape::Circle { x, y, radius } => {
-                let x = x.eval(&window.physical_properties) as f64;
-                let y = y.eval(&window.physical_properties) as f64;
-                let radius = radius.eval(&window.physical_properties) as f64;
+                let x = x.eval(windows_size, screen_props) as f64;
+                let y = y.eval(windows_size, screen_props) as f64;
+                let radius = radius.eval(windows_size, screen_props) as f64;
 
-                let shape = renderer::shapes::Circle {
-                    center: renderer::shapes::Point { x, y },
-                    radius: radius,
-                };
+                let shape = renderer::shapes::Shape::circle((x, y), radius);
 
-                scene.draw(Geom {
-                    style: Style::Fill(FillStyle::NonZero),
-                    shape: shape.clone(),
-                    brush: fill_brush,
-                    transform: Affine::identity(),
-                    brush_transform: None,
-                });
+                frame.scene_mut().draw_shape_fill(shape, fill_brush.clone(), None, None);
 
-                scene.draw(Geom {
-                    style: Style::Stroke(stroke_options),
-                    shape: shape,
-                    brush: stroke_brush,
-                    transform: Affine::identity(),
-                    brush_transform: None,
-                });
+                frame
+                    .scene_mut()
+                    .draw_shape_stroke(shape, stroke_brush, stroke_options, None, None);
             }
             Shape::Rectangle { x, y, width, height } => {
-                let x = x.eval(&window.physical_properties) as f64;
-                let y = y.eval(&window.physical_properties) as f64;
-                let width = width.eval(&window.physical_properties) as f64;
-                let height = height.eval(&window.physical_properties) as f64;
+                let x = x.eval(windows_size, screen_props) as f64;
+                let y = y.eval(windows_size, screen_props) as f64;
+                let width = width.eval(windows_size, screen_props) as f64;
+                let height = height.eval(windows_size, screen_props) as f64;
 
-                let shape = renderer::shapes::Rectangle {
-                    a: renderer::shapes::Point { x, y },
-                    b: renderer::shapes::Point {
-                        x: x + width,
-                        y: y + height,
-                    },
-                };
+                let shape = renderer::shapes::Shape::rectangle((x, y), width, height);
 
-                scene.draw(Geom {
-                    style: Style::Fill(FillStyle::NonZero),
-                    shape: shape.clone(),
-                    brush: fill_brush,
-                    transform: Affine::identity(),
-                    brush_transform: None,
-                });
+                frame.scene_mut().draw_shape_fill(shape, fill_brush.clone(), None, None);
 
-                scene.draw(Geom {
-                    style: Style::Stroke(stroke_options),
-                    shape: shape,
-                    brush: stroke_brush,
-                    transform: Affine::identity(),
-                    brush_transform: None,
-                });
+                frame
+                    .scene_mut()
+                    .draw_shape_stroke(shape, stroke_brush, stroke_options, None, None);
             }
             Shape::Ellipse {
                 x,

@@ -1,11 +1,10 @@
-use super::{affine::Affine, colors::RGBA};
-use crate::shapes::Point;
-use cosmic_text::Font as CosmicFont;
-use custom_debug::CustomDebug;
-use std::any::Any;
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
-pub struct DynamicFontFace(pub Box<dyn Font>);
+use custom_debug::CustomDebug;
+
+use crate::shapes::Point;
+
+pub struct DynamicFontFace(pub Box<dyn Typeface>);
 
 impl DynamicFontFace {
     pub fn try_as<T>(&self) -> Option<&T>
@@ -16,7 +15,7 @@ impl DynamicFontFace {
     }
 }
 
-pub trait Font: Any {
+pub trait Typeface: Any {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
@@ -24,20 +23,21 @@ pub trait Font: Any {
 /// A Glyph.
 #[derive(Debug, Clone)]
 pub struct Glyph {
-    pub id: u32,
+    pub id: u16,
+    pub position: Point,
+    pub start: u32,
+    pub end: u32,
 }
 
 /// A piece of formatted text.
 #[derive(CustomDebug)]
 pub struct FormatedText {
     pub position: Point,
-    pub text: String,
-    pub size: f32,
-    pub weight: f32,
-    pub style: FontStyle,
+    pub cosmic_buffer: cosmic_text::Buffer,
+    pub comic_metrics: cosmic_text::Metrics,
+    pub cosmic_font: Arc<cosmic_text::Font>,
     #[debug(skip)]
-    pub font: DynamicFontFace,
-    pub cosmic_font: Arc<CosmicFont>,
+    pub renderer_font: DynamicFontFace,
     pub alignment: Alignment,
     pub vertical_alignment: VerticalAlignment,
 }

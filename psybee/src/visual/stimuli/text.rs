@@ -3,19 +3,18 @@ use std::sync::Arc;
 use super::{
     animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
 };
-use crate::{
-    prelude::{Size, Transformation2D},
-    visual::window::Window,
-};
+use crate::visual::geometry::Size;
+use crate::visual::geometry::Transformation2D;
+use crate::visual::window::PsybeeWindow;
 use psybee_proc::StimulusParams;
-use pyo3::{exceptions::PyValueError, prelude::*};
-use renderer::prelude::*;
 use uuid::Uuid;
 
-use renderer::vello_backend::VelloFont;
-
-use crate::visual::color::LinRgba;
 use crate::visual::color::IntoLinRgba;
+use crate::visual::color::LinRgba;
+use crate::visual::window::Frame;
+use renderer::affine::Affine;
+use renderer::brushes::Brush;
+use renderer::colors::RGBA;
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct TextParams {
@@ -33,16 +32,10 @@ pub struct TextStimulus {
     transform: Transformation2D,
     animations: Vec<Animation>,
     visible: bool,
-    font: VelloFont,
 }
 
 impl TextStimulus {
     pub fn new(x: Size, y: Size, text: String, font_size: Size, fill: LinRgba, transform: Transformation2D) -> Self {
-        // load font
-        let font_data =
-            include_bytes!("IBMPlexSans-Medium.ttf");
-        let font = VelloFont::from_bytes(font_data);
-
         Self {
             id: Uuid::new_v4(),
             params: TextParams {
@@ -55,7 +48,6 @@ impl TextStimulus {
             transform,
             animations: Vec::new(),
             visible: true,
-            font,
         }
     }
 }
@@ -85,14 +77,14 @@ impl PyTextStimulus {
     ) -> (Self, PyStimulus) {
         (
             Self(),
-            PyStimulus(Arc::new(std::sync::Mutex::new(TextStimulus::new(
+            PyStimulus::new(TextStimulus::new(
                 x.into(),
                 y.into(),
                 text,
                 font_size.into(),
                 fill.into(),
                 transform,
-            )))),
+            )),
         )
     }
 }
@@ -104,40 +96,33 @@ impl Stimulus for TextStimulus {
         self.id
     }
 
-    fn animations(&mut self) -> &mut Vec<Animation> {
-        &mut self.animations
-    }
-
-    fn add_animation(&mut self, animation: Animation) {
-        self.animations.push(animation);
-    }
-
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, frame: &mut Frame) {
         if !self.visible {
             return;
         }
 
+        let window = frame.window();
+        let window_state = window.lock_state();
+        let window_size = window_state.size;
+        let screen_props = window_state.physical_screen;
+
         // convert physical units to pixels
-        let pos_x = self.params.x.eval(&window.physical_properties) as f64;
-        let pos_y = self.params.y.eval(&window.physical_properties) as f64;
-        let font_size = self.params.font_size.eval(&window.physical_properties) as f32;
+        let pos_x = self.params.x.eval(window_size, screen_props) as f64;
+        let pos_y = self.params.y.eval(window_size, screen_props) as f64;
+        let font_size = self.params.font_size.eval(window_size, screen_props) as f64;
 
-        let text = FormatedText {
-            x: pos_x,
-            y: pos_y / 3.0,
-            text: self.params.text.clone(),
-            size: font_size,
-            color: self.params.fill.into(),
-            weight: 100.0,
-            font: self.font.clone(),
-            style: FontStyle::Normal,
-            alignment: Alignment::Center,
-            vertical_alignment: VerticalAlignment::Middle,
-            transform: self.transform.eval(&window.physical_properties).into(),
-            glyph_transform: None,
-        };
+        let trans_mat = self.transform.eval(window_size, screen_props);
 
-        scene.draw(text);
+        let fill_color: RGBA = self.params.fill.into();
+
+        let formated_text = frame.scene_mut().draw_formated_text(
+            &self.params.text,
+            pos_x,
+            pos_y,
+            font_size,
+            fill_color,
+            trans_mat.into(),
+        );
     }
 
     fn set_visible(&mut self, visible: bool) {
@@ -146,6 +131,14 @@ impl Stimulus for TextStimulus {
 
     fn visible(&self) -> bool {
         self.visible
+    }
+
+    fn animations(&mut self) -> &mut Vec<Animation> {
+        &mut self.animations
+    }
+
+    fn add_animation(&mut self, animation: Animation) {
+        self.animations.push(animation);
     }
 
     fn set_transformation(&mut self, transformation: crate::visual::geometry::Transformation2D) {

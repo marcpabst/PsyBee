@@ -1,9 +1,9 @@
-use std::any::Any;
-use std::sync::Arc;
-use cosmic_text::fontdb::FaceInfo;
 use crate::brushes::{Extend, ImageColor};
+use cosmic_text::fontdb::FaceInfo;
 use image::{DynamicImage, GenericImageView};
 use skrifa::raw::FileRef;
+use std::any::Any;
+use std::sync::Arc;
 use vello::kurbo::PathEl;
 use vello::peniko::color::{AlphaColor, ColorSpaceTag};
 use vello::peniko::BlendMode as VelloBlendMode;
@@ -19,11 +19,11 @@ use super::{
     colors::RGBA,
 };
 use crate::bitmaps::DynamicBitmap;
+use crate::prelude::DynamicFontFace;
 use crate::renderer::Renderer;
 use crate::shapes::{Point, Shape};
 use crate::styles::{BlendMode, FillStyle, StrokeStyle};
 use crate::{affine::Affine, scenes::Scene};
-use crate::prelude::DynamicFontFace;
 
 pub struct VelloScene {
     /// The Vello scene.
@@ -112,7 +112,7 @@ impl Renderer for vello::Renderer {
 
     /// Render the scene to a WGPU texture.
     fn render_to_texture(
-        &mut self,
+        &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         texture: &wgpu::Texture,
@@ -134,17 +134,18 @@ impl Renderer for vello::Renderer {
         };
 
         // (interim) replace the images with GPU textures.
-        for (image, wgpu_texture) in &vello_scene.gpu_images {
-            self.override_image(image, Some(wgpu_texture.clone()));
-        }
-        self.render_to_texture(
-            device,
-            queue,
-            &vello_scene.vello_scene,
-            &texture.create_view(&Default::default()),
-            &render_params,
-        )
-        .expect("Failed to render to texture");
+        // for (image, wgpu_texture) in &vello_scene.gpu_images {
+        //     self.override_image(image, Some(wgpu_texture.clone()));
+        // }
+
+        // self.render_to_texture(
+        //     device,
+        //     queue,
+        //     &vello_scene.vello_scene,
+        //     &texture.create_view(&Default::default()),
+        //     &render_params,
+        // )
+        // .expect("Failed to render to texture");
     }
 
     fn create_scene(&self, width: u32, heigth: u32) -> Box<dyn Scene> {
@@ -155,7 +156,12 @@ impl Renderer for vello::Renderer {
         todo!()
     }
 
-    fn load_font_face(&self, face_info: &FaceInfo) -> DynamicFontFace {
+    fn load_font_face(
+        &mut self,
+        face_info: &cosmic_text::fontdb::FaceInfo,
+        font_data: &[u8],
+        index: usize,
+    ) -> DynamicFontFace {
         todo!()
     }
 }
@@ -375,6 +381,19 @@ impl Scene for VelloScene {
                 Line
             }
         );
+    }
+
+    fn draw_glyphs(
+        &mut self,
+        position: Point,
+        glyphs: &[crate::prelude::Glyph],
+        font_face: &DynamicFontFace,
+        font_size: f32,
+        brush: Brush,
+        transform: Option<Affine>,
+        blend_mode: Option<BlendMode>,
+    ) {
+        todo!()
     }
 }
 //

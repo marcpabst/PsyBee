@@ -83,10 +83,12 @@ pub enum TimestampingStrategy {
 
 impl Default for GlobalOptions {
     fn default() -> Self {
-        Self { gpu_backend: GPUBackend::Vulkan,
-               blocking_strategy: BlockingStrategy::BlockUntilVBlankEndVerified,
-               max_frames_in_flight: 1,
-               frame_drop_check_strategy: FrameDropCheckStrategy::GraphicsAPI,
-               timestamping_strategy: TimestampingStrategy::BlockingSubmit }
+        Self {
+            gpu_backend: GPUBackend::Vulkan,
+            blocking_strategy: BlockingStrategy::BlockUntilVBlankEndVerified,
+            max_frames_in_flight: 1,
+            frame_drop_check_strategy: FrameDropCheckStrategy::GraphicsAPI,
+            timestamping_strategy: TimestampingStrategy::BlockingSubmit,
+        }
     }
 }

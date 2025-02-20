@@ -121,8 +121,6 @@ macro_rules! impl_into_string_vector_tuple {
     );
 }
 
-
-
 pub trait IntoStringVector {
     fn into_string_vec(self) -> Vec<String>;
 }
@@ -134,8 +132,9 @@ impl IntoStringVector for Vec<String> {
 }
 
 fn check_unique_column_names<I, S>(column_names: I) -> bool
-    where I: IntoIterator<Item = S>,
-          S: Into<String> + 'static
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String> + 'static,
 {
     let column_names: Vec<String> = column_names.into_iter().map(Into::into).collect();
 
@@ -159,14 +158,11 @@ pub struct CSVEventLogger {
 
 impl CSVEventLogger {
     /// Create a new CSVEventLogger.
-    pub fn new<I, S, P>(path: P,
-                        columns: I,
-                        delimiter: u8,
-                        overwrite: bool)
-                        -> Result<Self, errors::PsybeeError>
-        where P: Into<std::path::PathBuf>,
-              I: IntoIterator<Item = S>,
-              S: Into<String> + 'static
+    pub fn new<I, S, P>(path: P, columns: I, delimiter: u8, overwrite: bool) -> Result<Self, errors::PsybeeError>
+    where
+        P: Into<std::path::PathBuf>,
+        I: IntoIterator<Item = S>,
+        S: Into<String> + 'static,
     {
         let filepath = path.into();
 
@@ -191,29 +187,35 @@ impl CSVEventLogger {
             }
         }
 
-        let mut writer = csv::WriterBuilder::new().has_headers(false)
-                                                  .delimiter(delimiter)
-                                                  .from_path(&filepath)?;
+        let mut writer = csv::WriterBuilder::new()
+            .has_headers(false)
+            .delimiter(delimiter)
+            .from_path(&filepath)?;
 
         writer.write_record(columns.clone())?;
 
-        Ok(Self { filepath,
-                  columns,
-                  delimiter,
-                  writer })
+        Ok(Self {
+            filepath,
+            columns,
+            delimiter,
+            writer,
+        })
     }
 
     /// Log an event.
     pub fn log<I>(&mut self, column_values: I) -> Result<(), PsybeeError>
-        where I: IntoStringVector
+    where
+        I: IntoStringVector,
     {
         // convert to vector
         let event: Vec<String> = column_values.into_string_vec();
 
         // make sure the event has the correct number of columns
         if event.len() != self.columns.len() {
-            return Err(errors::PsybeeError::DataLengthMismatchError(event.len(),
-                                                                           self.columns.len()));
+            return Err(errors::PsybeeError::DataLengthMismatchError(
+                event.len(),
+                self.columns.len(),
+            ));
         }
 
         // write event to file
@@ -223,12 +225,10 @@ impl CSVEventLogger {
         Ok(())
     }
 
-    pub fn log_cols<I, J>(&mut self,
-                          column_names: I,
-                          column_values: J)
-                          -> Result<(), PsybeeError>
-        where I: IntoStringVector,
-              J: IntoStringVector
+    pub fn log_cols<I, J>(&mut self, column_names: I, column_values: J) -> Result<(), PsybeeError>
+    where
+        I: IntoStringVector,
+        J: IntoStringVector,
     {
         let column_names: Vec<String> = column_names.into_string_vec();
         let column_values: Vec<String> = column_values.into_string_vec();
@@ -241,15 +241,15 @@ impl CSVEventLogger {
         // assert that all column names are in self.columns
         for column_name in column_names.iter() {
             if !self.columns.contains(column_name) {
-                return Err(errors::PsybeeError::ColumnNameDoesNotExistError(
-                    column_name.clone(),
-                ));
+                return Err(errors::PsybeeError::ColumnNameDoesNotExistError(column_name.clone()));
             }
         }
 
         if column_names.len() != column_values.len() {
-            return Err(errors::PsybeeError::DataLengthMismatchError(column_values.len(),
-                                                                           column_names.len()));
+            return Err(errors::PsybeeError::DataLengthMismatchError(
+                column_values.len(),
+                column_names.len(),
+            ));
         }
 
         // we need to cal self.log() with the correct order of columns, replacing
@@ -276,16 +276,16 @@ pub struct BIDSEventLogger {
 
 impl BIDSEventLogger {
     pub fn new<P, I, S>(path: P, columns: I, overwrite: bool) -> Result<Self, PsybeeError>
-        where P: Into<std::path::PathBuf>,
-              I: IntoIterator<Item = S>,
-              S: Into<String> + 'static
+    where
+        P: Into<std::path::PathBuf>,
+        I: IntoIterator<Item = S>,
+        S: Into<String> + 'static,
     {
         // make sure that the path ends with "events.tsv"
         let path = path.into();
-        let path_str = path.to_str().ok_or_else(|| {
-                                         std::io::Error::new(std::io::ErrorKind::InvalidInput,
-                                                             "path contains invalid characters")
-                                     })?;
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "path contains invalid characters"))?;
 
         if !path_str.ends_with("events.tsv") {
             return Err(PsybeeError::InvalidBIDSPathError(
@@ -299,15 +299,18 @@ impl BIDSEventLogger {
         let mandatory_columns = vec!["onset".to_string(), "duration".to_string()];
         let columns: Vec<String> = mandatory_columns.into_iter().chain(columns).collect();
 
-        let logger = CSVEventLogger::new(path, columns, '\t' as u8, overwrite)?;
+        let logger = CSVEventLogger::new(path, columns, b'\t', overwrite)?;
 
-        Ok(Self { logger,
-                  start_time: std::time::Instant::now() })
+        Ok(Self {
+            logger,
+            start_time: std::time::Instant::now(),
+        })
     }
 
     /// Log an event.
     pub fn log<I>(&mut self, columns_values: I, duration: f64) -> Result<(), PsybeeError>
-        where I: IntoStringVector
+    where
+        I: IntoStringVector,
     {
         // convert to vector
         let columns_values: Vec<String> = columns_values.into_string_vec();
@@ -316,23 +319,20 @@ impl BIDSEventLogger {
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let columns_values: Vec<String> =
-            vec![onset.to_string(), duration.to_string()].into_iter()
-                                                         .chain(columns_values.into_iter())
-                                                         .collect();
+        let columns_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
+            .into_iter()
+            .chain(columns_values)
+            .collect();
 
         // log event
         self.logger.log(columns_values)
     }
 
     /// Log an event with the given column names and values.
-    pub fn log_cols<I, J>(&mut self,
-                          column_names: I,
-                          column_values: J,
-                          duration: f64)
-                          -> Result<(), PsybeeError>
-        where I: IntoStringVector,
-              J: IntoStringVector
+    pub fn log_cols<I, J>(&mut self, column_names: I, column_values: J, duration: f64) -> Result<(), PsybeeError>
+    where
+        I: IntoStringVector,
+        J: IntoStringVector,
     {
         // convert to vector
         let column_names: Vec<String> = column_names.into_string_vec();
@@ -342,15 +342,15 @@ impl BIDSEventLogger {
         let onset = self.start_time.elapsed().as_secs_f64();
 
         // add onset and duration to event
-        let column_names: Vec<String> =
-            vec!["onset".to_string(), "duration".to_string()].into_iter()
-                                                             .chain(column_names.into_iter())
-                                                             .collect();
+        let column_names: Vec<String> = vec!["onset".to_string(), "duration".to_string()]
+            .into_iter()
+            .chain(column_names)
+            .collect();
 
-        let column_values: Vec<String> =
-            vec![onset.to_string(), duration.to_string()].into_iter()
-                                                         .chain(column_values.into_iter())
-                                                         .collect();
+        let column_values: Vec<String> = vec![onset.to_string(), duration.to_string()]
+            .into_iter()
+            .chain(column_values)
+            .collect();
 
         // log event
         self.logger.log_cols(column_names, column_values)
@@ -366,15 +366,15 @@ pub fn create_random_lowercase_string(len: usize) -> String {
 
     let mut rng = rand::thread_rng();
 
-    let random_string: String = (0..len).map(|_| {
-                                            // Generate a random number in the ASCII range of
-                                            // lowercase letters
-                                            let ascii = rng.gen_range(97..=122) as u8;
-                                            // Convert the number to a char
-                                            ascii as char
-                                        })
-                                        .collect();
+    let random_string: String = (0..len)
+        .map(|_| {
+            // Generate a random number in the ASCII range of
+            // lowercase letters
+            let ascii = rng.gen_range(97..=122) as u8;
+            // Convert the number to a char
+            ascii as char
+        })
+        .collect();
 
     random_string
 }
-

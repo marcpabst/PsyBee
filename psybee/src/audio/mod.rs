@@ -1,12 +1,20 @@
 use std::sync::{Arc, Mutex};
 
-use rodio::source::{SineWave, Source};
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Sample, Sink};
+use rodio::{
+    source::{SineWave, Source},
+    Decoder, OutputStream, OutputStreamHandle, Sample, Sink,
+};
 use web_time::Duration;
 
 pub struct AudioDevice {
     output_stream: Arc<OutputStream>,
     pub stream_handle: OutputStreamHandle,
+}
+
+impl Default for AudioDevice {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AudioDevice {
@@ -21,18 +29,18 @@ impl AudioDevice {
 
 pub trait AudioStimulus: Send + Sync + downcast_rs::Downcast + dyn_clone::DynClone {
     /// Play the audio stimulus.
-    fn play(&mut self) -> ();
+    fn play(&mut self);
     /// Stop the audio stimulus.
-    fn stop(&mut self) -> ();
+    fn stop(&mut self);
     /// Pause the audio stimulus.
-    fn pause(&mut self) -> ();
+    fn pause(&mut self);
     /// Seek to a specific time in the audio stimulus.
-    fn seek(&mut self, time: f32) -> ();
+    fn seek(&mut self, time: f32);
     /// Reset the audio stimulus to the beginning.
-    fn reset(&mut self) -> ();
+    fn reset(&mut self);
     // Restart the audio stimulus from the beginning. This is identical to
     // calling `reset` followed by `play`.
-    fn restart(&mut self) -> () {
+    fn restart(&mut self) {
         self.reset();
         self.play();
     }
@@ -40,7 +48,7 @@ pub trait AudioStimulus: Send + Sync + downcast_rs::Downcast + dyn_clone::DynClo
     /// unknown.
     fn duration(&self) -> f32;
     /// Set the volume of the audio stimulus (0.0 to 1.0)
-    fn set_volume(&mut self, volume: f32) -> ();
+    fn set_volume(&mut self, volume: f32);
     /// Get the volume of the audio stimulus (0.0 to 1.0)
     fn volume(&self) -> f32;
     /// Check if the audio stimulus is playing.
@@ -72,20 +80,20 @@ impl SineWaveStimulus {
 }
 
 impl AudioStimulus for SineWaveStimulus {
-    fn play(&mut self) -> () {
+    fn play(&mut self) {
         self.sink.lock().unwrap().play();
         log::info!("Playing sine wave");
     }
 
-    fn stop(&mut self) -> () {
+    fn stop(&mut self) {
         self.sink.lock().unwrap().stop();
     }
 
-    fn pause(&mut self) -> () {
+    fn pause(&mut self) {
         self.sink.lock().unwrap().pause();
     }
 
-    fn seek(&mut self, time: f32) -> () {
+    fn seek(&mut self, time: f32) {
         self.sink
             .lock()
             .unwrap()
@@ -93,7 +101,7 @@ impl AudioStimulus for SineWaveStimulus {
             .expect("Failed to seek sine wave");
     }
 
-    fn reset(&mut self) -> () {
+    fn reset(&mut self) {
         self.sink
             .lock()
             .unwrap()
@@ -105,7 +113,7 @@ impl AudioStimulus for SineWaveStimulus {
         0.0
     }
 
-    fn set_volume(&mut self, volume: f32) -> () {
+    fn set_volume(&mut self, volume: f32) {
         self.sink.lock().unwrap().set_volume(volume);
     }
 
@@ -148,19 +156,19 @@ impl FileStimulus {
 }
 
 impl AudioStimulus for FileStimulus {
-    fn play(&mut self) -> () {
+    fn play(&mut self) {
         self.sink.lock().unwrap().play();
     }
 
-    fn stop(&mut self) -> () {
+    fn stop(&mut self) {
         self.sink.lock().unwrap().stop();
     }
 
-    fn pause(&mut self) -> () {
+    fn pause(&mut self) {
         self.sink.lock().unwrap().pause();
     }
 
-    fn seek(&mut self, time: f32) -> () {
+    fn seek(&mut self, time: f32) {
         let _ = self
             .sink
             .lock()
@@ -168,7 +176,7 @@ impl AudioStimulus for FileStimulus {
             .try_seek(std::time::Duration::from_secs_f32(time));
     }
 
-    fn reset(&mut self) -> () {
+    fn reset(&mut self) {
         // if sink is stopped, it will not play again
         // so we need to append the source again
         let sink = self.sink.lock().unwrap();
@@ -181,7 +189,7 @@ impl AudioStimulus for FileStimulus {
         0.0
     }
 
-    fn set_volume(&mut self, volume: f32) -> () {
+    fn set_volume(&mut self, volume: f32) {
         self.sink.lock().unwrap().set_volume(volume);
     }
 
@@ -223,7 +231,7 @@ where
 
     fn next(&mut self) -> Option<<I as Iterator>::Item> {
         // if next is None, then the source has ended and we should return 0
-        Some(self.source.next().unwrap_or_else(|| I::Item::zero_value()))
+        Some(self.source.next().unwrap_or_else(I::Item::zero_value))
     }
 }
 

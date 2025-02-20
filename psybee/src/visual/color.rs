@@ -1,5 +1,6 @@
-use pyo3::prelude::*;
 use csscolorparser;
+use pyo3::prelude::*;
+
 use crate::visual::geometry::IntoSize;
 
 #[pyclass(name = "LinRgba")]
@@ -33,7 +34,6 @@ impl LinRgba {
             b: Self::srgb_to_lin_rgb(b),
             a,
         }
-
     }
 
     pub fn from_str(css_color_str: &str) -> Self {
@@ -45,7 +45,6 @@ impl LinRgba {
             a: color.a,
         }
     }
-
 }
 
 impl From<LinRgba> for renderer::prelude::RGBA {
@@ -109,8 +108,6 @@ impl From<IntoLinRgba> for LinRgba {
     }
 }
 
-
-
 impl<'py> FromPyObject<'py> for IntoLinRgba {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         // try to extract a LinRgba from the object
@@ -126,8 +123,8 @@ impl<'py> FromPyObject<'py> for IntoLinRgba {
             Ok(Self(LinRgba::new(r, g, b, a)))
         }
         // try to extract from a string
-        else if let Ok(css_color_str) = ob.extract::<&str>() {
-            Ok(Self(LinRgba::from_str(css_color_str)))
+        else if let Ok(css_color_str) = ob.extract::<String>() {
+            Ok(Self(LinRgba::from_str(&css_color_str)))
         }
         // otherwise, raise an error
         else {

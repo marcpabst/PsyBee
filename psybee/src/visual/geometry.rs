@@ -3,7 +3,10 @@
 //! transformations.
 
 use nalgebra::{Matrix3, Vector3};
+use num_traits::Float;
 use pyo3::{prelude::*, PyClass};
+
+use super::window::{PhysicalScreen, PixelSize, Window};
 
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -30,10 +33,10 @@ pub enum NumberOrSize {
 }
 
 impl NumberOrSize {
-    pub fn eval(&self, props: &super::window::WindowPhysicalProperties) -> f32 {
+    pub fn eval(&self, window_size: PixelSize, window_props: PhysicalScreen) -> f32 {
         match self {
             NumberOrSize::Dimensionless(value) => *value,
-            NumberOrSize::Size(size) => size.eval(props),
+            NumberOrSize::Size(size) => size.eval(window_size, window_props),
         }
     }
 }
@@ -106,7 +109,7 @@ impl<'py> FromPyObject<'py> for IntoSize {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         // try to extract a Size
         if let Ok(value) = ob.extract::<Size>() {
-            return Ok(IntoSize(value));
+            Ok(IntoSize(value))
         }
         // try to extract a float (-> Pixels)
         else if let Ok(value) = ob.extract::<f32>() {
@@ -144,8 +147,8 @@ impl From<(f64, f64)> for SizeVector2D {
 impl From<(f32, f32)> for SizeVector2D {
     fn from((x, y): (f32, f32)) -> Self {
         SizeVector2D {
-            x: Size::new_default(x as f32),
-            y: Size::new_default(y as f32),
+            x: Size::new_default(x),
+            y: Size::new_default(y),
         }
     }
 }
@@ -258,34 +261,38 @@ impl Size {
     /// # Returns
     ///
     /// The unit converted to pixels (as a float).
-    pub fn eval(&self, props: &super::window::WindowPhysicalProperties) -> f32 {
+    pub fn eval(&self, window_size: PixelSize, window_props: PhysicalScreen) -> f32 {
         match self {
             Size::Pixels(pixels) => *pixels,
-            Size::ScreenWidth(normalised) => *normalised * props.width as f32,
-            Size::ScreenHeight(normalised) => *normalised * props.height as f32,
-            Size::Degrees(degrees) => Size::angle_to_milimeter(*degrees, props.viewing_distance).eval(props),
-            Size::Millimeters(millimeters) => *millimeters / 1000.0 * props.width as f32 / props.width_m,
-            Size::Centimeters(centimeters) => Size::Millimeters(*centimeters * 10.0).eval(props),
-            Size::Inches(inches) => Size::Millimeters(*inches * 25.4).eval(props),
-            Size::Points(points) => Size::Inches(*points / 72.0).eval(props),
+            Size::ScreenWidth(normalised) => *normalised * window_size.width as f32,
+            Size::ScreenHeight(normalised) => *normalised * window_size.height as f32,
+            Size::Degrees(degrees) => {
+                Size::angle_to_milimeter(*degrees, window_props.viewing_distance).eval(window_size, window_props)
+            }
+            Size::Millimeters(millimeters) => {
+                *millimeters * window_size.width as f32 / window_props.width(window_size.width)
+            }
+            Size::Centimeters(centimeters) => Size::Millimeters(*centimeters * 10.0).eval(window_size, window_props),
+            Size::Inches(inches) => Size::Millimeters(*inches * 25.4).eval(window_size, window_props),
+            Size::Points(points) => Size::Inches(*points / 72.0).eval(window_size, window_props),
             Size::Quotient(a, b) => {
                 // first, we resolve `a` to pixels, the we divide by b
-                let a = a.eval(props);
+                let a = a.eval(window_size, window_props);
                 a / b
             }
             Size::Product(a, b) => {
                 // first, we resolve `a` to pixels, the we multiply with b
-                let a = a.eval(props);
+                let a = a.eval(window_size, window_props);
                 a * b
             }
             Size::Sum(a, b) => {
-                let a = a.eval(props);
-                let b = b.eval(props);
+                let a = a.eval(window_size, window_props);
+                let b = b.eval(window_size, window_props);
                 a + b
             }
             Size::Difference(a, b) => {
-                let a = a.eval(props);
-                let b = b.eval(props);
+                let a = a.eval(window_size, window_props);
+                let b = b.eval(window_size, window_props);
                 a - b
             }
         }
@@ -305,7 +312,7 @@ impl Size {
         // extract the number and the unit
         let (number, unit) = string.split_at(
             string
-                .find(|c: char| !c.is_digit(10) && c != '.')
+                .find(|c: char| !c.is_ascii_digit() && c != '.')
                 .unwrap_or(string.len()),
         );
         let number = number.parse::<f32>().map_err(|e| e.to_string())?;
@@ -357,9 +364,9 @@ impl Size {
 
     // evaluation
     #[pyo3(name = "eval")]
-    fn py_eval(&self, window: &super::window::WrappedWindow) -> f32 {
-        let props = window.inner().physical_properties;
-        self.eval(&props)
+    fn py_eval(&self, window: &Window) -> f32 {
+        let window_state = window.state.lock().unwrap();
+        self.eval(window_state.size, window_state.physical_screen)
     }
 }
 
@@ -377,8 +384,11 @@ impl SizeVector2D {
     /// # Returns
     ///
     /// The point converted to pixels.
-    fn to_pixels(&self, props: &super::window::WindowPhysicalProperties) -> (f32, f32) {
-        (self.x.eval(props), self.y.eval(props))
+    fn to_pixels(&self, window_size: PixelSize, window_props: PhysicalScreen) -> (f32, f32) {
+        (
+            self.x.eval(window_size, window_props),
+            self.y.eval(window_size, window_props),
+        )
     }
 }
 
@@ -416,33 +426,21 @@ impl std::ops::Deref for BoxedTransformation2D {
 pub enum Transformation2D {
     /// Identity transformation (no transformation).
     Identity(),
-    /// Rotation around the center of the object.
-    RotationCenter(f32),
     /// Rotation around an arbitrary point.
     RotationPoint(f32, Size, Size),
-    /// Scale around the center of the object.
-    ScaleCenter(f32, f32),
+    /// Rotation around the origin.
+    RotationOrigin(f32),
+    /// Scale around the origin.
+    ScaleOrigin(f32, f32),
     /// Scale around an arbitrary point.
     ScalePoint(f32, f32, Size, Size),
     /// Shear around the center of the object.
-    ShearCenter(f32, f32),
+    ShearOrigin(f32, f32),
     /// Shear around an arbitrary point.
     ShearPoint(f32, f32, Size, Size),
     /// Translation by x and y.
     Translation(Size, Size),
-    /// Arbitrary 2D transformation matrix.
-    // Matrix(Matrix2<f32>),
-    // /// Homogeneous 2D transformation matrix. This 4x4 matrix will be applied to
-    // /// the coordinates in NDC (Normalized Device Coordinates) space, but
-    // /// please note that the specific coordinate system this matrix will be
-    // /// applied to is considered an implementation detail and may change in
-    // /// the future. It is recommended to use the other variants instead or
-    // /// to combine a 2D transformation matrix with a `Translation`
-    // /// transformation, which will take care of the coordinate system for
-    // /// you.
-    // Homogeneous(Matrix3<f32>),
-    /// Product of two transformations. This variant is used to combine multiple
-    /// transformations in a lazy way.
+    /// Product of two transformations.
     Product(BoxedTransformation2D, BoxedTransformation2D),
 }
 
@@ -454,78 +452,90 @@ impl Transformation2D {
 
     /// Convert to the corresponding (homogeneous) 2D transformation matrix.
     #[rustfmt::skip]
-    pub fn eval(&self, props: &super::window::WindowPhysicalProperties) -> Matrix3<f32> {
+    pub fn eval(&self, window_size: PixelSize, window_props: PhysicalScreen) -> Matrix3<f32> {
         match self {
             Transformation2D::Identity() => Matrix3::identity(),
-            Transformation2D::RotationCenter(_angle) => {
-                todo!()
+            Transformation2D::RotationOrigin (angle) => {
+                let angle = angle.to_radians();
+                let cos = angle.cos();
+                let sin = angle.sin();
+
+                Matrix3::new(
+                    cos, -sin, 0.0,
+                    sin, cos, 0.0,
+                    0.0, 0.0, 1.0,
+                )
             }
             Transformation2D::RotationPoint(angle, x, y) => {
                 let angle = angle.to_radians();
-                let x = x.eval(
-                    props
-                ) as f32;
-                let y = y.eval(
-                    props
-                ) as f32;
+                let cos = angle.cos();
+                let sin = angle.sin();
+                let x = x.eval(window_size, window_props);
+                let y = y.eval(window_size, window_props);
 
                 Matrix3::new(
-                    angle.cos(), -angle.sin(), 0.0,
-                    angle.sin(), angle.cos(), 0.0,
-                    x * (1.0 - angle.cos()) + y * angle.sin(), y * (1.0 - angle.cos()) - x * angle.sin(), 1.0,
+                    cos, -sin, x * (1.0 - cos) + y * sin,
+                    sin, cos, y * (1.0 - cos) - x * sin,
+                    0.0, 0.0, 1.0,
                 )
-            }
-            Transformation2D::ScaleCenter(_x, _y) => {
-               todo!()
-            }
-            Transformation2D::ScalePoint(x, y, x0, y0) => {
-                let x0 = x0.eval(props);
-                let y0 = y0.eval(props);
-
+            },
+            Transformation2D::ScaleOrigin(x, y) => {
                 Matrix3::new(
                     *x, 0.0, 0.0,
                     0.0, *y, 0.0,
-                    x0 * (1.0 - x), y0 * (1.0 - y), 1.0,
+                    0.0, 0.0, 1.0,
                 )
             }
-            Transformation2D::ShearCenter(_x, _y) => {
-                todo!()
-            }
-            Transformation2D::ShearPoint(x, y, x0, y0) => {
-                let x0 = x0.eval(props);
-                let y0 = y0.eval(props);
+            Transformation2D::ScalePoint(x, y, x0, y0) => {
+                let t1 = Transformation2D::Translation(-x0.clone(), -y0.clone());
+                let t2 = Transformation2D::ScaleOrigin(*x, *y);
+                let t3 = Transformation2D::Translation(x0.clone(), y0.clone());
 
+                let t1 = t1.eval(window_size, window_props);
+                let t2 = t2.eval(window_size, window_props);
+                let t3 = t3.eval(window_size, window_props);
+
+                t3 * t2 * t1
+            }
+            Transformation2D::ShearOrigin(x, y) => {
                 Matrix3::new(
                     1.0, *x, 0.0,
                     *y, 1.0, 0.0,
-                    -x0 * y, -y0 * x, 1.0,
+                    0.0, 0.0, 1.0,
                 )
+            }
+            Transformation2D::ShearPoint(x, y, x0, y0) => {
+                let t1 = Transformation2D::Translation(-x0.clone(), -y0.clone());
+                let t2 = Transformation2D::ShearOrigin(*x, *y);
+                let t3 = Transformation2D::Translation(x0.clone(), y0.clone());
+
+                let t1 = t1.eval(window_size, window_props);
+                let t2 = t2.eval(window_size, window_props);
+                let t3 = t3.eval(window_size, window_props);
+
+                t3 * t2 * t1
             }
             Transformation2D::Translation(x, y) => {
-                let x = x.eval(props) as f32;
-                let y = y.eval(props) as f32;
+                let x = x.eval(window_size, window_props);
+                let y = y.eval(window_size, window_props);
 
                 Matrix3::new(
-                    1.0, 0.0, 0.0,
-                    0.0, 1.0, 0.0,
-                    x, y, 1.0,
+                    1.0, 0.0, x,
+                    0.0, 1.0, y,
+                    0.0, 0.0, 1.0,
                 )
             }
-            // Transformation2D::Matrix(matrix) => {
-            //     matrix.clone().to_homogeneous()
-            // }
-            //Transformation2D::Homogeneous(matrix) => matrix.clone(),
             Transformation2D::Product(a,b) =>
             {
-                let a = a.eval(props);
-                let b = b.eval(props);
+                let a = a.eval(window_size, window_props);
+                let b = b.eval(window_size, window_props);
                 a * b
             }
         }
     }
 
-    pub fn transform_point(&self, x: f32, y: f32, props: &super::window::WindowPhysicalProperties) -> (f32, f32) {
-        let matrix = self.eval(props).transpose();
+    pub fn transform_point(&self, x: f32, y: f32, window_size: PixelSize, window_props: PhysicalScreen) -> (f32, f32) {
+        let matrix = self.eval(window_size, window_props).transpose();
         let newpoint = matrix * Vector3::new(x, y, 1.0);
         (newpoint.x, newpoint.y)
     }
@@ -567,11 +577,8 @@ pub enum Shape {
     },
 
     /// A polygon.
-    Polygon {
-        points: Vec<(Size, Size)>,
-    },
+    Polygon { points: Vec<(Size, Size)> },
 }
-
 
 #[pymethods]
 impl Shape {
@@ -618,27 +625,74 @@ impl Shape {
         }
     }
 
-    // #[staticmethod]
-    // /// Create a new pentagon.
-    // fn pentagon(x: IntoSize, y: IntoSize, radius: IntoSize) -> Shape {
-    //     let radius: Size = radius.into();
-    //     let x: Size = x.into();
-    //     let y: Size = y.into();
-    //     let mut points = Vec::new();
-    //
-    //     for i in 0..5 {
-    //         let angle = 2.0 * std::f32::consts::PI / 5.0 * i as f32;
-    //         let rotation = Transformation2D::RotationPoint(angle, x.clone(), y.clone());
-    //         let x = &x + &radius;
-    //         let y = &y + &radius;
-    //
-    //         points.push((x, y));
-    //     }
-    //     Shape::Polygon { points }
-    // }
-
     // for printing
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Anchor {
+    TopLeft,
+    TopCenter,
+    TopRight,
+    CenterLeft,
+    Center,
+    CenterRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+}
+
+impl Anchor {
+    pub fn to_top_left<T: Float>(&self, x: T, y: T, width: T, height: T) -> (T, T) {
+        match self {
+            Anchor::TopLeft => (x, y),
+            Anchor::TopCenter => (x - width / T::from(2.0).unwrap(), y),
+            Anchor::TopRight => (x - width, y),
+            Anchor::CenterLeft => (x, y - height / T::from(2.0).unwrap()),
+            Anchor::Center => (x - width / T::from(2.0).unwrap(), y - height / T::from(2.0).unwrap()),
+            Anchor::CenterRight => (x - width, y - height / T::from(2.0).unwrap()),
+            Anchor::BottomLeft => (x, y - height),
+            Anchor::BottomCenter => (x - width / T::from(2.0).unwrap(), y - height),
+            Anchor::BottomRight => (x - width, y - height),
+        }
+    }
+
+    pub fn to_center<T: Float>(&self, x: T, y: T, width: T, height: T) -> (T, T) {
+        let top_left = self.to_top_left(x, y, width, height);
+        (
+            top_left.0 + width / T::from(2.0).unwrap(),
+            top_left.1 + height / T::from(2.0).unwrap(),
+        )
+    }
+
+    pub fn from_str(string: &str) -> Result<Anchor, String> {
+        match string {
+            "top-left" => Ok(Anchor::TopLeft),
+            "top-center" => Ok(Anchor::TopCenter),
+            "top-right" => Ok(Anchor::TopRight),
+            "center-left" => Ok(Anchor::CenterLeft),
+            "center" => Ok(Anchor::Center),
+            "center-right" => Ok(Anchor::CenterRight),
+            "bottom-left" => Ok(Anchor::BottomLeft),
+            "bottom-center" => Ok(Anchor::BottomCenter),
+            "bottom-right" => Ok(Anchor::BottomRight),
+            _ => Err(format!("Unknown anchor: {}", string)),
+        }
+    }
+}
+
+// implement FromPyObject for Anchor
+impl<'py> FromPyObject<'py> for Anchor {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+        // try to extract a string from the object and then convert it to a TransitionFunction
+        if let Ok(name) = ob.extract::<String>() {
+            Ok(Anchor::from_str(&name).unwrap())
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Anchor must be a string.",
+            ))
+        }
     }
 }

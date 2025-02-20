@@ -1,12 +1,14 @@
-use crate::affine::Affine;
-use crate::bitmaps::DynamicBitmap;
-use crate::colors::RGBA;
-use crate::shapes::{Point, Shape};
-use crate::styles::ImageFitMode;
-use custom_debug::CustomDebug;
-use std::sync::Arc;
 
-#[derive(Debug)]
+
+use crate::{
+    affine::Affine,
+    bitmaps::DynamicBitmap,
+    colors::RGBA,
+    shapes::{Point, Shape},
+    styles::ImageFitMode,
+};
+
+#[derive(Debug, Clone)]
 pub enum Brush<'a> {
     /// Solid color brush.
     Solid(RGBA),

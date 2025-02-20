@@ -1,13 +1,10 @@
-use std::borrow::Borrow;
-use std::ops::Deref;
+use std::{borrow::Borrow, ops::Deref};
 
 use derive_more::Display;
 use paste::paste;
-use pyo3::prelude::*;
-use pyo3::types::PyList;
+use pyo3::{prelude::*, types::PyList};
 use pywrap::{py_forward, py_getter, py_wrap, transmute_ignore_size};
-use rapier2d::parry::shape;
-use rapier2d::prelude::*;
+use rapier2d::{parry::shape, prelude::*};
 
 // and for references (if type supports cloning)
 

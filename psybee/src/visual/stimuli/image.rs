@@ -1,19 +1,16 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+use psybee_proc::StimulusParams;
+use renderer::{prelude::*, DynamicBitmap};
+use uuid::Uuid;
 
 use super::{
     animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
-    WrappedStimulus,
 };
-use crate::{
-    prelude::{Size, Transformation2D},
-    visual::window::Window,
+use crate::visual::{
+    geometry::{Anchor, Size, Transformation2D},
+    window::Frame,
 };
-
-use psybee_proc::StimulusParams;
-
-use pyo3::{exceptions::PyValueError, prelude::*};
-use renderer::prelude::*;
-use uuid::Uuid;
 
 #[derive(StimulusParams, Clone, Debug)]
 pub struct ImageParams {
@@ -26,36 +23,48 @@ pub struct ImageParams {
     pub image_y: Size,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ImageStimulus {
     id: uuid::Uuid,
 
     params: ImageParams,
 
-    image: super::WrappedImage,
-    image_fit_mode: ImageFitMode,
-
+    image: DynamicBitmap,
+    anchor: Anchor,
     transformation: Transformation2D,
     animations: Vec<Animation>,
     visible: bool,
 }
 
 impl ImageStimulus {
-    pub fn from_image(image: super::WrappedImage, params: ImageParams) -> Self {
+    pub fn from_image(
+        image: DynamicBitmap,
+        params: ImageParams,
+        transform: Option<Transformation2D>,
+        anchor: Anchor,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
-            transformation: crate::visual::geometry::Transformation2D::Identity(),
+            transformation: transform.unwrap_or_else(|| Transformation2D::Identity()),
             animations: Vec::new(),
             visible: true,
-            image: image,
-            image_fit_mode: ImageFitMode::Fill,
+            image,
+            anchor,
             params,
         }
     }
 
-    pub fn from_path(src: String, params: ImageParams, is_srgb: bool) -> Self {
-        let image = super::WrappedImage::from_path(src).unwrap();
-        Self::from_image(image, params)
+    pub fn from_path(
+        src: String,
+        params: ImageParams,
+        transform: Option<Transformation2D>,
+        anchor: Anchor,
+        window: Window,
+        is_srgb: bool,
+    ) -> Self {
+        let win_state = window.state.lock().unwrap();
+        let image = win_state.renderer.create_bitmap_from_path(&src);
+        Self::from_image(image, params, transform, anchor)
     }
 }
 
@@ -67,25 +76,33 @@ pub struct PyImageStimulus();
 impl PyImageStimulus {
     #[new]
     #[pyo3(signature = (
-        image,
+        src,
         x,
         y,
+        window,
         width,
         height,
-        opacity = 1.0
+        opacity = 1.0,
+        anchor = Anchor::Center,
+        transform = None,
+        srgb = true
     ))]
     fn __new__(
-        image: &super::WrappedImage,
+        src: String,
         x: IntoSize,
         y: IntoSize,
+        window: Window,
         width: IntoSize,
         height: IntoSize,
         opacity: f64,
+        anchor: Anchor,
+        transform: Option<Transformation2D>,
+        srgb: bool,
     ) -> (Self, PyStimulus) {
         (
             Self(),
-            PyStimulus(Arc::new(std::sync::Mutex::new(ImageStimulus::from_image(
-                image.clone(),
+            PyStimulus::new(ImageStimulus::from_path(
+                src,
                 ImageParams {
                     x: x.into(),
                     y: y.into(),
@@ -95,7 +112,11 @@ impl PyImageStimulus {
                     image_y: 0.0.into(),
                     opacity,
                 },
-            )))),
+                transform,
+                anchor,
+                window,
+                srgb,
+            )),
         )
     }
 }
@@ -107,34 +128,49 @@ impl Stimulus for ImageStimulus {
         self.id
     }
 
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, frame: &mut Frame) {
         if !self.visible {
             return;
         }
 
+        let window = frame.window();
+        let window_state = window.lock_state();
+        let window_size = window_state.size;
+        let screen_props = window_state.physical_screen;
+
         // convert physical units to pixels
-        let x = self.params.x.eval(&window.physical_properties) as f64;
-        let y = self.params.y.eval(&window.physical_properties) as f64;
-        let width = self.params.width.eval(&window.physical_properties) as f64;
-        let height = self.params.height.eval(&window.physical_properties) as f64;
+        let x = self.params.x.eval(window_size, screen_props);
+        let y = self.params.y.eval(window_size, screen_props);
 
-        let image_offset_x = self.params.image_x.eval(&window.physical_properties) as f64;
-        let image_offset_y = self.params.image_y.eval(&window.physical_properties) as f64;
+        let width = self.params.width.eval(window_size, screen_props);
+        let height = self.params.height.eval(window_size, screen_props);
 
-        let trans_mat = self.transformation.eval(&window.physical_properties);
+        let (x, y) = self.anchor.to_top_left(x, y, width, height);
+        println!("x: {}, y: {}, width: {}, height: {}", x, y, width + x, height + y);
 
-        scene.draw(Geom::new_image(
-            self.image.inner().clone(),
-            x,
-            y,
-            width,
-            height,
-            trans_mat.into(),
-            image_offset_x,
-            image_offset_y,
-            ImageFitMode::Fill,
-            Extend::Pad,
-        ));
+        let image_offset_x = self.params.image_x.eval(window_size, screen_props);
+        let image_offset_y = self.params.image_y.eval(window_size, screen_props);
+
+        let trans_mat = self.transformation.eval(window_size, screen_props);
+
+        frame.scene_mut().draw_shape_fill(
+            Shape::Rectangle {
+                a: (x, y).into(),
+                w: width as f64,
+                h: height as f64,
+            },
+            Brush::Image {
+                image: &self.image,
+                start: (x + image_offset_x, y + image_offset_y).into(),
+                fit_mode: ImageFitMode::Exact { width, height },
+                sampling: ImageSampling::Linear,
+                edge_mode: (Extend::Pad, Extend::Pad),
+                transform: None,
+                alpha: None,
+            },
+            Some(self.transformation.eval(window_size, screen_props).into()),
+            None,
+        );
     }
 
     fn set_visible(&mut self, visible: bool) {
@@ -165,17 +201,20 @@ impl Stimulus for ImageStimulus {
         self.transformation.clone()
     }
 
-    fn contains(&self, x: Size, y: Size, window: &WrappedWindow) -> bool {
-        let window = window.inner();
-        let ix = self.params.x.eval(&window.physical_properties);
-        let iy = self.params.y.eval(&window.physical_properties);
-        let width = self.params.width.eval(&window.physical_properties);
-        let height = self.params.height.eval(&window.physical_properties);
+    fn contains(&self, x: Size, y: Size, window: &Window) -> bool {
+        let window_state = window.state.lock().unwrap();
+        let window_size = window_state.size;
+        let screen_props = window_state.physical_screen;
 
-        let trans_mat = self.transformation.eval(&window.physical_properties);
+        let ix = self.params.x.eval(window_size, screen_props);
+        let iy = self.params.y.eval(window_size, screen_props);
+        let width = self.params.width.eval(window_size, screen_props);
+        let height = self.params.height.eval(window_size, screen_props);
 
-        let x = x.eval(&window.physical_properties);
-        let y = y.eval(&window.physical_properties);
+        let trans_mat = self.transformation.eval(window_size, screen_props);
+
+        let x = x.eval(window_size, screen_props);
+        let y = y.eval(window_size, screen_props);
 
         // apply transformation by multiplying the point with the transformation matrix
         let p = nalgebra::Vector3::new(x, y, 1.0);

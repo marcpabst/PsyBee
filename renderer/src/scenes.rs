@@ -1,38 +1,53 @@
-use super::affine::Affine;
-use super::colors;
-use super::styles::{BlendMode, ImageFitMode, StrokeStyle};
-use crate::bitmaps::DynamicBitmap;
-use crate::brushes::{Brush, Extend};
-use crate::colors::RGBA;
-use crate::prelude::FillStyle;
-use crate::shapes::{Point, Shape};
-use std::any::Any;
+use std::{
+    any::Any,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
-pub struct DynamicScene(pub Box<dyn Scene>);
+use super::{
+    affine::Affine,
+    styles::{BlendMode, ImageFitMode, StrokeStyle},
+};
+use crate::{
+    bitmaps::DynamicBitmap,
+    brushes::{Brush, Extend},
+    colors::RGBA,
+    shapes::{Point, Shape},
+    text::{DynamicFontFace, Glyph},
+};
+
+pub struct DynamicScene(pub Arc<Mutex<Box<dyn Scene>>>);
 
 impl DynamicScene {
+    pub fn new(scene: Box<dyn Scene>) -> Self {
+        DynamicScene(Arc::new(Mutex::new(scene)))
+    }
+
+    pub fn inner(&self) -> MutexGuard<Box<dyn Scene>> {
+        self.0.lock().unwrap()
+    }
+
     pub fn set_background_color(&mut self, color: RGBA) {
-        self.0.set_background_color(color);
+        self.inner().set_background_color(color);
     }
 
     pub fn set_width(&mut self, width: u32) {
-        self.0.set_width(width);
+        self.inner().set_width(width);
     }
 
     pub fn set_height(&mut self, height: u32) {
-        self.0.set_height(height);
+        self.inner().set_height(height);
     }
 
     pub fn background_color(&self) -> RGBA {
-        self.0.background_color()
+        self.inner().background_color()
     }
 
     pub fn width(&self) -> u32 {
-        self.0.width()
+        self.inner().width()
     }
 
     pub fn height(&self) -> u32 {
-        self.0.height()
+        self.inner().height()
     }
 
     pub fn start_layer(
@@ -43,12 +58,12 @@ impl DynamicScene {
         layer_transform: Option<Affine>,
         alpha: f32,
     ) {
-        self.0
+        self.inner()
             .start_layer(composite_mode, clip, clip_transform, layer_transform, alpha);
     }
 
     pub fn end_layer(&mut self) {
-        self.0.end_layer();
+        self.inner().end_layer();
     }
 
     pub fn draw_shape_fill(
@@ -58,7 +73,7 @@ impl DynamicScene {
         transform: Option<Affine>,
         blend_mode: Option<BlendMode>,
     ) {
-        self.0.draw_shape_fill(shape, brush, transform, blend_mode);
+        self.inner().draw_shape_fill(shape, brush, transform, blend_mode);
     }
 
     pub fn draw_shape_stroke(
@@ -69,14 +84,34 @@ impl DynamicScene {
         transform: Option<Affine>,
         blend_mode: Option<BlendMode>,
     ) {
-        self.0.draw_shape_stroke(shape, brush, style, transform, blend_mode);
+        self.inner()
+            .draw_shape_stroke(shape, brush, style, transform, blend_mode);
     }
 
-    pub fn try_as<T>(&self) -> Option<&T>
-    where
-        T: Any,
-    {
-        self.0.as_any().downcast_ref::<T>()
+    fn draw_glyphs(
+        &mut self,
+        position: Point,
+        glyphs: &[Glyph],
+        font_face: &DynamicFontFace,
+        font_size: f32,
+        brush: Brush,
+        transform: Option<Affine>,
+        blend_mode: Option<BlendMode>,
+    ) {
+        self.inner()
+            .draw_glyphs(position, glyphs, font_face, font_size, brush, transform, blend_mode);
+    }
+
+    pub fn draw_formated_text(
+        &mut self,
+        fm: &mut cosmic_text::FontSystem,
+        formated_text: &crate::text::FormatedText,
+        brush: Brush,
+        transform: Option<Affine>,
+        blend_mode: Option<BlendMode>,
+    ) {
+        self.inner()
+            .draw_formated_text(fm, formated_text, brush, transform, blend_mode);
     }
 }
 
@@ -126,14 +161,62 @@ pub trait Scene: Any {
             transform,
             alpha,
         };
-        
-        self.draw_shape_fill(Shape::rectangle(position, width as f64, height as f64), brush, None, blend_mode);
+
+        self.draw_shape_fill(
+            Shape::rectangle(position, width as f64, height as f64),
+            brush,
+            None,
+            blend_mode,
+        );
     }
-    // fn draw_glyphs(
-    //     &mut self,
-    //     glyphs: &dyn Iterator<Item = Glyph>,
-    //     brush: Brush,
-    //     transform: Option<Affine>,
-    //     blend_mode: Option<BlendMode>,
-    // );
+    fn draw_glyphs(
+        &mut self,
+        position: Point,
+        glyphs: &[Glyph],
+        font_face: &DynamicFontFace,
+        font_size: f32,
+        brush: Brush,
+        transform: Option<Affine>,
+        blend_mode: Option<BlendMode>,
+    );
+
+    fn draw_formated_text(
+        &mut self,
+        fm: &mut cosmic_text::FontSystem,
+        formated_text: &crate::text::FormatedText,
+        brush: Brush,
+        transform: Option<Affine>,
+        blend_mode: Option<BlendMode>,
+    ) {
+        let buffer = &mut formated_text.cosmic_buffer.clone();
+        let mut buffer = buffer.borrow_with(fm);
+        buffer.shape_until_scroll(true);
+
+        // Inspect the output runs
+        for run in buffer.layout_runs() {
+            let glyphs = run
+                .glyphs
+                .iter()
+                .map(|g| Glyph {
+                    id: g.glyph_id,
+                    position: Point {
+                        x: g.x as f64,
+                        y: g.y as f64,
+                    },
+                    start: g.start as u32,
+                    end: g.end as u32,
+                })
+                .collect::<Vec<_>>();
+
+            self.draw_glyphs(
+                formated_text.position,
+                &glyphs,
+                &formated_text.renderer_font,
+                formated_text.comic_metrics.font_size,
+                brush.clone(),
+                transform,
+                blend_mode,
+            );
+        }
+    }
 }

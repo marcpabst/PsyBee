@@ -1,106 +1,166 @@
-use std::collections::HashMap;
-#[cfg(target_arch = "wasm32")]
-use std::collections::HashMap;
-use std::pin::Pin;
-#[cfg(target_arch = "wasm32")]
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, RwLock};
-use std::time::Instant;
+use std::{
+    collections::HashMap,
+    pin::Pin,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, MutexGuard, RwLock,
+    },
+    time::Instant,
+};
 
 use async_channel::{bounded, Receiver, Sender};
 use derive_debug::Dbg;
-use futures_lite::future::block_on;
-use futures_lite::Future;
+use futures_lite::{future::block_on, Future};
 use nalgebra;
 use palette::IntoColor;
 use pyo3::prelude::*;
-use renderer::vello_backend::VelloRenderer;
+use renderer::{prelude::*, wgpu_renderer::WgpuRenderer, DynamicRenderer};
 use send_wrapper::SendWrapper;
 use uuid::Uuid;
-use winit::window::WindowId;
+use wgpu::TextureFormat;
+use winit::{dpi::PhysicalSize, window::WindowId};
 
-use super::color::LinRgba;
-use super::geometry::Size;
-use super::stimuli::{Stimulus, WrappedStimulus};
-use crate::input::{Event, EventHandler, EventHandlerId, EventHandlingExt, EventKind, EventReceiver};
-use crate::{GPUState, RenderThreadChannelPayload};
-use renderer::prelude::*;
+use super::{
+    color::LinRgba,
+    geometry::Size,
+    stimuli::{DynamicStimulus, Stimulus},
+};
+use crate::{
+    app::GPUState,
+    input::{Event, EventHandler, EventHandlerId, EventHandlingExt, EventKind, EventReceiver},
+    RenderThreadChannelPayload,
+};
+
+#[derive(Debug, Clone, Copy)]
+pub struct PhysicalScreen {
+    /// Pixel/mm of the screen.
+    pub pixel_density: f32,
+    /// Viewing distance in meters.
+    pub viewing_distance: f32,
+}
+
+impl PhysicalScreen {
+    /// Creates a new physical screen given width in pixels and millimeters.
+    pub fn new(width_px: u32, width_mm: f32, viewing_distance: f32) -> Self {
+        let pixel_density = width_px as f32 / width_mm;
+        Self {
+            pixel_density,
+            viewing_distance,
+        }
+    }
+
+    /// Returns the size of the screen in millimeters.
+    pub fn size(&self, width_px: u32, height_px: u32) -> (f32, f32) {
+        let width_mm = width_px as f32 / self.pixel_density;
+        let height_mm = height_px as f32 / self.pixel_density;
+        (width_mm, height_mm)
+    }
+
+    /// Returns the width of the screen in millimeters.
+    pub fn width(&self, width_px: u32) -> f32 {
+        width_px as f32 / self.pixel_density
+    }
+
+    /// Returns the height of the screen in millimeters.
+    pub fn height(&self, height_px: u32) -> f32 {
+        height_px as f32 / self.pixel_density
+    }
+
+    /// Sets the pixel density of the screen based on the width of the screen in pixels and millimeters.
+    pub fn set_pixel_density(&mut self, width_px: u32, width_mm: f32) {
+        self.pixel_density = width_px as f32 / width_mm;
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PixelSize {
+    pub width: u32,
+    pub height: u32,
+}
+
+impl From<(u32, u32)> for PixelSize {
+    fn from((width, height): (u32, u32)) -> Self {
+        Self { width, height }
+    }
+}
+
+impl From<PhysicalSize<u32>> for PixelSize {
+    fn from(size: PhysicalSize<u32>) -> Self {
+        Self {
+            width: size.width,
+            height: size.height,
+        }
+    }
+}
+
+impl From<PixelSize> for (u32, u32) {
+    fn from(val: PixelSize) -> Self {
+        (val.width, val.height)
+    }
+}
 
 /// Internal window state. This is used to store the winit window, the wgpu
 /// device, the wgpu queue, etc.
 #[derive(Dbg)]
-pub struct InternalWindowState {
+pub struct WindowState {
     /// the winit window
     pub winit_window: Arc<winit::window::Window>,
     /// the wgpu surface
     pub surface: wgpu::Surface<'static>,
     /// the wgpu surface configuration
     pub config: wgpu::SurfaceConfiguration,
-    /// the renderer
+    /// the renderers
+    #[dbg(placeholder = "[[ WgpuRenderer ]]")]
+    pub wgpu_renderer: WgpuRenderer,
+    #[dbg(placeholder = "[[ DynamicRenderer ]]")]
+    pub renderer: DynamicRenderer,
+    // The current mouse position. None if the mouse has left the window.
+    pub mouse_position: Option<(Size, Size)>,
+    /// Stores if the mouse cursor is currently visible.
+    pub mouse_cursor_visible: bool,
+    /// The size of the window in pixels.
+    pub size: PixelSize,
+    /// Physical properties of the screen.
+    pub physical_screen: PhysicalScreen,
+    /// Event handlers for the window.
     #[dbg(placeholder = "...")]
-    pub renderer: VelloRenderer,
+    pub event_handlers: HashMap<EventHandlerId, (EventKind, EventHandler)>,
 }
 
-/// Describes the physical aspect of a window.
-#[derive(Debug, Clone, Copy)]
-pub struct WindowPhysicalProperties {
-    /// The width of the window in pixels.
-    pub width: u32,
-    /// The height of the window in pixels.
-    pub height: u32,
-    /// The width of the window in meters.
-    pub width_m: f32,
-    /// The pixel aspect ratio.
-    pub pixel_aspect_ratio: f32,
-    /// The viewing distance in meters.
-    pub viewing_distance: f32,
+unsafe impl Send for WindowState {}
+
+impl WindowState {
+    /// Resize the window's renders
+    pub fn resize(&mut self, size: PixelSize, gpu_state: &mut GPUState) {
+        self.size = size;
+        self.config.width = size.width;
+        self.config.height = size.height;
+
+        self.surface.configure(&gpu_state.device, &self.config);
+
+        self.wgpu_renderer
+            .resize(size.width, size.height, &self.surface, &gpu_state.device);
+    }
 }
 
 /// How to block when presenting a frame.
 /// A Window represents a window on the screen. It is used to create stimuli and
 /// to submit them to the screen for rendering. Each window has a render task
 /// that is responsible for rendering stimuli to the screen.
-#[derive(Dbg)]
+#[derive(Dbg, Clone)]
+#[pyclass(unsendable)]
 pub struct Window {
-    // WINDOW STATE
     /// Window ID
-    pub winit_id: winit::window::WindowId,
-    /// The window state. This contains the underlying winit window, the wgpu
-    /// device, the wgpu queue, etc.
-    pub(crate) state: InternalWindowState,
-    /// The GPU state
-    pub(crate) gpu_state: Arc<Mutex<GPUState>>,
-    /// The current mouse position. None if the mouse is not over the
-    /// window.
-    pub(crate) mouse_position: Option<(Size, Size)>,
-    /// Stores if the mouse cursor is currently visible.
-    pub(crate) mouse_cursor_visible: bool,
-
-    // CHANNELS FOR COMMUNICATION BETWEEN THREADS
-    /// Broadcast sender for keyboard events. Used by the experiment task to
-    /// send keyboard events to the main window task.
-    pub(crate) event_broadcast_sender: async_broadcast::Sender<Event>,
-    /// Broadcast receiver for keyboard events. Used by the main window task to
-    /// send keyboard events to the experiment task.
-    pub(crate) event_broadcast_receiver: async_broadcast::InactiveReceiver<Event>,
-    // PHYSICAL WINDOW PROPERTIES
-    /// Physical width of the window in millimeters.
-    pub physical_properties: WindowPhysicalProperties,
-
-    /// Vector of stimuli that will be added to each frame automatically.
-    #[dbg(placeholder = "...")]
-    pub stimuli: Arc<Mutex<Vec<Box<dyn Stimulus>>>>,
-
-    // EVENT HANDLING
-    /// Event handlers for the window. Handlers are stored in a HashMap with
-    /// the event id as the key.
-    #[dbg(placeholder = "...")]
-    pub event_handlers: Arc<Mutex<HashMap<EventHandlerId, (EventKind, EventHandler)>>>,
-
-    /// global options
-    pub options: Arc<Mutex<crate::options::GlobalOptions>>,
+    pub winit_id: WindowId,
+    /// The window state. Shared between all clones of the window.
+    pub state: Arc<Mutex<WindowState>>,
+    /// gpu state for the window
+    pub gpu_state: Arc<Mutex<GPUState>>,
+    /// Broadcast sender for keyboard events.
+    pub event_broadcast_sender: async_broadcast::Sender<Event>,
+    /// Broadcast receiver for keyboard events.
+    pub event_broadcast_receiver: async_broadcast::InactiveReceiver<Event>,
 }
 
 impl Window {
@@ -112,15 +172,26 @@ impl Window {
         }
     }
 
-    /// Submits a frame to the render task. This will in turn call the prepare()
-    /// and render() functions of all renderables in the frame.
-    /// This will block until the frame has been consumed by the render task.
-    pub fn present(&mut self, frame: &Frame) {
-        let win_state = &mut self.state;
+    /// Resizes the window's surface to the given size.
+    pub fn resize(&self, size: impl Into<PixelSize>) {
+        let size = size.into();
+        let mut gpu_state = self.gpu_state.lock().unwrap();
+        let mut win_state = self.state.lock().unwrap();
+
+        win_state.resize(size, &mut gpu_state);
+    }
+
+    /// Present a frame on the window.
+    pub fn present(&self, frame: &mut Frame) {
+        // lock the gpu state and window state
         let gpu_state = &mut self.gpu_state.lock().unwrap();
+        let mut win_state = &mut self.state.lock().unwrap();
 
         let device = &gpu_state.device;
         let queue = &gpu_state.queue;
+        let width = win_state.size.width;
+        let height = win_state.size.height;
+
         let config = &win_state.config;
 
         let suface_texture = win_state
@@ -131,14 +202,21 @@ impl Window {
         let width = suface_texture.texture.size().width;
         let height = suface_texture.texture.size().height;
 
-        let view = suface_texture.texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(wgpu::TextureFormat::Bgra8Unorm),
+        let texture = win_state.wgpu_renderer.texture();
+
+        win_state
+            .renderer
+            .render_to_texture(device, queue, texture, width, height, &mut frame.scene);
+
+        let surface_texture_view = suface_texture.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(config.format),
             ..wgpu::TextureViewDescriptor::default()
         });
 
-        &win_state
-            .renderer
-            .render_to_surface2(device, queue, &suface_texture, &frame.scene);
+        // render the texture to the surface
+        win_state
+            .wgpu_renderer
+            .render_to_texture(device, queue, &surface_texture_view);
 
         // present the frame
         suface_texture.present();
@@ -149,20 +227,22 @@ impl Window {
     }
 
     /// Set the visibility of the mouse cursor.
-    pub fn set_cursor_visible(&mut self, visible: bool) {
-        let window = &self.state.winit_window;
-        window.set_cursor_visible(false);
-        self.mouse_cursor_visible = visible;
+    pub fn set_cursor_visible(&self, visible: bool) {
+        let mut win_state = self.state.lock().unwrap();
+        win_state.mouse_cursor_visible = visible;
+        win_state.winit_window.set_cursor_visible(false);
     }
 
     /// Returns true if the mouse cursor is currently visible.
     pub fn cursor_visible(&self) -> bool {
-        return self.mouse_cursor_visible;
+        let win_state = &self.state.lock().unwrap();
+        win_state.mouse_cursor_visible
     }
 
     /// Returns the mouse position. None if cursor not in window.
     pub fn mouse_position(&self) -> Option<(Size, Size)> {
-        return self.mouse_position.clone();
+        let win_state = &self.state.lock().unwrap();
+        win_state.mouse_position.clone()
     }
 
     /// Returns the 4x4 matrix than when applied to pixel coordinates will transform
@@ -180,108 +260,83 @@ impl Window {
     }
 
     /// Returns the size of the window in pixels.
-    pub fn size(&self) -> (u32, u32) {
-        let props = self.physical_properties;
-        (props.width, props.height)
-    }
-}
-
-#[pyclass(name = "Window")]
-#[derive(Debug, Clone)]
-pub struct WrappedWindow(pub(crate) Arc<Mutex<Window>>);
-
-impl WrappedWindow {
-    pub fn new(window: Window) -> Self {
-        Self(Arc::new(Mutex::new(window)))
+    pub fn size(&self) -> PixelSize {
+        let win_state = &self.state.lock().unwrap();
+        win_state.size
     }
 
-    pub fn winit_id(&self) -> WindowId {
-        self.inner().winit_id
-    }
-
-    pub fn inner(&self) -> MutexGuard<'_, Window> {
-        self.0.lock().unwrap()
-    }
-
-    pub fn create_event_receiver(&self) -> EventReceiver {
-        self.inner().create_event_receiver()
-    }
-
-    pub fn present(&self, frame: &Frame) {
-        self.inner().present(frame)
-    }
-
-    pub fn close(&self) {
-        self.inner().close()
-    }
-
-    pub fn set_cursor_visible(&self, visible: bool) {
-        self.inner().set_cursor_visible(visible)
-    }
-
-    pub fn cursor_visible(&self) -> bool {
-        self.inner().cursor_visible()
-    }
-
-    pub fn mouse_position(&self) -> Option<(Size, Size)> {
-        self.inner().mouse_position()
-    }
-
-    pub fn transformation_matrix_to_ndc(width_px: u32, height_px: u32) -> nalgebra::Matrix3<f64> {
-        Window::transformation_matrix_to_ndc(width_px, height_px)
-    }
-
-    pub fn size(&self) -> (u32, u32) {
-        self.inner().size()
-    }
-
-    // Create a new frame with a black background.
+    /// Return a new frame for the window.
     pub fn get_frame(&self) -> Frame {
-        // check if self.state is locked
-        let props = &self.inner().physical_properties;
-
-        let width = props.width;
-        let height = props.height;
-
-        let bg = super::color::LinRgba {
-            r: 0.5,
-            g: 0.5,
-            b: 0.5,
-            a: 1.0,
-        };
-        // create new scene
-        let mut scene = Scene::new(bg.into(), width, height);
-        let mut frame = Frame {
-            bg_color: bg,
+        let win_state = &self.state.lock().unwrap();
+        let scene = win_state
+            .renderer
+            .create_scene(win_state.size.width, win_state.size.height);
+        Frame {
+            bg_color: LinRgba::new(0.0, 0.0, 0.0, 1.0),
             scene,
             window: self.clone(),
+        }
+    }
+    fn remove_event_handler(&self, id: EventHandlerId) {
+        let mut state = self.state.lock().unwrap();
+        state.event_handlers.remove(&id);
+    }
+
+    fn dispatch_event(&self, event: Event) -> bool {
+        let mut handled = false;
+        let state = self.state.lock().unwrap();
+
+        let event_handlers = &state.event_handlers;
+
+        for (id, (kind, handler)) in event_handlers.iter() {
+            if kind == &event.kind() {
+                handled |= handler(event.clone());
+            }
+        }
+
+        handled
+    }
+
+    fn add_event_handler<F>(&self, kind: EventKind, handler: F) -> EventHandlerId
+    where
+        F: Fn(Event) -> bool + 'static + Send + Sync,
+    {
+        let mut state = self.state.lock().unwrap();
+        let mut event_handlers = &mut state.event_handlers;
+
+        // find a free id
+        let id = loop {
+            let id = rand::random::<EventHandlerId>();
+            if !event_handlers.contains_key(&id) {
+                break id;
+            }
         };
 
-        frame
+        // add handler
+        event_handlers.insert(id, (kind, Box::new(handler)));
+
+        id
     }
-    
-    fn get_frames(&self) -> FrameIterator {
-        FrameIterator {
-            window: self.clone(),
-        }
+
+    pub fn lock_state(&self) -> MutexGuard<WindowState> {
+        self.state.lock().unwrap()
     }
 }
 
 #[pymethods]
-impl WrappedWindow {
+impl Window {
     #[pyo3(name = "get_frame")]
     fn py_get_frame(&self, py: Python) -> Frame {
-        let f = self.get_frame();
-        f
+        self.get_frame()
     }
-    
+
     #[pyo3(name = "get_frames")]
     fn py_get_frames(&self, py: Python) -> FrameIterator {
-        self.get_frames()
+        todo!()
     }
 
     #[pyo3(name = "present")]
-    fn py_present(&self, frame: &Frame, py: Python) {
+    fn py_present(&self, frame: &mut Frame, py: Python) {
         self.present(frame);
     }
 
@@ -297,7 +352,7 @@ impl WrappedWindow {
 
     #[pyo3(name = "get_size")]
     fn py_get_size(&self, py: Python) -> (u32, u32) {
-        self.size()
+        self.size().into()
     }
 
     /// Add an event handler to the window. The event handler will be called
@@ -324,9 +379,10 @@ impl WrappedWindow {
 
         let self_wrapper = SendWrapper::new(self);
 
-        py.allow_threads(move || self_wrapper.add_event_handler(kind.into(), rust_callback_fn));
+        // TODO
+        // py.allow_threads(move || self_wrapper.add_event_handler(kind.into(), rust_callback_fn));
     }
-    
+
     /// Create a new EventReceiver that will receive events from the window.
     #[pyo3(name = "create_event_receiver")]
     fn py_create_event_receiver(&self) -> EventReceiver {
@@ -334,56 +390,12 @@ impl WrappedWindow {
     }
 }
 
-impl EventHandlingExt for WrappedWindow {
-    fn remove_event_handler(&self, id: EventHandlerId) {
-        self.inner().event_handlers.lock().unwrap().remove(&id);
-    }
-
-    fn dispatch_event(&self, event: Event) -> bool {
-        let mut handled = false;
-
-        let event_handlers = {
-            let c = self.inner().event_handlers.clone();
-            c
-        };
-        for (id, (kind, handler)) in event_handlers.lock().unwrap().iter() {
-            if kind == &event.kind() {
-                handled |= handler(event.clone());
-            }
-        }
-
-        return handled;
-    }
-
-    fn add_event_handler<F>(&self, kind: EventKind, handler: F) -> EventHandlerId
-    where
-        F: Fn(Event) -> bool + 'static + Send + Sync,
-    {
-        // find a free id
-        let id = loop {
-            let id = rand::random::<EventHandlerId>();
-            if !self.inner().event_handlers.lock().unwrap().contains_key(&id) {
-                break id;
-            }
-        };
-
-        // add handler
-        self.inner()
-            .event_handlers
-            .lock()
-            .unwrap()
-            .insert(id, (kind, Box::new(handler)));
-
-        return id;
-    }
-}
-
 /// FrameIterator is an iterator that yields frames.
 #[derive(Debug, Clone)]
-#[pyclass]
+#[pyclass(unsendable)]
 pub struct FrameIterator {
     /// The window that the frames are associated with.
-    window: WrappedWindow,
+    window: Window,
 }
 
 #[pymethods]
@@ -391,13 +403,12 @@ impl FrameIterator {
     fn __iter__(slf: PyRef<Self>) -> PyResult<Py<FrameIterator>> {
         Ok(slf.into())
     }
-    
+
     fn __next__(mut slf: PyRefMut<Self>) -> PyResult<Option<Frame>> {
         let frame = slf.window.get_frame();
         Ok(Some(frame))
     }
 }
-
 
 #[derive(Dbg)]
 #[pyclass]
@@ -405,9 +416,9 @@ impl FrameIterator {
 pub struct Frame {
     pub bg_color: super::color::LinRgba,
     #[dbg(placeholder = "...")]
-    scene: VelloScene,
+    scene: DynamicScene,
     /// The window that the frame is associated with.
-    window: WrappedWindow,
+    window: Window,
 }
 
 impl Frame {
@@ -417,11 +428,30 @@ impl Frame {
     }
 
     /// Draw onto the frame.
-    pub fn draw(&mut self, stimulus: WrappedStimulus) {
+    pub fn draw(&mut self, stimulus: &DynamicStimulus) {
+        let mut stimulus = stimulus.lock();
+
         let now = Instant::now();
-        let mut stimulus = stimulus.lock().unwrap();
-        stimulus.update_animations(now, &self.window.inner());
-        stimulus.draw(&mut self.scene, &self.window.inner());
+
+        {
+            // this needs to be scoped so that the mutable borrow of self is released
+            let window_state = self.window.state.lock().unwrap();
+            stimulus.update_animations(now, &window_state);
+        }
+
+        stimulus.draw(self);
+    }
+
+    pub fn window(&self) -> Window {
+        self.window.clone()
+    }
+
+    pub fn scene(&self) -> &DynamicScene {
+        &self.scene
+    }
+
+    pub fn scene_mut(&mut self) -> &mut DynamicScene {
+        &mut self.scene
     }
 }
 
@@ -429,7 +459,7 @@ impl Frame {
 impl Frame {
     #[pyo3(name = "draw")]
     fn py_draw(&mut self, stimulus: crate::visual::stimuli::PyStimulus) {
-        self.draw(stimulus.0);
+        self.draw(stimulus.as_super());
     }
 
     #[getter(bg_color)]

@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     prelude::{Size, Transformation2D},
-    visual::window::Window,
+    visual::window::PsybeeWindow,
 };
 
 use psybee_proc::StimulusParams;
@@ -62,12 +62,10 @@ pub struct VideoStimulus {
 
 impl VideoStimulus {
     pub fn from_path(path: &str, params: VideoParams) -> Self {
-
         let (status_tx, status_rx) = std::sync::mpsc::channel();
         let buffer = Arc::new(Mutex::new(None));
         let pipeline = Self::create_pipeline(path, status_tx, buffer.clone()).unwrap();
         Self::start_pipeline(pipeline.clone());
-
 
         Self {
             id: Uuid::new_v4(),
@@ -83,7 +81,6 @@ impl VideoStimulus {
 
             params,
         }
-
     }
 
     pub fn is_playing(&self) -> bool {
@@ -99,7 +96,6 @@ impl VideoStimulus {
     }
 
     pub fn seek(&self, to: f64, accurate: bool, flush: bool, block: bool) {
-
         // combine the flags
         let mut flags = gstreamer::SeekFlags::empty();
         if accurate {
@@ -109,19 +105,24 @@ impl VideoStimulus {
             flags |= gstreamer::SeekFlags::FLUSH;
         }
 
-        self.pipeline.seek_simple(
-            flags,
-            gstreamer::ClockTime::from_seconds(to as u64),
-        ).expect("Failed to seek in video pipeline");
+        self.pipeline
+            .seek_simple(flags, gstreamer::ClockTime::from_seconds(to as u64))
+            .expect("Failed to seek in video pipeline");
 
         // if block is true, block until the seek is done
         if block {
-            self.pipeline.state(gstreamer::ClockTime::from_seconds(5)).0.expect("Failed to block until seek is done");
+            self.pipeline
+                .state(gstreamer::ClockTime::from_seconds(5))
+                .0
+                .expect("Failed to block until seek is done");
         }
     }
 
-
-    fn create_pipeline(path: &str, status_tx: std::sync::mpsc::Sender<VideoState>, buffer: Arc<Mutex<Option<renderer::image::RgbImage>>>) -> Result<gstreamer::Pipeline, Error> {
+    fn create_pipeline(
+        path: &str,
+        status_tx: std::sync::mpsc::Sender<VideoState>,
+        buffer: Arc<Mutex<Option<renderer::image::RgbImage>>>,
+    ) -> Result<gstreamer::Pipeline, Error> {
         gstreamer::init()?;
 
         let pipeline = gstreamer::Pipeline::default();
@@ -147,10 +148,10 @@ impl VideoStimulus {
                     let sample = appsink.pull_sample().map_err(|_| gstreamer::FlowError::Eos)?;
                     let gst_buffer = sample.buffer().ok_or_else(|| {
                         element_error!(
-                        appsink,
-                        gstreamer::ResourceError::Failed,
-                        ("Failed to get buffer from appsink")
-                    );
+                            appsink,
+                            gstreamer::ResourceError::Failed,
+                            ("Failed to get buffer from appsink")
+                        );
 
                         gstreamer::FlowError::Error
                     })?;
@@ -161,7 +162,6 @@ impl VideoStimulus {
                     let height = structure.get::<i32>("height").expect("height in caps");
                     let time = gst_buffer.pts().expect("timestamp").useconds() as f64 / 1_000_000.0;
 
-
                     // At this point, buffer is only a reference to an existing memory region somewhere.
                     // When we want to access its content, we have to map it while requesting the required
                     // mode of access (read, read/write).
@@ -171,25 +171,23 @@ impl VideoStimulus {
                     // See: https://gstreamer.freedesktop.org/documentation/plugin-development/advanced/allocation.html
                     let map = gst_buffer.map_readable().map_err(|_| {
                         element_error!(
-                        appsink,
-                        gstreamer::ResourceError::Failed,
-                        ("Failed to map buffer readable")
-                    );
+                            appsink,
+                            gstreamer::ResourceError::Failed,
+                            ("Failed to map buffer readable")
+                        );
 
                         gstreamer::FlowError::Error
                     })?;
-
 
                     let samples = map.as_slice_of::<u8>().map_err(|_| {
                         element_error!(
-                        appsink,
-                        gstreamer::ResourceError::Failed,
-                        ("Failed to interpret buffer as array of u8")
-                    );
+                            appsink,
+                            gstreamer::ResourceError::Failed,
+                            ("Failed to interpret buffer as array of u8")
+                        );
 
                         gstreamer::FlowError::Error
                     })?;
-
 
                     let new_buffer = renderer::image::RgbImage::from_raw(width as u32, height as u32, samples.to_vec())
                         .expect("Failed to create image buffer from raw data");
@@ -201,12 +199,10 @@ impl VideoStimulus {
                     // send the status (playing) to the channel
                     status_tx.send(VideoState::Playing(time)).unwrap();
 
-
                     Ok(gstreamer::FlowSuccess::Ok)
                 })
                 .build(),
         );
-
 
         pipeline.add_many([&src, &decodebin])?;
         src.link(&decodebin)?;
@@ -232,7 +228,6 @@ impl VideoStimulus {
                 return;
             };
 
-
             // Try to detect whether the raw stream decodebin provided us with
             // just now is either audio or video (or none of both, e.g. subtitles).
             let (is_audio, is_video) = {
@@ -246,17 +241,16 @@ impl VideoStimulus {
                 match media_type {
                     None => {
                         element_warning!(
-                        dbin,
-                        gstreamer::CoreError::Negotiation,
-                        ("Failed to get media type from pad {}", src_pad.name())
-                    );
+                            dbin,
+                            gstreamer::CoreError::Negotiation,
+                            ("Failed to get media type from pad {}", src_pad.name())
+                        );
 
                         return;
                     }
                     Some(media_type) => media_type,
                 }
             };
-
 
             let insert_sink = |is_audio, is_video| -> Result<(), Error> {
                 if is_audio {
@@ -314,9 +308,7 @@ impl VideoStimulus {
     fn start_pipeline(pipeline: gstreamer::Pipeline) {
         // pipeline.set_state(gstreamer::State::Playing).unwrap();
 
-        let bus = pipeline
-            .bus()
-            .expect("Pipeline without bus. Shouldn't happen!");
+        let bus = pipeline.bus().expect("Pipeline without bus. Shouldn't happen!");
 
         std::thread::spawn(move || {
             for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
@@ -326,19 +318,19 @@ impl VideoStimulus {
                     MessageView::Eos(..) => break,
                     MessageView::Error(err) => {
                         pipeline.set_state(gstreamer::State::Null).unwrap();
-                        println!("Error from element {}: {}",
-                                 msg.src().map(|s| s.path_string()).as_deref().unwrap_or("None"),
-                                 err.error().to_string());
+                        println!(
+                            "Error from element {}: {}",
+                            msg.src().map(|s| s.path_string()).as_deref().unwrap_or("None"),
+                            err.error().to_string()
+                        );
                     }
                     _ => (),
                 }
             }
 
             pipeline.set_state(gstreamer::State::Null).unwrap();
-
         });
     }
-
 }
 
 #[derive(Debug, Clone)]
@@ -389,7 +381,6 @@ impl PyVideoStimulus {
         downcast_stimulus!(slf, VideoStimulus).pause();
     }
 
-
     #[pyo3(signature = (to, accurate = true, flush = true, block = true))]
     fn seek(mut slf: PyRef<'_, Self>, to: f64, accurate: bool, flush: bool, block: bool) {
         downcast_stimulus!(slf, VideoStimulus).seek(to, accurate, flush, block);
@@ -403,7 +394,7 @@ impl Stimulus for VideoStimulus {
         self.id
     }
 
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, scene: &mut VelloScene, window: &PsybeeWindow) {
         if !self.visible {
             return;
         }
@@ -434,23 +425,21 @@ impl Stimulus for VideoStimulus {
                     new_frame = true;
                     self.last_frame_time = time;
                 }
-
             }
             Some(VideoState::Errored(msg)) => {
                 eprintln!("Error in video stimulus: {}", msg);
                 return;
             }
-            _ => {
-
-            }
-
+            _ => {}
         }
 
         if new_frame {
             let buffer = self.buffer.lock().unwrap();
             let image = buffer.as_ref().unwrap();
             let image = image.clone();
-            self.image = Some(super::WrappedImage::from_dynamic_image(renderer::image::DynamicImage::ImageRgb8(image)));
+            self.image = Some(super::WrappedImage::from_dynamic_image(
+                renderer::image::DynamicImage::ImageRgb8(image),
+            ));
         } else if self.image.is_none() {
             return;
         }

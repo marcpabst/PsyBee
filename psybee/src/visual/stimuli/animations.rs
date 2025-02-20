@@ -2,9 +2,11 @@ use std::time::Instant;
 
 use pyo3::{types::PyAnyMethods, Bound, FromPyObject, PyAny, PyResult};
 
-use crate::{prelude::Size, visual::window::Window};
-
 use super::{Stimulus, StimulusParamValue};
+use crate::visual::{
+    geometry::Size,
+    window::{Window, WindowState},
+};
 
 #[derive(FromPyObject, Debug, Clone)]
 pub enum Repeat {
@@ -134,7 +136,7 @@ impl Animation {
     }
 
     /// Returns the current value of the animated parameter at the specified time.
-    pub fn value(&self, time: Instant, window: &Window) -> StimulusParamValue {
+    pub fn value(&self, time: Instant, window_state: &WindowState) -> StimulusParamValue {
         if self.finished(time) {
             return self.to.clone();
         }
@@ -155,19 +157,22 @@ impl Animation {
                 }
             }
         };
-        
+
         let duration = self.duration;
         let easing = self.easing.clone();
         let from = self.from.clone();
         let to = self.to.clone();
+
+        let window_size = window_state.size;
+        let screen_props = window_state.physical_screen;
 
         match (from, to) {
             (StimulusParamValue::f64(f), StimulusParamValue::f64(t)) => {
                 StimulusParamValue::f64(Self::value_f64(f, t, elapsed, duration, easing))
             }
             (StimulusParamValue::Size(f), StimulusParamValue::Size(t)) => {
-                let f = f.eval(&window.physical_properties) as f64;
-                let t = t.eval(&window.physical_properties) as f64;
+                let f = f.eval(window_size, screen_props) as f64;
+                let t = t.eval(window_size, screen_props) as f64;
                 let value = Self::value_f64(f, t, elapsed, duration, easing);
                 StimulusParamValue::Size(Size::Pixels(value as f32))
             }

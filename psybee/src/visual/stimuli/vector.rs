@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     prelude::{Size, Transformation2D},
-    visual::window::Window,
+    visual::window::PsybeeWindow,
 };
 
 use psybee_proc::StimulusParams;
@@ -102,7 +102,7 @@ impl Stimulus for VectorStimulus {
         self.id
     }
 
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, scene: &mut VelloScene, window: &PsybeeWindow) {
         if !self.visible {
             return;
         }
@@ -118,12 +118,14 @@ impl Stimulus for VectorStimulus {
         let vector_width = self.vector.width;
         let vector_height = self.vector.height;
 
-        let transformation_mat :Affine = self.transformation.eval(&window.physical_properties).into();
+        let transformation_mat: Affine = self.transformation.eval(&window.physical_properties).into();
         let translation_mat = Affine::translate(x, y);
         let scale_mat = Affine::scale_xy(width / vector_width, height / vector_height);
 
         // set the transformation matrix
-        &self.vector.set_transform((scale_mat * translation_mat * transformation_mat).into());
+        &self
+            .vector
+            .set_transform((scale_mat * translation_mat * transformation_mat).into());
 
         scene.draw(&self.vector);
     }

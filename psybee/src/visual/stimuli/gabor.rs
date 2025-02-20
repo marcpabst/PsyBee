@@ -1,20 +1,23 @@
 use std::sync::Arc;
 
-
+use psybee_proc::StimulusParams;
+use pyo3::{pyclass, pymethods};
+use renderer::{
+    affine::Affine,
+    brushes::{Brush, Extend, Gradient, GradientKind},
+    colors::RGBA,
+    shapes::{Point, Shape},
+    styles::BlendMode,
+};
+use uuid::Uuid;
 
 use super::{
     animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
-    WrappedStimulus,
 };
-use crate::{
-    prelude::{Size, Transformation2D},
-    visual::window::Window,
+use crate::visual::{
+    geometry::{Anchor, Size, Transformation2D},
+    window::Frame,
 };
-
-use psybee_proc::StimulusParams;
-use pyo3::{exceptions::PyValueError, prelude::*};
-use renderer::prelude::*;
-use uuid::Uuid;
 
 pub enum Pattern {
     Sine,
@@ -44,6 +47,7 @@ pub struct GaborStimulus {
     gaussian_colors: Option<Vec<RGBA>>,
 
     transformation: Transformation2D,
+    anchor: Anchor,
     animations: Vec<Animation>,
     visible: bool,
 }
@@ -57,18 +61,20 @@ impl GaborStimulus {
         phase: f64,
         sigma: Size,
         orientation: f64,
+        anchor: Anchor,
     ) -> Self {
-        let gaussian_colors: Vec<RGBA> = (0..256)
+        let gaussian_colors: Vec<RGBA> = (0..128)
             .map(|i| {
                 let sigma: f32 = 0.25;
                 // we need a Gaussian function scaled to values between 0 and 1
                 // i.e., f(x) = exp(-x^2 / (2 * sigma^2))
-                let x = (i as f32 / 256.0);
+                let x = (i as f32 / 128.0);
                 let t = (-x.powi(2) / (2.0 * sigma.powi(2))).exp();
+
                 RGBA {
-                    r: 1.0,
-                    g: 1.0,
-                    b: 1.0,
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
                     a: t,
                 }
             })
@@ -77,6 +83,7 @@ impl GaborStimulus {
         Self {
             id: Uuid::new_v4(),
             transformation: crate::visual::geometry::Transformation2D::Identity(),
+            anchor,
             animations: Vec::new(),
             visible: true,
 
@@ -89,7 +96,7 @@ impl GaborStimulus {
                 sigma,
                 orientation,
             },
-            pattern_colors: Self::create_square_colors(256),
+            pattern_colors: Self::create_sine_colors(256),
             gaussian_colors: Some(gaussian_colors),
         }
     }
@@ -141,7 +148,8 @@ impl PyGaborStimulus {
         cycle_lenght,
         sigma,
         phase = 0.0,
-        orientation = 0.0
+        orientation = 0.0,
+        anchor = Anchor::Center
     ))]
     fn __new__(
         cx: IntoSize,
@@ -151,10 +159,11 @@ impl PyGaborStimulus {
         sigma: IntoSize,
         phase: f64,
         orientation: f64,
+        anchor: Anchor,
     ) -> (Self, PyStimulus) {
         (
             Self(),
-            PyStimulus(Arc::new(std::sync::Mutex::new(GaborStimulus::new(
+            PyStimulus::new(GaborStimulus::new(
                 cx.into(),
                 cy.into(),
                 radius.into(),
@@ -162,7 +171,8 @@ impl PyGaborStimulus {
                 phase,
                 sigma.into(),
                 orientation,
-            )))),
+                anchor,
+            )),
         )
     }
 }
@@ -174,19 +184,32 @@ impl Stimulus for GaborStimulus {
         self.id
     }
 
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, frame: &mut Frame) {
         if !self.visible {
             return;
         }
 
-        // convert physical units to pixels
-        let radius = self.params.radius.eval(&window.physical_properties);
-        let sigma = self.params.sigma.eval(&window.physical_properties);
-        let cycle_length = self.params.cycle_length.eval(&window.physical_properties) as f64;
-        let pos_x = self.params.cx.eval(&window.physical_properties) as f64;
-        let pos_y = self.params.cy.eval(&window.physical_properties) as f64;
+        let window = frame.window();
+        let window_state = window.lock_state();
+        let window_size = window_state.size;
+        let screen_props = window_state.physical_screen;
 
-        let trans_mat = self.transformation.eval(&window.physical_properties);
+        let mut scene = frame.scene_mut();
+
+        // convert physical units to pixels
+        let radius = self.params.radius.eval(window_size, screen_props) as f64;
+        let sigma = self.params.sigma.eval(window_size, screen_props);
+        let cycle_length = self.params.cycle_length.eval(window_size, screen_props) as f64;
+        let pos_x = self.params.cx.eval(window_size, screen_props) as f64;
+        let pos_y = self.params.cy.eval(window_size, screen_props) as f64;
+
+        // apply the anchor
+        let bb_width = radius * 2.0;
+        let bb_height = radius * 2.0;
+        let (pos_x, pos_y) = self.anchor.to_center(pos_x, pos_y, bb_width, bb_height);
+        println!("Anchor: {:?} -> ({}, {})", self.anchor, pos_x, pos_y);
+
+        let trans_mat = self.transformation.eval(window_size, screen_props);
 
         // convert phase into the range [0, 1] (from [0, 2π])
         let phase = self.params.phase % (2.0 * std::f64::consts::PI);
@@ -195,63 +218,52 @@ impl Stimulus for GaborStimulus {
         // transform for the brush
         let grating_transform = Affine::rotate_at(self.params.orientation, pos_x, pos_y);
 
-        let sine_grating = Geom {
-            style: Style::Fill(FillStyle::NonZero),
-            shape: Circle {
-                center: Point { x: pos_x, y: pos_y },
-                radius: radius as f64,
-            },
-            brush: Brush::Gradient(Gradient::new_equidistant(
-                Extend::Repeat,
-                GradientKind::Linear {
-                    start: Point {
-                        x: pos_x + transl_x,
-                        y: pos_y,
-                    },
-                    end: Point {
-                        x: pos_x + cycle_length + transl_x,
-                        y: pos_y,
-                    },
-                },
-                &self.pattern_colors,
-            )),
-            transform: Affine::identity(),
-            brush_transform: Some(grating_transform),
-        };
+        let grating_shape = Shape::circle(Point { x: pos_x, y: pos_y }, radius);
 
-        let gaussian = Geom {
-            style: Style::Fill(FillStyle::NonZero),
-            shape: Circle {
-                center: Point { x: pos_x, y: pos_y },
-                radius: radius as f64,
-            },
-            brush: Brush::Gradient(Gradient::new_equidistant(
-                Extend::Pad,
-                GradientKind::Radial {
-                    start_center: Point { x: pos_x, y: pos_y },
-                    start_radius: 0.0,
-                    end_center: Point { x: pos_x, y: pos_y },
-                    end_radius: sigma,
+        let grating_brush = Brush::Gradient(Gradient::new_equidistant(
+            Extend::Repeat,
+            GradientKind::Linear {
+                start: Point {
+                    x: pos_x + transl_x,
+                    y: pos_y,
                 },
-                &self.gaussian_colors.as_deref().unwrap(),
-            )),
-            transform: Affine::identity(),
-            brush_transform: None,
-        };
+                end: Point {
+                    x: pos_x + cycle_length + transl_x,
+                    y: pos_y,
+                },
+            },
+            &self.pattern_colors,
+        ));
 
-        scene.draw_alpha_mask(
-            |scene| {
-                scene.draw(sine_grating);
-            },
-            |scene| {
-                scene.draw(gaussian);
-            },
-            Circle {
+        let gaussian_shape = Shape::circle(Point { x: pos_x, y: pos_y }, radius + 1.0);
+
+        let gaussian_brush = Brush::Gradient(Gradient::new_equidistant(
+            Extend::Pad,
+            GradientKind::Radial {
                 center: Point { x: pos_x, y: pos_y },
-                radius: radius as f64,
+                radius: (radius as f32),
             },
-            Affine::identity(),
+            self.gaussian_colors.as_deref().unwrap(),
+        ));
+
+        let transform = self.transformation.eval(window_size, screen_props);
+
+        scene.start_layer(BlendMode::SourceOver, gaussian_shape, Some(transform.into()), None, 1.0);
+        scene.draw_shape_fill(
+            gaussian_shape,
+            gaussian_brush,
+            Some(transform.into()),
+            Some(BlendMode::SourceOver),
         );
+        scene.draw_shape_fill(
+            grating_shape,
+            grating_brush,
+            Some(transform.into()),
+            Some(BlendMode::SourceIn),
+        );
+        scene.end_layer();
+
+        // println!("Gaussian colors: {:?}", self.gaussian_colors);
     }
 
     fn set_visible(&mut self, visible: bool) {
@@ -282,26 +294,26 @@ impl Stimulus for GaborStimulus {
         self.transformation.clone()
     }
 
-    fn contains(&self, x: Size, y: Size, window: &WrappedWindow) -> bool {
-        let window = window.inner();
-        let cx = self.params.cx.eval(&window.physical_properties);
-        let cy = self.params.cy.eval(&window.physical_properties);
-        let radius = self.params.radius.eval(&window.physical_properties);
-        let trans_mat = self.transformation.eval(&window.physical_properties);
+    fn contains(&self, x: Size, y: Size, window: &Window) -> bool {
+        // let cx = self.params.cx.eval(&window.physical_properties);
+        // let cy = self.params.cy.eval(&window.physical_properties);
+        // let radius = self.params.radius.eval(&window.physical_properties);
+        // let trans_mat = self.transformation.eval(&window.physical_properties);
 
-        let x = x.eval(&window.physical_properties);
-        let y = y.eval(&window.physical_properties);
+        // let x = x.eval(&window.physical_properties);
+        // let y = y.eval(&window.physical_properties);
 
-        // apply transformation by multiplying the point with the transformation matrix
-        let p = nalgebra::Vector3::new(x, y, 1.0);
-        let p_new = trans_mat * p;
+        // // apply transformation by multiplying the point with the transformation matrix
+        // let p = nalgebra::Vector3::new(x, y, 1.0);
+        // let p_new = trans_mat * p;
 
-        // check if the point is inside the circle
-        let dx = p_new[0] - cx;
-        let dy = p_new[1] - cy;
-        let distance = (dx * dx + dy * dy).sqrt();
+        // // check if the point is inside the circle
+        // let dx = p_new[0] - cx;
+        // let dy = p_new[1] - cy;
+        // let distance = (dx * dx + dy * dy).sqrt();
 
-        distance <= radius
+        // distance <= radius
+        false
     }
 
     fn get_param(&self, name: &str) -> Option<StimulusParamValue> {

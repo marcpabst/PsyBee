@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
-use pyo3::pyclass;
-use pyo3::pymethods;
+use pyo3::{pyclass, pymethods};
 use strum::EnumString;
 use web_time::SystemTime;
 use winit::event as winit_event;
@@ -17,9 +16,7 @@ pub use winit::keyboard::KeyCode as Key;
 ))]
 use winit::platform::scancode::PhysicalKeyExtScancode;
 
-use crate::visual::geometry::Size;
-use crate::visual::window::Window;
-use crate::visual::window::WrappedWindow;
+use crate::visual::{geometry::Size, window::Window};
 
 // pub mod video;
 
@@ -42,7 +39,7 @@ pub enum MouseButton {
 }
 
 #[derive(Debug, Clone, enum_fields::EnumFields, strum::EnumDiscriminants)]
-#[pyclass]
+#[pyclass(unsendable)]
 #[strum_discriminants(name(EventKind))]
 #[strum_discriminants(derive(EnumString))]
 pub enum Event {
@@ -74,8 +71,8 @@ pub enum Event {
         button: MouseButton,
         /// The position of the mouse cursor when the button was pressed.
         position: (Size, Size),
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
     },
 
     /// A mouse button release event. This is triggered when a mouse button is
@@ -87,8 +84,8 @@ pub enum Event {
         button: MouseButton,
         /// The position of the mouse cursor when the button was released.
         position: (Size, Size),
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
     },
     /// A touch start event. This is triggered when a touch screen is touched.
     TouchStart {
@@ -96,8 +93,8 @@ pub enum Event {
         timestamp: SystemTime,
         /// The position of the touch.
         position: (Size, Size),
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
         /// The id of the touch (if available).
         id: Option<u64>,
     },
@@ -107,8 +104,8 @@ pub enum Event {
         timestamp: SystemTime,
         /// The position of the touch.
         position: (Size, Size),
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
         /// The id of the touch (if available).
         id: Option<u64>,
     },
@@ -119,8 +116,8 @@ pub enum Event {
         timestamp: SystemTime,
         /// The position of the touch.
         position: (Size, Size),
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
         /// The id of the touch (if available).
         id: Option<u64>,
     },
@@ -131,8 +128,8 @@ pub enum Event {
         timestamp: SystemTime,
         /// The position of the touch.
         position: (Size, Size),
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
         /// The id of the touch (if available).
         id: Option<u64>,
     },
@@ -140,15 +137,15 @@ pub enum Event {
     FocusGained {
         /// Timestamp of the event.
         timestamp: SystemTime,
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
     },
     /// The window has gained focus.
     FocusLost {
         /// Timestamp of the event.
         timestamp: SystemTime,
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
     },
     /// The mouse cursor was moved.
     CursorMoved {
@@ -156,22 +153,22 @@ pub enum Event {
         timestamp: SystemTime,
         /// The position of the cursor.
         position: (Size, Size),
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
     },
     /// The mouse cursor was entered into the window.
     CursorEntered {
         /// Timestamp of the event.
         timestamp: SystemTime,
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
     },
     /// The mouse cursor was exited from the window.
     CursorExited {
         /// Timestamp of the event.
         timestamp: SystemTime,
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
     },
     /// A pressure-sensitive touchpad was pressed (if available).
     TouchpadPress {
@@ -181,8 +178,8 @@ pub enum Event {
         pressure: f32,
         /// The level of the touch.
         stage: i64,
-        /// The WrappedWindow that the event was triggered on.
-        window: WrappedWindow,
+        /// The Window that the event was triggered on.
+        window: Window,
     },
     /// The mouse wheel was scrolled (or the equivalent touchpad gesture).
     MouseWheel {
@@ -242,27 +239,29 @@ impl Event {
 
     #[getter]
     #[pyo3(name = "window")]
-    fn py_window(&self) -> Option<WrappedWindow> {
+    fn py_window(&self) -> Option<Window> {
         self.window().cloned()
     }
-    
+
     #[getter]
     #[pyo3(name = "key")]
-    fn py_key(&self) -> Option<String> { self.key().cloned() }
+    fn py_key(&self) -> Option<String> {
+        self.key().cloned()
+    }
 }
 
 // Custom conversion from winit events to InputEvents.
 pub(crate) trait EventTryFrom<T>: Sized {
     type Error;
 
-    fn try_from_winit(value: T, window: &WrappedWindow) -> Result<Self, Self::Error>;
+    fn try_from_winit(value: T, window: &Window) -> Result<Self, Self::Error>;
 }
 
 /// Convert a winit WindowEvent to an InputEvent.
 impl EventTryFrom<winit_event::WindowEvent> for Event {
     type Error = &'static str;
 
-    fn try_from_winit(event: winit_event::WindowEvent, window: &WrappedWindow) -> Result<Self, Self::Error> {
+    fn try_from_winit(event: winit_event::WindowEvent, window: &Window) -> Result<Self, Self::Error> {
         let timestamp = SystemTime::now();
         let data = match event {
             // match keyboad events
@@ -291,12 +290,12 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
 
                 match event.state {
                     winit_event::ElementState::Pressed => Event::KeyPress {
-                        timestamp: timestamp,
+                        timestamp,
                         key: key_str.to_string(),
                         code: key_code,
                     },
                     winit_event::ElementState::Released => Event::KeyRelease {
-                        timestamp: timestamp,
+                        timestamp,
                         key: key_str.to_string(),
                         code: key_code,
                     },
@@ -319,16 +318,16 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
 
                 let position = window
                     .mouse_position()
-                    .unwrap_or_else(|| (Size::Pixels(0.0), Size::Pixels(0.0)));
+                    .unwrap_or((Size::Pixels(0.0), Size::Pixels(0.0)));
                 match state {
                     winit_event::ElementState::Pressed => Event::MouseButtonPress {
-                        timestamp: timestamp,
+                        timestamp,
                         button,
                         position,
                         window: window.clone(),
                     },
                     winit_event::ElementState::Released => Event::MouseButtonRelease {
-                        timestamp: timestamp,
+                        timestamp,
                         button,
                         position,
                         window: window.clone(),
@@ -346,26 +345,26 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
                 // dispatch on TouchPhase
                 match touch.phase {
                     winit_event::TouchPhase::Started => Event::TouchStart {
-                        timestamp: timestamp,
-                        position: position,
+                        timestamp,
+                        position,
                         window: window.clone(),
                         id: Some(touch.id),
                     },
                     winit_event::TouchPhase::Moved => Event::TouchMove {
-                        timestamp: timestamp,
-                        position: position,
+                        timestamp,
+                        position,
                         window: window.clone(),
                         id: Some(touch.id),
                     },
                     winit_event::TouchPhase::Ended => Event::TouchEnd {
-                        timestamp: timestamp,
-                        position: position,
+                        timestamp,
+                        position,
                         window: window.clone(),
                         id: Some(touch.id),
                     },
                     winit_event::TouchPhase::Cancelled => Event::TouchCancel {
-                        timestamp: timestamp,
-                        position: position,
+                        timestamp,
+                        position,
                         window: window.clone(),
                         id: Some(touch.id),
                     },
@@ -392,7 +391,7 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
                     Size::Pixels(position.y as f32) - Size::ScreenHeight(0.5),
                 );
                 Event::CursorMoved {
-                    timestamp: timestamp,
+                    timestamp,
                     position,
                     window: window.clone(),
                 }
@@ -413,14 +412,14 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
                 pressure,
                 stage,
             } => Event::TouchpadPress {
-                timestamp: timestamp,
+                timestamp,
                 pressure,
-                stage: stage,
+                stage,
                 window: window.clone(),
             },
             // match any other event
             _ => Event::Other {
-                timestamp: timestamp,
+                timestamp,
                 name: format!("{:?}", event),
             },
         };
@@ -431,14 +430,14 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
 
 /// Receives physical input events.
 #[derive(Debug)]
-#[pyclass]
+#[pyclass(unsendable)]
 pub struct EventReceiver {
     pub(crate) receiver: async_broadcast::Receiver<Event>,
 }
 
 /// Contains a vector of events.
 #[derive(Debug, Clone)]
-#[pyclass]
+#[pyclass(unsendable)]
 pub struct EventVec(Vec<Event>);
 
 // convenience methods for KeyEventVec

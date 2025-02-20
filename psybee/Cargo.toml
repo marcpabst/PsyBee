@@ -30,14 +30,14 @@ crate-type = ["cdylib"]
 
 # General dependencies
 [dependencies]
+wgpu = { path = "../../wgpu/wgpu" }
 winapi = "0.3"
 serde = { version = "1.0", features = ["derive"] }
-wgpu = { version = "23" }
 renderer = { path = "../renderer" }
 psybee-proc = { path = "../psybee-proc" }
 
 raw-window-handle = "0.6"
-winit = { version = "0.29" }
+winit = "0.30.8"
 rand = "0.8.5"
 bytemuck = { version = "1.14.0", features = ["derive"] }
 nalgebra = "0.33.0"
@@ -89,6 +89,7 @@ gstreamer-app = { version = "0.23.3", optional = true }
 gstreamer-video = { version = "0.23.3", optional = true }
 tupleops = "0.1.1"
 anyhow = "1.0.93"
+pollster = "0.4.0"
 
 # MacOS dependencies
 [target.'cfg(target_os = "macos")'.dependencies]

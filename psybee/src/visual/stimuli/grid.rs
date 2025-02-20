@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
-use super::{animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams, WrappedStimulus};
+use super::{
+    animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
+    WrappedStimulus,
+};
 use crate::{
     prelude::{Size, Transformation2D},
-    visual::window::Window,
+    visual::window::PsybeeWindow,
 };
 use psybee_proc::StimulusParams;
 use pyo3::{exceptions::PyValueError, prelude::*};
@@ -51,12 +54,7 @@ impl GridStimulus {
     ) -> Self {
         Self {
             id: Uuid::new_v4(),
-            params: GridParams {
-                x,
-                y,
-                width,
-                height,
-            },
+            params: GridParams { x, y, width, height },
             transform,
             animations: Vec::new(),
             visible: true,
@@ -99,22 +97,21 @@ impl PyGridStimulus {
         anchor: (f64, f64),
         transform: Transformation2D,
     ) -> (Self, PyStimulus) {
-
         let elements = elements.into_iter().map(|e| e.0).collect();
-    (
-    Self(),
-    PyStimulus(Arc::new(std::sync::Mutex::new(GridStimulus::new(
-        elements,
-        x.into(),
-        y.into(),
-        width.into(),
-        height.into(),
-        cols,
-        rows,
-        anchor,
-        transform,
-    )))),
-    )
+        (
+            Self(),
+            PyStimulus(Arc::new(std::sync::Mutex::new(GridStimulus::new(
+                elements,
+                x.into(),
+                y.into(),
+                width.into(),
+                height.into(),
+                cols,
+                rows,
+                anchor,
+                transform,
+            )))),
+        )
     }
 }
 
@@ -133,7 +130,7 @@ impl Stimulus for GridStimulus {
         self.animations.push(animation);
     }
 
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, scene: &mut VelloScene, window: &PsybeeWindow) {
         // work out number of columns and rows if not specified
         // if only one is specified, calculate the other based on the number of elements
         // if neither are specified, calculate the number of columns based on the number of elements,
@@ -141,13 +138,11 @@ impl Stimulus for GridStimulus {
         let cols = self.cols.unwrap_or_else(|| {
             self.rows
                 .map(|r| (self.elements.len() as f64 / r as f64).ceil() as usize)
-                .unwrap_or_else(|| {
-                    (self.elements.len() as f64).sqrt().ceil() as usize
-                })
+                .unwrap_or_else(|| (self.elements.len() as f64).sqrt().ceil() as usize)
         });
-        let rows = self.rows.unwrap_or_else(|| {
-            (self.elements.len() as f64 / cols as f64).ceil() as usize
-        });
+        let rows = self
+            .rows
+            .unwrap_or_else(|| (self.elements.len() as f64 / cols as f64).ceil() as usize);
 
         // calculate the width and height of each cell
         let cell_width = self.params.width.eval(&window.physical_properties) / cols as f32;
@@ -160,7 +155,7 @@ impl Stimulus for GridStimulus {
 
             let x = self.params.x.eval(&window.physical_properties) + col as f32 * cell_width;
             let y = self.params.y.eval(&window.physical_properties) + row as f32 * cell_height;
-        
+
             let mut stimulus = element.lock().unwrap();
             stimulus.draw(scene, window);
         }

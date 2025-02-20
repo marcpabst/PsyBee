@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     prelude::{Size, Transformation2D},
-    visual::window::Window,
+    visual::window::PsybeeWindow,
 };
 
 use psybee_proc::StimulusParams;
@@ -102,7 +102,7 @@ impl Stimulus for SpriteStimulus {
         self.id
     }
 
-    fn draw(&mut self, scene: &mut VelloScene, window: &Window) {
+    fn draw(&mut self, scene: &mut VelloScene, window: &PsybeeWindow) {
         if !self.visible {
             return;
         }

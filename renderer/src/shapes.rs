@@ -12,7 +12,16 @@ impl Into<Point> for (f64, f64) {
     }
 }
 
-#[derive(Debug, Clone)]
+impl Into<Point> for (f32, f32) {
+    fn into(self) -> Point {
+        Point {
+            x: self.0 as f64,
+            y: self.1 as f64,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum Shape {
     Circle {
         center: Point,
@@ -20,7 +29,8 @@ pub enum Shape {
     },
     Rectangle {
         a: Point,
-        b: Point,
+        w: f64,
+        h: f64,
     },
     RoundedRectangle {
         a: Point,
@@ -51,10 +61,7 @@ impl Shape {
         let a = topleft.into();
         let width = width;
         let height = height;
-        Self::Rectangle {
-            a,
-            b: (a.x + width, a.y + height).into(),
-        }
+        Self::Rectangle { a, w: width, h: height }
     }
 
     pub fn rounded_rectangle(topleft: impl Into<Point>, width: f64, height: f64, radius: f64) -> Self {

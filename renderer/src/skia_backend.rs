@@ -1,34 +1,31 @@
-use crate::affine::Affine;
-use crate::brushes::Extend;
-use crate::brushes::{Brush, Gradient, GradientKind};
-use crate::colors::RGBA;
-use crate::prelude::{BlendMode, DynamicFontFace, StrokeStyle};
-use crate::renderer::Renderer;
-use crate::scenes::Scene;
-use crate::shapes::Shape;
-use foreign_types_shared::ForeignType;
-use skia_safe::{PictureRecorder, SamplingOptions};
-use std::any::Any;
-use cosmic_text::fontdb::FaceInfo;
-use wgpu::{Device, Queue, Texture};
+use std::{any::Any, cell::RefCell};
 
+use cosmic_text::fontdb::FaceInfo;
+use foreign_types_shared::ForeignType;
 use skia_safe::{
     gpu::{self, mtl, SurfaceOrigin},
-    scalar, ColorType,
+    gradient_shader::{
+        linear as sk_linear, radial as sk_radial, sweep as sk_sweep, GradientShaderColors as SkGradientShaderColors,
+    },
+    image::Image as SkImage,
+    images::raster_from_data as sk_raster_from_data,
+    scalar, AlphaType as SkAlphaType, BlendMode as SkBlendMode, ColorSpace, ColorType, Font as SkFont, Matrix,
+    PictureRecorder, SamplingOptions, Typeface as SkTypeface,
 };
+use wgpu::{Device, Queue, Texture};
 
-use skia_safe::gradient_shader::linear as sk_linear;
-use skia_safe::gradient_shader::radial as sk_radial;
-use skia_safe::gradient_shader::sweep as sk_sweep;
-use skia_safe::image::Image as SkImage;
-use skia_safe::images::raster_from_data as sk_raster_from_data;
-use skia_safe::AlphaType as SkAlphaType;
-
-use skia_safe::BlendMode as SkBlendMode;
-
-use crate::bitmaps::{Bitmap, DynamicBitmap};
-use crate::styles::ImageFitMode;
-use skia_safe::gradient_shader::GradientShaderColors as SkGradientShaderColors;
+use crate::{
+    affine::Affine,
+    bitmaps::{Bitmap, DynamicBitmap},
+    brushes::{Brush, Extend, Gradient, GradientKind, ImageSampling},
+    colors::RGBA,
+    prelude::{BlendMode, DynamicFontFace, Glyph, StrokeStyle},
+    renderer::Renderer,
+    scenes::Scene,
+    shapes::{Point, Shape},
+    styles::ImageFitMode,
+    text::Typeface,
+};
 
 #[derive(Debug)]
 pub struct SkiaScene {
@@ -39,15 +36,29 @@ pub struct SkiaScene {
 }
 
 pub struct SkiaRenderer {
-    context: gpu::DirectContext,
-    new_command_queue: metal::CommandQueue,
+    context: RefCell<gpu::DirectContext>,
+    font_manager: skia_safe::FontMgr,
+}
+
+impl Typeface for SkTypeface {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }
 
 impl SkiaScene {
     pub fn new(width: u32, height: u32) -> Self {
         let mut picture_recorder = PictureRecorder::new();
         let bounds = skia_safe::Rect::from_wh(width as f32, height as f32);
-        let _ = picture_recorder.begin_recording(bounds, None);
+        picture_recorder.begin_recording(bounds, None);
+
+        // clear the canvas
+        let canvas = picture_recorder.recording_canvas().unwrap();
+        canvas.clear(skia_safe::Color4f::new(1.0, 1.0, 1.0, 1.0));
 
         Self {
             picture_recorder,
@@ -65,8 +76,8 @@ impl SkiaScene {
         }
 
         match shape {
-            Shape::Rectangle { a, b } => {
-                let rect = skia_safe::Rect::from_xywh(a.x as f32, a.y as f32, b.x as f32, b.y as f32);
+            Shape::Rectangle { a, w, h } => {
+                let rect = skia_safe::Rect::from_xywh(a.x as f32, a.y as f32, w as f32, h as f32);
                 skia_canvas.draw_rect(rect, &skia_paint);
             }
             Shape::Circle { center, radius } => {
@@ -110,9 +121,15 @@ impl SkiaScene {
     }
 
     fn clip_shape(skia_canvas: &skia_safe::Canvas, skia_paint: skia_safe::Paint, shape: Shape, affine: Option<Affine>) {
+        // apply the affine transformation
+        if let Some(affine) = affine {
+            skia_canvas.save();
+            skia_canvas.concat(&affine.into());
+        }
+
         match shape {
-            Shape::Rectangle { a, b } => {
-                let rect = skia_safe::Rect::from_xywh(a.x as f32, a.y as f32, b.x as f32, b.y as f32);
+            Shape::Rectangle { a, w, h } => {
+                let rect = skia_safe::Rect::from_xywh(a.x as f32, a.y as f32, w as f32, h as f32);
                 skia_canvas.clip_rect(rect, skia_safe::ClipOp::Intersect, true);
             }
             Shape::Circle { center, radius } => {
@@ -122,6 +139,11 @@ impl SkiaScene {
             _ => {
                 todo!()
             }
+        }
+
+        // restore the canvas
+        if let Some(_) = affine {
+            skia_canvas.restore();
         }
     }
 }
@@ -171,7 +193,7 @@ impl Scene for SkiaScene {
         let mut layer_paint = skia_safe::Paint::default();
         layer_paint.set_alpha_f(alpha);
         layer_paint.set_blend_mode(composite_mode.into());
-        let mut save_layer_rec = skia_safe::canvas::SaveLayerRec::default();
+        let save_layer_rec = skia_safe::canvas::SaveLayerRec::default();
         let save_layer_rec = save_layer_rec.paint(&layer_paint);
 
         canvas.save_layer(&save_layer_rec);
@@ -227,11 +249,43 @@ impl Scene for SkiaScene {
 
         Self::draw_shape(&mut canvas, paint, shape, transform);
     }
+
+    fn draw_glyphs(
+        &mut self,
+        position: Point,
+        glyphs: &[Glyph],
+        font_face: &DynamicFontFace,
+        font_size: f32,
+        brush: Brush,
+        transform: Option<Affine>,
+        blend_mode: Option<BlendMode>,
+    ) {
+        // cast the font face to a skia font face
+        let skia_typeface = font_face.try_as::<SkTypeface>().unwrap();
+
+        // create a new skia font
+        let skia_font = SkFont::from_typeface(skia_typeface, font_size);
+
+        // create a new paint
+        let paint: skia_safe::Paint = brush.into();
+
+        // the origin of the text
+        let origin: skia_safe::Point = position.into();
+
+        // draw the glyphs
+        let canvas = self.picture_recorder.recording_canvas().unwrap();
+        let glyph_ids = glyphs.iter().map(|glyph| glyph.id).collect::<Vec<u16>>();
+        let glyph_positions: Vec<skia_safe::Point> = glyphs.into_iter().map(|glyph| glyph.position.into()).collect();
+        let glyph_positions = skia_safe::canvas::GlyphPositions::Points(&glyph_positions);
+        // let glyph_cluster_size: Vec<u32> = glyphs.into_iter().map(|glyph| glyph.end - glyph.start).collect();
+        // canvas.draw_glyphs_at(&glyph_ids, glyph_positions, origin, &skia_font, &paint);
+        canvas.draw_glyphs_at(&glyph_ids, glyph_positions, origin, &skia_font, &paint);
+    }
 }
 
 impl Renderer for SkiaRenderer {
     fn render_to_texture(
-        &mut self,
+        &self,
         device: &Device,
         queue: &Queue,
         texture: &Texture,
@@ -251,33 +305,32 @@ impl Renderer for SkiaRenderer {
             &texture_info,
         );
 
+        let mut skia_context = self.context.borrow_mut();
+
         // create a new skia surface
         let mut surface = unsafe {
             gpu::surfaces::wrap_backend_render_target(
-                &mut self.context,
+                &mut *skia_context,
                 &backend_render_target,
                 SurfaceOrigin::TopLeft,
-                ColorType::RGBA8888,
-                None,
+                ColorType::RGBAF16,
+                ColorSpace::new_srgb_linear(),
                 None,
             )
             .unwrap()
         };
 
-        // clear the surface
-        surface.canvas().clear(skia_safe::Color::BLACK);
-
-        let mut canvas = surface.canvas();
+        let canvas = surface.canvas();
 
         // try to downcast the scene to a SkiaScene
-        let mut skia_scene = scene.as_any_mut().downcast_mut::<SkiaScene>().unwrap();
+        let skia_scene = scene.as_any_mut().downcast_mut::<SkiaScene>().unwrap();
         let picture = skia_scene.picture_recorder.finish_recording_as_picture(None).unwrap();
 
         // draw the picture to the canvas
         canvas.draw_picture(&picture, None, None);
 
         // flush the surface
-        self.context.flush_and_submit();
+        skia_context.flush_and_submit();
     }
 
     fn create_scene(&self, width: u32, heigth: u32) -> Box<dyn Scene> {
@@ -306,32 +359,54 @@ impl Renderer for SkiaRenderer {
         DynamicBitmap(Box::new(image))
     }
 
-    fn load_font_face(&self, face_info: &FaceInfo) -> DynamicFontFace {
+    fn load_font_face(&mut self, face_info: &FaceInfo, font_data: &[u8], index: usize) -> DynamicFontFace {
         // load the font face using skia
-        todo!("load the font face using skia")
+        let typeface = self
+            .font_manager
+            .new_from_data(font_data, index)
+            .expect("Failed to load font face");
+        // let typeface = self.font_manager.n
+        return DynamicFontFace(Box::new(typeface));
     }
 }
 
 impl SkiaRenderer {
-    pub fn new(_width: u32, _heigth: u32, device: &Device) -> Self {
-        let command_queue = unsafe {
-            device
-                .as_hal::<wgpu::hal::api::Metal, _, _>(|device| device.unwrap().raw_device().lock().new_command_queue())
-        };
+    #[cfg(target_os = "macos")]
+    fn try_create_backend_metal(device: &Device, queue: &Queue) -> Option<mtl::BackendContext> {
+        let command_queue_ptr =
+            unsafe { queue.as_hal::<wgpu::hal::api::Metal, _, _>(|queue| queue.map(|s| s.as_raw().as_ptr())) };
 
-        let raw_device_ptr = unsafe {
-            device.as_hal::<wgpu::hal::api::Metal, _, _>(|device| {
-                device.unwrap().raw_device().lock().as_ptr() as mtl::Handle
-            })
-        };
+        if let Some(command_queue_ptr) = command_queue_ptr {
+            let raw_device_ptr = unsafe {
+                device.as_hal::<wgpu::hal::api::Metal, _, _>(|device| {
+                    device.map(|s| s.raw_device().lock().as_ptr() as mtl::Handle)
+                })
+            };
 
-        let backend = unsafe { mtl::BackendContext::new(raw_device_ptr, command_queue.as_ptr() as mtl::Handle) };
+            let backend =
+                unsafe { mtl::BackendContext::new(raw_device_ptr.unwrap(), command_queue_ptr as mtl::Handle) };
+
+            Some(backend)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn try_create_backend_dx12(&self, device: &Device, queue: &Queue) -> gpu::DirectContext {
+        todo!()
+    }
+
+    pub fn new(_width: u32, _heigth: u32, device: &Device, queue: &Queue) -> Self {
+        #[cfg(target_os = "macos")]
+        let backend = Self::try_create_backend_metal(device, queue).unwrap();
 
         let skia_context = gpu::direct_contexts::make_metal(&backend, None).unwrap();
+        let font_manager = skia_safe::FontMgr::new();
 
         Self {
-            context: skia_context,
-            new_command_queue: command_queue,
+            context: RefCell::new(skia_context),
+            font_manager,
         }
     }
 }
@@ -429,32 +504,35 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                     .expect("You're trying to use a non-skia image with a skia renderer");
 
                 let local_matrix = match fit_mode {
-                    ImageFitMode::Original => None,
+                    ImageFitMode::Original => Matrix::new_identity(),
                     ImageFitMode::Exact { width, height } => {
                         let scale_x = width / skia_image.width() as f32;
                         let scale_y = height / skia_image.height() as f32;
-                        Some(skia_safe::Matrix::scale((scale_x as scalar, scale_y as scalar)))
+                        let p: skia_safe::Vector = (*start).into();
+                        let mut mat = Matrix::translate((start.x as scalar, start.y as scalar));
+                        mat.post_scale((scale_x as scalar, scale_y as scalar), p);
+                        mat
                     }
                 };
 
-                // apply the transform
-                let local_matrix = match transform {
-                    None => local_matrix,
-                    Some(transform) => match local_matrix {
-                        Some(matrix) => {
-                            let mut new_matrix = matrix.clone();
-                            new_matrix.post_concat(&(*transform).into());
-                            Some(new_matrix)
-                        }
-                        None => Some((*transform).into()),
-                    },
+                // apply the start position
+                let delta: skia_safe::Vector = (*start).into();
+                // let local_matrix = Matrix::translate(delta);
+                //
+                let sampling_options = match sampling {
+                    ImageSampling::Nearest => {
+                        SamplingOptions::new(skia_safe::FilterMode::Nearest, skia_safe::MipmapMode::None)
+                    }
+                    ImageSampling::Linear => {
+                        SamplingOptions::new(skia_safe::FilterMode::Linear, skia_safe::MipmapMode::None)
+                    }
                 };
 
                 // create a shader from the image
                 let shader = skia_image.to_shader(
                     Some((edge_mode.0.into(), edge_mode.1.into())),
-                    SamplingOptions::default(),
-                    local_matrix.as_ref(),
+                    sampling_options,
+                    &local_matrix,
                 );
 
                 paint.set_shader(shader);
@@ -492,10 +570,19 @@ impl From<crate::shapes::Point> for skia_safe::Point {
 // convert Affine to skia matrix
 impl From<Affine> for skia_safe::Matrix {
     fn from(affine: Affine) -> Self {
-        let mut matrix = skia_safe::Matrix::default();
-        let scalar_array: [scalar; 6] = affine.0.map(|x| x as scalar);
-        matrix.set_affine(&scalar_array);
-        matrix
+        let mut sk_matrix = skia_safe::Matrix::default();
+        let nalgebra_matrix = affine.as_matrix();
+        // skia expects the matrix in column major order
+        let scalar_array: [scalar; 6] = [
+            nalgebra_matrix[(0, 0)] as scalar,
+            nalgebra_matrix[(1, 0)] as scalar,
+            nalgebra_matrix[(0, 1)] as scalar,
+            nalgebra_matrix[(1, 1)] as scalar,
+            nalgebra_matrix[(0, 2)] as scalar,
+            nalgebra_matrix[(1, 2)] as scalar,
+        ];
+        sk_matrix.set_affine(&scalar_array);
+        sk_matrix
     }
 }
 
@@ -536,9 +623,9 @@ impl From<&Shape> for skia_safe::Path {
     fn from(shape: &Shape) -> Self {
         let mut path = skia_safe::Path::new();
         match shape {
-            Shape::Rectangle { a, b } => {
+            Shape::Rectangle { a, w, h } => {
                 path.add_rect(
-                    skia_safe::Rect::from_xywh(a.x as scalar, a.y as scalar, b.x as scalar, b.y as scalar),
+                    skia_safe::Rect::from_xywh(a.x as scalar, a.y as scalar, *w as scalar, *h as scalar),
                     None,
                 );
             }
