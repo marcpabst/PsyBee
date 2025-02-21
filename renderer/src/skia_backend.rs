@@ -345,9 +345,6 @@ impl Renderer for SkiaRenderer {
         let (width, height) = rgba.dimensions();
         let buffer = rgba.into_raw();
 
-        // for debugging purposes, leak the buffer
-        std::mem::forget(buffer);
-
         // create a new skia image
         let image = sk_raster_from_data(
             &skia_safe::ImageInfo::new(
@@ -360,6 +357,9 @@ impl Renderer for SkiaRenderer {
             width as usize * 4,
         )
         .unwrap();
+
+        // for debugging purposes, leak the buffer
+        std::mem::forget(buffer);
 
         DynamicBitmap(Box::new(image))
     }
