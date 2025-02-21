@@ -25,7 +25,6 @@ pub mod app;
 pub mod audio;
 pub mod errors;
 pub mod input;
-pub mod options;
 pub mod utils;
 pub mod visual;
 

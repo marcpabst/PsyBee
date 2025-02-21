@@ -3,8 +3,6 @@ use std::ops::Deref;
 use pyo3::{pyclass, pymethods};
 use strum::EnumString;
 use web_time::SystemTime;
-use winit::event as winit_event;
-pub use winit::keyboard::KeyCode as Key;
 #[cfg(any(
     target_os = "windows",
     target_os = "macos",
@@ -15,6 +13,7 @@ pub use winit::keyboard::KeyCode as Key;
     target_os = "netbsd"
 ))]
 use winit::platform::scancode::PhysicalKeyExtScancode;
+use winit::{event as winit_event, keyboard::Key};
 
 use crate::visual::{geometry::Size, window::Window};
 
@@ -268,7 +267,13 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
             winit_event::WindowEvent::KeyboardInput {
                 device_id: _, event, ..
             } => {
-                let key_str = event.logical_key.to_text();
+                let key = event.logical_key;
+
+                let key_str = match key {
+                    Key::Named(key) => Some(format!("{:?}", key).to_string()),
+                    Key::Character(key) => Some(key.to_string()),
+                    _ => None,
+                };
 
                 let key_str = match key_str {
                     Some(key) => key,
@@ -469,6 +474,28 @@ impl EventVec {
     #[pyo3(name = "key_released")]
     pub fn py_key_released(&self, key: &str) -> bool {
         self.key_released(key)
+    }
+
+    /// Returns all pressed keys in the KeyEventVec.
+    #[pyo3(name = "keys_pressed")]
+    pub fn py_keys_pressed(&self) -> Vec<String> {
+        self.iter()
+            .filter_map(|event| match event {
+                Event::KeyPress { key, .. } => Some(key.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Returns all released keys in the KeyEventVec.
+    #[pyo3(name = "keys_released")]
+    pub fn py_keys_released(&self) -> Vec<String> {
+        self.iter()
+            .filter_map(|event| match event {
+                Event::KeyRelease { key, .. } => Some(key.clone()),
+                _ => None,
+            })
+            .collect()
     }
 
     pub fn events(&self) -> Vec<Event> {

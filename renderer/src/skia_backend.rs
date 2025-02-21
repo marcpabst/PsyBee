@@ -30,6 +30,7 @@ use crate::{
 #[derive(Debug)]
 pub struct SkiaScene {
     pub picture_recorder: PictureRecorder,
+    // pub canvas: skia_safe::Canvas,
     pub width: u32,
     pub height: u32,
     pub current_blend_mode: SkBlendMode,
@@ -322,6 +323,9 @@ impl Renderer for SkiaRenderer {
 
         let canvas = surface.canvas();
 
+        // move origin to the center
+        canvas.translate((width as scalar / 2.0, height as scalar / 2.0));
+
         // try to downcast the scene to a SkiaScene
         let skia_scene = scene.as_any_mut().downcast_mut::<SkiaScene>().unwrap();
         let picture = skia_scene.picture_recorder.finish_recording_as_picture(None).unwrap();
@@ -392,9 +396,10 @@ impl SkiaRenderer {
         }
     }
 
-    #[cfg(target_os = "windows")]
-    fn try_create_backend_dx12(&self, device: &Device, queue: &Queue) -> gpu::DirectContext {
-        todo!()
+    // #[cfg(target_os = "windows")]
+    fn try_create_backend_dx12(&self, device: &Device, queue: &Queue) -> Option<dx12::BackendContext> {
+        let command_queue_ptr =
+            unsafe { queue.as_hal::<wgpu::hal::api::Metal, _, _>(|queue| queue.map(|s| s.as_raw().as_ptr())) };
     }
 
     pub fn new(_width: u32, _heigth: u32, device: &Device, queue: &Queue) -> Self {

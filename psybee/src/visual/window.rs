@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    ops::Deref,
     pin::Pin,
     str::FromStr,
     sync::{
@@ -282,15 +283,26 @@ impl Window {
         state.event_handlers.remove(&id);
     }
 
-    fn dispatch_event(&self, event: Event) -> bool {
+    pub fn dispatch_event(&self, event: Event) -> bool {
         let mut handled = false;
+
+        // check if window state can be locked
+        if let Err(mut state) = self.state.try_lock() {
+            print!("Failed to lock window state. This should never happen: {:?}", state);
+        }
+
         let state = self.state.lock().unwrap();
+
+        println!("Dispatching event: {:?}", event);
 
         let event_handlers = &state.event_handlers;
 
         for (id, (kind, handler)) in event_handlers.iter() {
+            println!("Checking handler with id: {} for event kind: {:?}", id, kind);
             if kind == &event.kind() {
+                println!("Dispatching event to handler with id: {}", id);
                 handled |= handler(event.clone());
+                println!("Handler with id: {} returned: {}", id, handled);
             }
         }
 
@@ -327,7 +339,9 @@ impl Window {
 impl Window {
     #[pyo3(name = "get_frame")]
     fn py_get_frame(&self, py: Python) -> Frame {
-        self.get_frame()
+        let self_wrapper = SendWrapper::new(self.clone());
+        let d = py.allow_threads(move || SendWrapper::new(self_wrapper.get_frame()));
+        d.take()
     }
 
     #[pyo3(name = "get_frames")]
@@ -337,7 +351,9 @@ impl Window {
 
     #[pyo3(name = "present")]
     fn py_present(&self, frame: &mut Frame, py: Python) {
-        self.present(frame);
+        let self_wrapper = SendWrapper::new(self.clone());
+        let frame_wrapper = SendWrapper::new(frame);
+        py.allow_threads(move || self_wrapper.present(frame_wrapper.take()));
     }
 
     #[getter(cursor_visible)]
@@ -369,7 +385,9 @@ impl Window {
         let kind = EventKind::from_str(&kind).expect("Invalid event kind");
 
         let rust_callback_fn = move |event: Event| -> bool {
+            println!("Calling callback with event 1: {:?}", event);
             Python::with_gil(|py| -> PyResult<()> {
+                    println!("Calling callback with event 2 {:?}", event);
                     callback.call1(py, (event,))
                             .expect("Error calling callback in event handler. Make sure the callback takes a single argument of type Event. Error");
                     Ok(())
@@ -379,8 +397,7 @@ impl Window {
 
         let self_wrapper = SendWrapper::new(self);
 
-        // TODO
-        // py.allow_threads(move || self_wrapper.add_event_handler(kind.into(), rust_callback_fn));
+        let id = self.add_event_handler(kind, rust_callback_fn);
     }
 
     /// Create a new EventReceiver that will receive events from the window.
@@ -458,8 +475,10 @@ impl Frame {
 #[pymethods]
 impl Frame {
     #[pyo3(name = "draw")]
-    fn py_draw(&mut self, stimulus: crate::visual::stimuli::PyStimulus) {
-        self.draw(stimulus.as_super());
+    fn py_draw(&mut self, stimulus: crate::visual::stimuli::PyStimulus, py: Python) {
+        let mut self_wrapper = SendWrapper::new(self);
+        let stimulus_wrapper = SendWrapper::new(stimulus);
+        py.allow_threads(move || self_wrapper.draw(stimulus_wrapper.as_super()));
     }
 
     #[getter(bg_color)]

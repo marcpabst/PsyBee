@@ -146,7 +146,6 @@ impl Stimulus for ImageStimulus {
         let height = self.params.height.eval(window_size, screen_props);
 
         let (x, y) = self.anchor.to_top_left(x, y, width, height);
-        println!("x: {}, y: {}, width: {}, height: {}", x, y, width + x, height + y);
 
         let image_offset_x = self.params.image_x.eval(window_size, screen_props);
         let image_offset_y = self.params.image_y.eval(window_size, screen_props);

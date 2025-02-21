@@ -25,7 +25,9 @@ use winit::{
 use crate::{
     errors,
     experiment::{EventLoopAction, ExperimentManager, Monitor},
+    input::Event,
     visual::window::{PhysicalScreen, Window, WindowState},
+    EventTryFrom,
 };
 
 type ArcMutex<T> = Arc<Mutex<T>>;
@@ -284,10 +286,12 @@ impl App {
                 std::process::exit(1);
             }
         });
-        println!("starting event loop");
+
         // start event loop
         let _ = event_loop.run_app(self);
     }
+
+    // Start a thread that will dispath
 }
 
 impl ApplicationHandler<()> for App {
@@ -342,6 +346,30 @@ impl ApplicationHandler<()> for App {
                 if let Some(window) = window {
                     // update the window size
                     window.resize(size);
+                }
+            }
+            WindowEvent::KeyboardInput {
+                device_id,
+                event: _,
+                is_synthetic,
+            } => {
+                // find the window
+                let window = self.windows.iter().find(|w| w.winit_id == window_id);
+
+                if let Some(window) = window {
+                    if let Some(input) = Event::try_from_winit(event.clone(), &window).ok() {
+                        // if escape key was pressed, close window
+                        if input.key_pressed("\u{1b}") {
+                            // for now, just exit the program
+                            std::process::exit(0);
+                        }
+
+                        // broadcast the event
+                        window.event_broadcast_sender.try_broadcast(input.clone()).unwrap();
+
+                        // send the event to the window
+                        window.dispatch_event(input);
+                    }
                 }
             }
             _ => {}

@@ -207,7 +207,6 @@ impl Stimulus for GaborStimulus {
         let bb_width = radius * 2.0;
         let bb_height = radius * 2.0;
         let (pos_x, pos_y) = self.anchor.to_center(pos_x, pos_y, bb_width, bb_height);
-        println!("Anchor: {:?} -> ({}, {})", self.anchor, pos_x, pos_y);
 
         let trans_mat = self.transformation.eval(window_size, screen_props);
 

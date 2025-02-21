@@ -1,42 +1,55 @@
 from psybee import run_experiment, ShapeStimulus, Shape, GaborStimulus, ImageStimulus, Transformation2D
 import time
+import sys
 
 def my_experiment(exp_manager) -> None:
     # create a new window
 
     main_window = exp_manager.create_default_window(0)
 
+    main_window.add_event_handler("KeyPress", lambda e: sys.exit(0) if e.key == "Q" else None)
+
+    event_receiver = main_window.create_event_receiver()
+
     # sleep for 1 second
     time.sleep(0.1)
 
-    rect = Shape.rectangle(500, 500, 400, 400)
-    stim = ShapeStimulus(rect, fill_color=(121/255, 165/255, 177/255))
-    image = ImageStimulus("test.png", 500, 500, main_window, 400, 400, anchor = "center")
-
-    gabor = GaborStimulus(500, 500, 500, 70, 50, anchor = "center")
+    rect = ShapeStimulus(Shape.rectangle(-400, -400, 800, 800), fill_color=(0, 0, 0, 1))
+    image = ImageStimulus("test.png", 0, 0, main_window, 400, 400, anchor = "center")
+    gabor = GaborStimulus(0, 0, 500, 70, 50, anchor = "center")
 
 
-
-    # gabor.translated("-0.5sw", "-0.5sh")
+    is_visible = False
 
     for i in range(10000000):
         frame = main_window.get_frame()
 
         angle = (i / 10) % 360
 
-        gabor.rotated_at(angle, 500, 500)
-        image.rotated_at(-angle, 500, 500)
+        gabor.rotated_at(angle, 0, 0)
+        image.rotated_at(-angle, 0, 0)
 
-        # frame.draw(stim)
         frame.draw(gabor)
         frame.draw(image)
+
+        keys = event_receiver.poll()
+
+        if "Enter" in keys.keys_pressed():
+            is_visible = True
+
+        if "Enter" in keys.keys_released():
+            is_visible = False
+
+
+
+        if is_visible:
+            frame.draw(rect)
 
         main_window.present(frame)
 
 
-    print(rect)
 
-    time.sleep(1000)
+
 
 
 if __name__ == "__main__":
