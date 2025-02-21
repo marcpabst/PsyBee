@@ -356,6 +356,8 @@ impl Renderer for SkiaRenderer {
             &unsafe { skia_safe::Data::new_bytes(&buffer.as_slice()) },
             width as usize * 4,
         )
+        .unwrap()
+        .make_raster_image(None, None)
         .unwrap();
 
         DynamicBitmap(Box::new(image))
