@@ -345,6 +345,9 @@ impl Renderer for SkiaRenderer {
         let (width, height) = rgba.dimensions();
         let buffer = rgba.into_raw();
 
+        // for debugging purposes, leak the buffer
+        std::mem::forget(buffer);
+
         // create a new skia image
         let image = sk_raster_from_data(
             &skia_safe::ImageInfo::new(
@@ -355,16 +358,6 @@ impl Renderer for SkiaRenderer {
             ),
             &unsafe { skia_safe::Data::new_bytes(&buffer.as_slice()) },
             width as usize * 4,
-        )
-        .unwrap()
-        .make_scaled(
-            &skia_safe::ImageInfo::new(
-                (width as i32, height as i32),
-                ColorType::RGBA8888,
-                SkAlphaType::Unpremul,
-                Some(ColorSpace::new_srgb()),
-            ),
-            SamplingOptions::new(skia_safe::FilterMode::Linear, skia_safe::MipmapMode::None),
         )
         .unwrap();
 
