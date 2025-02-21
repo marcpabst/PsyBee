@@ -53,9 +53,10 @@ pub struct SkiaRenderer {
     font_manager: skia_safe::FontMgr,
 }
 
+#[derive(Debug)]
 pub struct SkiaBitmap {
     image: SkImage,
-    data: Vec<u8>,
+    data: Box<[u8]>,
 }
 
 impl Typeface for SkTypeface {
@@ -344,6 +345,7 @@ impl Renderer for SkiaRenderer {
         let rgba = img.to_rgba8();
         let (width, height) = rgba.dimensions();
         let buffer = rgba.into_raw();
+        let boxed_buffer = buffer.into_boxed_slice();
 
         // create a new skia image
         let image = sk_raster_from_data(
@@ -353,15 +355,15 @@ impl Renderer for SkiaRenderer {
                 SkAlphaType::Unpremul,
                 Some(ColorSpace::new_srgb()),
             ),
-            &unsafe { skia_safe::Data::new_bytes(&buffer.as_slice()) },
+            &unsafe { skia_safe::Data::new_bytes(&boxed_buffer) },
             width as usize * 4,
         )
         .unwrap();
 
-        // for debugging purposes, leak the buffer
-        std::mem::forget(buffer);
-
-        DynamicBitmap(Box::new(image))
+        DynamicBitmap(Box::new(SkiaBitmap {
+            image,
+            data: boxed_buffer,
+        }))
     }
 
     fn load_font_face(&mut self, face_info: &FaceInfo, font_data: &[u8], index: usize) -> DynamicFontFace {
@@ -532,7 +534,7 @@ impl SkiaRenderer {
     }
 }
 
-impl Bitmap for SkImage {
+impl Bitmap for SkiaBitmap {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -620,9 +622,10 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                 alpha,
             } => {
                 // downcast the image to a skia image
-                let skia_image = image
-                    .try_as::<SkImage>()
-                    .expect("You're trying to use a non-skia image with a skia renderer");
+                let skia_image = &image
+                    .try_as::<SkiaBitmap>()
+                    .expect("You're trying to use a non-skia image with a skia renderer")
+                    .image;
 
                 let local_matrix = match fit_mode {
                     ImageFitMode::Original => Matrix::new_identity(),
