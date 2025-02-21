@@ -4,16 +4,16 @@ use cosmic_text::fontdb::FaceInfo;
 use foreign_types_shared::ForeignType;
 
 #[cfg(target_os = "windows")]
-use skia_safe::gpu::d3d;
+use skia_safe::gpu::{d3d, d3d::BackendContext, Protected};
 #[cfg(target_os = "macos")]
-use skia_safe::gpu::mtl;
+use skia_safe::gpu::{mtl, mtl::BackendContext};
 #[cfg(target_os = "windows")]
 use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC, DXGI_STANDARD_MULTISAMPLE_QUALITY_PATTERN,
 };
 
 use skia_safe::{
-    gpu::{self, d3d::BackendContext, Protected, SurfaceOrigin},
+    gpu::{self, SurfaceOrigin},
     gradient_shader::{
         linear as sk_linear, radial as sk_radial, sweep as sk_sweep, GradientShaderColors as SkGradientShaderColors,
     },
@@ -311,7 +311,7 @@ impl Renderer for SkiaRenderer {
         #[cfg(target_os = "windows")]
         let mut surface = Self::create_surface_dx12(device, width, height, texture, &self.backend, &mut skia_context);
         #[cfg(target_os = "macos")]
-        let mut surface = Self::create_surface_metal(device, width, height, &self.backend);
+        let mut surface = Self::create_surface_metal(device, width, height, texture, &self.backend, &mut skia_context);
 
         let canvas = surface.canvas();
 
@@ -382,7 +382,9 @@ impl SkiaRenderer {
             let backend =
                 unsafe { mtl::BackendContext::new(raw_device_ptr.unwrap(), command_queue_ptr as mtl::Handle) };
 
-            Some(backend)
+            let context = unsafe { gpu::DirectContext::new_metal(&backend, None).unwrap() };
+
+            Some((backend, context))
         } else {
             None
         }
@@ -393,18 +395,28 @@ impl SkiaRenderer {
         device: &Device,
         width: u32,
         height: u32,
-        backend: &mtl::BackendContext,
+        texture: &Texture,
+        backend: &BackendContext,
+        context: &mut gpu::DirectContext,
     ) -> skia_safe::Surface {
-        let texture_info = mtl::TextureInfo::new(device, width, height);
-        let backend_render_target =
-            skia_safe::gpu::backend_render_targets::make_mtl((width as i32, height as i32), &texture_info, &backend);
+        let raw_texture_ptr = unsafe {
+            texture
+                .as_hal::<wgpu::hal::api::Metal, _, _>(|texture| texture.unwrap().raw_handle().as_ptr() as mtl::Handle)
+        };
+
+        let texture_info = unsafe { mtl::TextureInfo::new(raw_texture_ptr) };
+
+        let backend_render_target = skia_safe::gpu::backend_render_targets::make_mtl(
+            (texture.width() as i32, texture.height() as i32),
+            &texture_info,
+        );
 
         unsafe {
             gpu::surfaces::wrap_backend_render_target(
-                &mut *skia_context,
+                &mut *context,
                 &backend_render_target,
                 SurfaceOrigin::TopLeft,
-                ColorType::RGBA8888,
+                ColorType::RGBAF16,
                 ColorSpace::new_srgb_linear(),
                 None,
             )
