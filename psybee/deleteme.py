@@ -15,7 +15,8 @@ def my_experiment(exp_manager) -> None:
     time.sleep(0.4)
 
     rect = ShapeStimulus(Shape.rectangle(-400, -400, 800, 800), fill_color=(0, 0, 0, 1))
-    image = ImageStimulus("test.png", 0, 0, main_window, 400, 400, anchor = "center")
+    image = ImageStimulus("test.png", -300, -300, main_window, 400, 400, anchor = "top-left")
+    rect2 = ShapeStimulus(Shape.rectangle(-300, -300, 400, 400), stroke_color=(1, 0, 0, 1), stroke_width=10)
     gabor = GaborStimulus(0, 0, 500, 70, 50, anchor = "center")
 
     is_visible = False
@@ -26,10 +27,13 @@ def my_experiment(exp_manager) -> None:
         angle = (i / 10) % 360
 
         gabor.rotated_at(angle, 0, 0)
+
+        rect2.rotated_at(-angle, 0, 0)
         image.rotated_at(-angle, 0, 0)
 
-        frame.draw(gabor)
+        # frame.draw(gabor)
         frame.draw(image)
+        # frame.draw(rect2)
 
         keys = event_receiver.poll()
 

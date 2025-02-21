@@ -3,6 +3,7 @@ use std::{any::Any, cell::RefCell};
 use cosmic_text::fontdb::FaceInfo;
 use foreign_types_shared::ForeignType;
 
+use image::EncodableLayout;
 #[cfg(target_os = "windows")]
 use skia_safe::gpu::{d3d, d3d::BackendContext, Protected};
 #[cfg(target_os = "macos")]
@@ -345,12 +346,14 @@ impl Renderer for SkiaRenderer {
                 (width as i32, height as i32),
                 ColorType::RGBA8888,
                 SkAlphaType::Unpremul,
-                None,
+                Some(ColorSpace::new_srgb()),
             ),
             &unsafe { skia_safe::Data::new_bytes(&buffer.as_slice()) },
             width as usize * 4,
         )
         .unwrap();
+
+        // println!("Image created: {:?}", image);
 
         DynamicBitmap(Box::new(image))
     }
@@ -627,10 +630,6 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                     }
                 };
 
-                // apply the start position
-                let delta: skia_safe::Vector = (*start).into();
-                // let local_matrix = Matrix::translate(delta);
-                //
                 let sampling_options = match sampling {
                     ImageSampling::Nearest => {
                         SamplingOptions::new(skia_safe::FilterMode::Nearest, skia_safe::MipmapMode::None)
@@ -647,6 +646,7 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                     &local_matrix,
                 );
 
+                // paint.set_color(skia_safe::Color::WHITE);
                 paint.set_shader(shader);
 
                 // set the alpha
