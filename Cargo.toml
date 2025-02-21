@@ -4,4 +4,4 @@ members = ["psybee", "psybee-proc", "rapier2d-py", "renderer"]
 
 # patch wgpu to git d9e9c3a
 [patch.crates-io]
-wgpu = { path = "../../wgpu/wgpu" }
+wgpu = { path = "../wgpu/wgpu" }

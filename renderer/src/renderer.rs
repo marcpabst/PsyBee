@@ -22,6 +22,7 @@ pub struct DynamicRenderer {
 impl DynamicRenderer {
     pub fn new(
         backend: Backend,
+        adapter: &wgpu::Adapter,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         surface_format: wgpu::TextureFormat,
@@ -58,7 +59,7 @@ impl DynamicRenderer {
                 // Box::new(renderer) as Box<dyn Renderer>
             }
             Backend::Skia => {
-                let renderer = skia_backend::SkiaRenderer::new(width, height, device, queue);
+                let renderer = skia_backend::SkiaRenderer::new(width, height, adapter, device, queue);
                 Box::new(renderer) as Box<dyn Renderer>
             }
         };

@@ -59,7 +59,7 @@ impl App {
     pub fn new() -> Self {
         let (action_sender, action_receiver) = std::sync::mpsc::channel();
 
-        let backend = wgpu::Backends::PRIMARY;
+        let backend = wgpu::Backends::DX12 | wgpu::Backends::METAL;
         let instance_desc = wgpu::InstanceDescriptor {
             backends: backend,
             // use defaults for the rest
@@ -187,6 +187,7 @@ impl App {
         // create the renderer
         let mut renderer = renderer::DynamicRenderer::new(
             renderer::Backend::Skia,
+            adapter,
             device,
             queue,
             swapchain_format,

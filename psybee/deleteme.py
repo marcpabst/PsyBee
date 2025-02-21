@@ -12,12 +12,11 @@ def my_experiment(exp_manager) -> None:
     event_receiver = main_window.create_event_receiver()
 
     # sleep for 1 second
-    time.sleep(0.1)
+    time.sleep(0.4)
 
     rect = ShapeStimulus(Shape.rectangle(-400, -400, 800, 800), fill_color=(0, 0, 0, 1))
     image = ImageStimulus("test.png", 0, 0, main_window, 400, 400, anchor = "center")
     gabor = GaborStimulus(0, 0, 500, 70, 50, anchor = "center")
-
 
     is_visible = False
 

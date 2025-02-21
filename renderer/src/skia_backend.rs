@@ -2,8 +2,18 @@ use std::{any::Any, cell::RefCell};
 
 use cosmic_text::fontdb::FaceInfo;
 use foreign_types_shared::ForeignType;
+
+#[cfg(target_os = "windows")]
+use skia_safe::gpu::d3d;
+#[cfg(target_os = "macos")]
+use skia_safe::gpu::mtl;
+#[cfg(target_os = "windows")]
+use windows::Win32::Graphics::Dxgi::Common::{
+    DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC, DXGI_STANDARD_MULTISAMPLE_QUALITY_PATTERN,
+};
+
 use skia_safe::{
-    gpu::{self, mtl, SurfaceOrigin},
+    gpu::{self, d3d::BackendContext, Protected, SurfaceOrigin},
     gradient_shader::{
         linear as sk_linear, radial as sk_radial, sweep as sk_sweep, GradientShaderColors as SkGradientShaderColors,
     },
@@ -12,7 +22,7 @@ use skia_safe::{
     scalar, AlphaType as SkAlphaType, BlendMode as SkBlendMode, ColorSpace, ColorType, Font as SkFont, Matrix,
     PictureRecorder, SamplingOptions, Typeface as SkTypeface,
 };
-use wgpu::{Device, Queue, Texture};
+use wgpu::{Adapter, Device, Queue, Texture};
 
 use crate::{
     affine::Affine,
@@ -38,6 +48,7 @@ pub struct SkiaScene {
 
 pub struct SkiaRenderer {
     context: RefCell<gpu::DirectContext>,
+    backend: BackendContext,
     font_manager: skia_safe::FontMgr,
 }
 
@@ -294,32 +305,13 @@ impl Renderer for SkiaRenderer {
         height: u32,
         scene: &mut dyn Scene,
     ) {
-        let raw_texture_ptr = unsafe {
-            texture
-                .as_hal::<wgpu::hal::api::Metal, _, _>(|texture| texture.unwrap().raw_handle().as_ptr() as mtl::Handle)
-        };
-
-        let texture_info = unsafe { mtl::TextureInfo::new(raw_texture_ptr) };
-
-        let backend_render_target = skia_safe::gpu::backend_render_targets::make_mtl(
-            (texture.width() as i32, texture.height() as i32),
-            &texture_info,
-        );
-
         let mut skia_context = self.context.borrow_mut();
 
-        // create a new skia surface
-        let mut surface = unsafe {
-            gpu::surfaces::wrap_backend_render_target(
-                &mut *skia_context,
-                &backend_render_target,
-                SurfaceOrigin::TopLeft,
-                ColorType::RGBAF16,
-                ColorSpace::new_srgb_linear(),
-                None,
-            )
-            .unwrap()
-        };
+        // create a new surface
+        #[cfg(target_os = "windows")]
+        let mut surface = Self::create_surface_dx12(device, width, height, texture, &self.backend, &mut skia_context);
+        #[cfg(target_os = "macos")]
+        let mut surface = Self::create_surface_metal(device, width, height, &self.backend);
 
         let canvas = surface.canvas();
 
@@ -376,7 +368,7 @@ impl Renderer for SkiaRenderer {
 
 impl SkiaRenderer {
     #[cfg(target_os = "macos")]
-    fn try_create_backend_metal(device: &Device, queue: &Queue) -> Option<mtl::BackendContext> {
+    fn try_create_backend_metal(device: &Device, queue: &Queue) -> Option<(mtl::BackendContext, gpu::DirectContext)> {
         let command_queue_ptr =
             unsafe { queue.as_hal::<wgpu::hal::api::Metal, _, _>(|queue| queue.map(|s| s.as_raw().as_ptr())) };
 
@@ -396,21 +388,124 @@ impl SkiaRenderer {
         }
     }
 
-    // #[cfg(target_os = "windows")]
-    fn try_create_backend_dx12(&self, device: &Device, queue: &Queue) -> Option<dx12::BackendContext> {
-        let command_queue_ptr =
-            unsafe { queue.as_hal::<wgpu::hal::api::Metal, _, _>(|queue| queue.map(|s| s.as_raw().as_ptr())) };
+    #[cfg(target_os = "macos")]
+    fn create_surface_metal(
+        device: &Device,
+        width: u32,
+        height: u32,
+        backend: &mtl::BackendContext,
+    ) -> skia_safe::Surface {
+        let texture_info = mtl::TextureInfo::new(device, width, height);
+        let backend_render_target =
+            skia_safe::gpu::backend_render_targets::make_mtl((width as i32, height as i32), &texture_info, &backend);
+
+        unsafe {
+            gpu::surfaces::wrap_backend_render_target(
+                &mut *skia_context,
+                &backend_render_target,
+                SurfaceOrigin::TopLeft,
+                ColorType::RGBA8888,
+                ColorSpace::new_srgb_linear(),
+                None,
+            )
+            .unwrap()
+        }
     }
 
-    pub fn new(_width: u32, _heigth: u32, device: &Device, queue: &Queue) -> Self {
-        #[cfg(target_os = "macos")]
-        let backend = Self::try_create_backend_metal(device, queue).unwrap();
+    #[cfg(target_os = "windows")]
+    fn try_create_backend_dx12(
+        adapter: &Adapter,
+        device: &Device,
+        queue: &Queue,
+    ) -> Option<(d3d::BackendContext, gpu::DirectContext)> {
+        let command_queue =
+            unsafe { queue.as_hal::<wgpu::hal::api::Dx12, _, _>(|queue| queue.map(|s| s.as_raw().clone())) };
 
-        let skia_context = gpu::direct_contexts::make_metal(&backend, None).unwrap();
+        if let Some(command_queue) = command_queue {
+            let raw_adapter = unsafe {
+                adapter.as_hal::<wgpu::hal::api::Dx12, _, _>(|adapter| adapter.map(|s| (**s.raw_adapter()).clone()))
+            }
+            .unwrap();
+
+            let raw_device =
+                unsafe { device.as_hal::<wgpu::hal::api::Dx12, _, _>(|device| device.map(|s| s.raw_device().clone())) }
+                    .unwrap();
+
+            let backend = unsafe {
+                d3d::BackendContext {
+                    adapter: raw_adapter.into(),
+                    device: raw_device,
+                    queue: command_queue.clone(),
+                    memory_allocator: None,
+                    protected_context: Protected::No,
+                }
+            };
+
+            let context = unsafe { gpu::DirectContext::new_d3d(&backend, None).unwrap() };
+
+            Some((backend, context))
+        } else {
+            None
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn create_surface_dx12(
+        device: &Device,
+        width: u32,
+        height: u32,
+        texture: &Texture,
+        backend: &d3d::BackendContext,
+        context: &mut gpu::DirectContext,
+    ) -> skia_safe::Surface {
+        use windows::Win32::Graphics::{
+            Direct3D12::D3D12_RESOURCE_STATE_COMMON, Dxgi::Common::DXGI_FORMAT_R16G16B16A16_FLOAT,
+        };
+
+        let raw_texture = unsafe {
+            texture.as_hal::<wgpu::hal::api::Dx12, _, _>(|texture| texture.map(|s| s.raw_resource().clone()))
+        }
+        .unwrap();
+
+        let backend_render_target = skia_safe::gpu::BackendRenderTarget::new_d3d(
+            (width as i32, height as i32),
+            &d3d::TextureResourceInfo {
+                resource: raw_texture,
+                alloc: None,
+                resource_state: D3D12_RESOURCE_STATE_COMMON,
+                format: DXGI_FORMAT_R16G16B16A16_FLOAT,
+                sample_count: 1,
+                level_count: 0,
+                sample_quality_pattern: DXGI_STANDARD_MULTISAMPLE_QUALITY_PATTERN,
+                protected: Protected::No,
+            },
+        );
+
+        unsafe {
+            gpu::surfaces::wrap_backend_render_target(
+                &mut *context,
+                &backend_render_target,
+                SurfaceOrigin::TopLeft,
+                ColorType::RGBAF16,
+                ColorSpace::new_srgb_linear(),
+                None,
+            )
+            .unwrap()
+        }
+    }
+
+    pub fn new(width: u32, heigth: u32, adapter: &Adapter, device: &Device, queue: &Queue) -> Self {
+        #[cfg(target_os = "windows")]
+        let (backend, mut skia_context) = Self::try_create_backend_dx12(adapter, device, queue).unwrap();
+
+        #[cfg(target_os = "macos")]
+        let (backend, mut skia_context) = Self::try_create_backend_metal(device, queue).unwrap();
+
         let font_manager = skia_safe::FontMgr::new();
 
         Self {
             context: RefCell::new(skia_context),
+            backend,
             font_manager,
         }
     }

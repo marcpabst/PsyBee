@@ -103,7 +103,7 @@ impl ExperimentManager {
         self.event_loop_proxy.send_event(());
 
         // wait for response
-        let window = receiver.recv().unwrap();
+        let window = receiver.recv().expect("Failed to create window");
         log::debug!("New window successfully created");
 
         window
