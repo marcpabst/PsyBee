@@ -52,6 +52,11 @@ pub struct SkiaRenderer {
     font_manager: skia_safe::FontMgr,
 }
 
+pub struct SkiaBitmap {
+    image: SkImage,
+    data: Vec<u8>,
+}
+
 impl Typeface for SkTypeface {
     fn as_any(&self) -> &dyn Any {
         self
@@ -352,6 +357,7 @@ impl Renderer for SkiaRenderer {
         )
         .unwrap();
 
+        // move image to gpu
         DynamicBitmap(Box::new(image))
     }
 
