@@ -12,10 +12,10 @@ def my_experiment(exp_manager) -> None:
     event_receiver = main_window.create_event_receiver()
 
 
-    rect = ShapeStimulus(Shape.rectangle(-400, -400, 800, 800), fill_color=(0, 0, 0, 1))
-    image = ImageStimulus("test.png", -300, -300, main_window, 400, 400, anchor = "center")
-    rect2 = ShapeStimulus(Shape.rectangle(-300, -300, 400, 400), stroke_color=(1, 0, 0, 1), stroke_width=10)
-    gabor = GaborStimulus(0, 0, 500, 70, 50, anchor = "center")
+    rect = ShapeStimulus(Shape.rectangle("-0.25sw", "-0.25sh", "0.25sw", "0.25sh"), fill_color=(0, 0, 0, 1))
+    image = ImageStimulus("test.png", "-0.25sw", "-0.25sh",  main_window, "0.25sw", "0.25sw", anchor = "center")
+    rect2 = ShapeStimulus(Shape.rectangle(0, 0, "0.25sw", "0.25sw"), stroke_color=(1, 0, 0, 1), stroke_width=10)
+    gabor = GaborStimulus(0, 0, "0.25sw", 70, 50, anchor = "center")
 
     is_visible = False
 
