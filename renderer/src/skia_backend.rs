@@ -357,7 +357,15 @@ impl Renderer for SkiaRenderer {
             width as usize * 4,
         )
         .unwrap()
-        .make_raster_image(None, None)
+        .make_scaled(
+            &skia_safe::ImageInfo::new(
+                (width as i32, height as i32),
+                ColorType::RGBA8888,
+                SkAlphaType::Unpremul,
+                Some(ColorSpace::new_srgb()),
+            ),
+            SamplingOptions::new(skia_safe::FilterMode::Linear, skia_safe::MipmapMode::None),
+        )
         .unwrap();
 
         DynamicBitmap(Box::new(image))
