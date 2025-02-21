@@ -165,7 +165,7 @@ impl Stimulus for ImageStimulus {
                 sampling: ImageSampling::Linear,
                 edge_mode: (Extend::Pad, Extend::Pad),
                 transform: None,
-                alpha: None,
+                alpha: Some(self.params.opacity as f32),
             },
             Some(self.transformation.eval(window_size, screen_props).into()),
             None,
