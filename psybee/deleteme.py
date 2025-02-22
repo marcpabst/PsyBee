@@ -11,13 +11,14 @@ def my_experiment(exp_manager) -> None:
 
     event_receiver = main_window.create_event_receiver()
 
-
-    rect = ShapeStimulus(Shape.rectangle("-0.25sw", "-0.25sh", "0.25sw", "0.25sh"), fill_color=(0, 0, 0, 1))
+    rect0 = ShapeStimulus(Shape.rectangle("-0.25sw", "-0.25sh", "0.25sw", "0.25sh"), fill_color=(1, 0, 0, 1))
+    rect1 = ShapeStimulus(Shape.rectangle("-0.25sw", "-0.25sh", "0.25sw", "0.25sh"), fill_color=(0, 0, 0, 1))
     image = ImageStimulus("test.png", "-0.25sw", "-0.25sh",  main_window, "0.25sw", "0.25sw", anchor = "center")
     rect2 = ShapeStimulus(Shape.rectangle(0, 0, "0.25sw", "0.25sw"), stroke_color=(1, 0, 0, 1), stroke_width=10)
     gabor = GaborStimulus(0, 0, "0.25sw", 70, 50, anchor = "center")
 
     is_visible = False
+    is_visible2 = False
 
     for i in range(10000000):
         frame = main_window.get_frame()
@@ -41,10 +42,13 @@ def my_experiment(exp_manager) -> None:
         if "Enter" in keys.keys_released():
             is_visible = False
 
-
-
         if is_visible:
-            frame.draw(rect)
+            frame.draw(rect1)
+
+        if is_visible2:
+            frame.draw(rect0)
+
+        is_visible2 = not is_visible2
 
         main_window.present(frame)
 
