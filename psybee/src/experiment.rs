@@ -147,7 +147,11 @@ impl ExperimentManager {
     #[pyo3(name = "create_default_window")]
     #[pyo3(signature = (fullscreen = false, monitor = None))]
     /// Create a new window. This is a convenience function that creates a
-    /// window with the default options. When `fullscreen` is set to `true`,
+    /// window with the default options.
+    ///
+    /// Even when `fullscreen` is set to `True`, no video mode changes will be
+    /// initiated. The window will be created with the highest resolution
+    /// changes. When `fullscreen` is set to `true`,
     /// `monitor` can be used to select the monitor to use. Monitor enumeration
     /// is OS-specific and the primary monitor may not always be at index 0.
     ///

@@ -7,7 +7,7 @@ import sys
 def my_experiment(exp_manager) -> None:
     # create a new window
 
-    main_window = exp_manager.create_default_window(0)
+    main_window = exp_manager.create_default_window()
 
     circle = ShapeStimulus(Shape.circle(0, 0, "0.01sw"), x=-100, fill_color=(1, 0, 0, 1))
 
