@@ -8,6 +8,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum PsybeeError {
+    // Pyo3 errors
+    #[error("{0}")]
+    Pyo3Error(#[from] pyo3::PyErr),
+
     // file errors
     #[error("{0}")]
     IOError(#[from] std::io::Error),
@@ -63,4 +67,11 @@ macro_rules! error {
     ($msg:expr) => {
         return Err(PsybeeError::CustomError($msg.to_string()));
     };
+}
+
+// allow PsybeeError to be converted to a PyErr
+impl From<PsybeeError> for pyo3::PyErr {
+    fn from(err: PsybeeError) -> pyo3::PyErr {
+        pyo3::exceptions::PyException::new_err(err.to_string())
+    }
 }

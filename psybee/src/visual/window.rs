@@ -117,7 +117,7 @@ pub struct WindowState {
     #[dbg(placeholder = "[[ DynamicRenderer ]]")]
     pub renderer: DynamicRenderer,
     // The current mouse position. None if the mouse has left the window.
-    pub mouse_position: Option<(Size, Size)>,
+    pub mouse_position: Option<(f32, f32)>,
     /// Stores if the mouse cursor is currently visible.
     pub mouse_cursor_visible: bool,
     /// The size of the window in pixels.
@@ -241,7 +241,7 @@ impl Window {
     }
 
     /// Returns the mouse position. None if cursor not in window.
-    pub fn mouse_position(&self) -> Option<(Size, Size)> {
+    pub fn mouse_position(&self) -> Option<(f32, f32)> {
         let win_state = &self.state.lock().unwrap();
         win_state.mouse_position.clone()
     }
@@ -286,23 +286,26 @@ impl Window {
     pub fn dispatch_event(&self, event: Event) -> bool {
         let mut handled = false;
 
-        // check if window state can be locked
-        if let Err(mut state) = self.state.try_lock() {
-            print!("Failed to lock window state. This should never happen: {:?}", state);
-        }
+        let event_handlers = {
+            let state = self.state.lock().unwrap();
 
-        let state = self.state.lock().unwrap();
+            // clone the event handlers
+            let event_handlers = &state.event_handlers;
 
-        println!("Dispatching event: {:?}", event);
+            let mut new_event_handlers: HashMap<EventHandlerId, (EventKind, EventHandler)> = HashMap::new();
+            for (id, (kind, handler)) in event_handlers.iter() {
+                new_event_handlers.insert(*id, (*kind, handler.clone()));
+            }
 
-        let event_handlers = &state.event_handlers;
+            new_event_handlers
+        };
 
         for (id, (kind, handler)) in event_handlers.iter() {
-            println!("Checking handler with id: {} for event kind: {:?}", id, kind);
+            // println!("Checking handler with id: {} for event kind: {:?}", id, kind);
             if kind == &event.kind() {
-                println!("Dispatching event to handler with id: {}", id);
+                // println!("Dispatching event to handler with id: {}", id);
                 handled |= handler(event.clone());
-                println!("Handler with id: {} returned: {}", id, handled);
+                // println!("Handler with id: {} returned: {}", id, handled);
             }
         }
 
@@ -325,7 +328,7 @@ impl Window {
         };
 
         // add handler
-        event_handlers.insert(id, (kind, Box::new(handler)));
+        event_handlers.insert(id, (kind, Arc::new(handler)));
 
         id
     }
@@ -381,13 +384,12 @@ impl Window {
     /// callback : callable
     ///  The callback that will be called when the event occurs. The callback should take a single argument, an instance of `Event`.
     #[pyo3(name = "add_event_handler")]
-    fn py_add_event_handler(&self, kind: String, callback: Py<PyAny>, py: Python<'_>) {
-        let kind = EventKind::from_str(&kind).expect("Invalid event kind");
+    fn py_add_event_handler(&self, kind: EventKind, callback: Py<PyAny>, py: Python<'_>) {
+        // let kind = EventKind::from_str(&kind).expect("Invalid event kind");
 
         let rust_callback_fn = move |event: Event| -> bool {
-            println!("Calling callback with event 1: {:?}", event);
             Python::with_gil(|py| -> PyResult<()> {
-                    println!("Calling callback with event 2 {:?}", event);
+
                     callback.call1(py, (event,))
                             .expect("Error calling callback in event handler. Make sure the callback takes a single argument of type Event. Error");
                     Ok(())

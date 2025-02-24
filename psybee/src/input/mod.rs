@@ -1,7 +1,7 @@
-use std::ops::Deref;
+use std::{ops::Deref, str::FromStr, sync::Arc};
 
-use pyo3::{pyclass, pymethods};
-use strum::EnumString;
+use pyo3::{pyclass, pymethods, types::PyAnyMethods, FromPyObject};
+use strum::{EnumString, VariantArray, VariantNames};
 use web_time::SystemTime;
 #[cfg(any(
     target_os = "windows",
@@ -39,8 +39,11 @@ pub enum MouseButton {
 
 #[derive(Debug, Clone, enum_fields::EnumFields, strum::EnumDiscriminants)]
 #[pyclass(unsendable)]
-#[strum_discriminants(name(EventKind))]
-#[strum_discriminants(derive(EnumString))]
+#[strum_discriminants(
+    name(EventKind),
+    strum(serialize_all = "snake_case"),
+    derive(EnumString, VariantNames)
+)]
 pub enum Event {
     /// A keypress event. This is triggered when a key is pressed.
     KeyPress {
@@ -69,7 +72,7 @@ pub enum Event {
         /// The button that was pressed.
         button: MouseButton,
         /// The position of the mouse cursor when the button was pressed.
-        position: (Size, Size),
+        position: (f32, f32),
         /// The Window that the event was triggered on.
         window: Window,
     },
@@ -82,7 +85,7 @@ pub enum Event {
         /// The button that was released.
         button: MouseButton,
         /// The position of the mouse cursor when the button was released.
-        position: (Size, Size),
+        position: (f32, f32),
         /// The Window that the event was triggered on.
         window: Window,
     },
@@ -91,7 +94,7 @@ pub enum Event {
         /// Timestamp of the event.
         timestamp: SystemTime,
         /// The position of the touch.
-        position: (Size, Size),
+        position: (f32, f32),
         /// The Window that the event was triggered on.
         window: Window,
         /// The id of the touch (if available).
@@ -102,7 +105,7 @@ pub enum Event {
         /// Timestamp of the event.
         timestamp: SystemTime,
         /// The position of the touch.
-        position: (Size, Size),
+        position: (f32, f32),
         /// The Window that the event was triggered on.
         window: Window,
         /// The id of the touch (if available).
@@ -114,7 +117,7 @@ pub enum Event {
         /// Timestamp of the event.
         timestamp: SystemTime,
         /// The position of the touch.
-        position: (Size, Size),
+        position: (f32, f32),
         /// The Window that the event was triggered on.
         window: Window,
         /// The id of the touch (if available).
@@ -126,7 +129,7 @@ pub enum Event {
         /// Timestamp of the event.
         timestamp: SystemTime,
         /// The position of the touch.
-        position: (Size, Size),
+        position: (f32, f32),
         /// The Window that the event was triggered on.
         window: Window,
         /// The id of the touch (if available).
@@ -151,7 +154,7 @@ pub enum Event {
         /// Timestamp of the event.
         timestamp: SystemTime,
         /// The position of the cursor.
-        position: (Size, Size),
+        position: (f32, f32),
         /// The Window that the event was triggered on.
         window: Window,
     },
@@ -232,7 +235,7 @@ impl Event {
 impl Event {
     #[getter]
     #[pyo3(name = "position")]
-    fn py_position(&self) -> Option<(Size, Size)> {
+    fn py_position(&self) -> Option<(f32, f32)> {
         self.position().cloned()
     }
 
@@ -321,9 +324,8 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
                     winit_event::MouseButton::Other(id) => MouseButton::Other(id),
                 };
 
-                let position = window
-                    .mouse_position()
-                    .unwrap_or((Size::Pixels(0.0), Size::Pixels(0.0)));
+                let position = window.mouse_position().unwrap_or((0.0, 0.0));
+
                 match state {
                     winit_event::ElementState::Pressed => Event::MouseButtonPress {
                         timestamp,
@@ -342,10 +344,7 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
             // match touch events
             winit_event::WindowEvent::Touch(touch) => {
                 //  let position = (Size::Pixels(position.x) - Size::ScreenWidth(0.5), Size::Pixels(-position.y) + Size::ScreenHeight(0.5));
-                let position = (
-                    Size::Pixels(touch.location.x as f32) - Size::ScreenWidth(0.5),
-                    -(Size::Pixels(-touch.location.y as f32) + Size::ScreenHeight(0.5)),
-                );
+                let position = (touch.location.x as f32, touch.location.y as f32);
 
                 // dispatch on TouchPhase
                 match touch.phase {
@@ -391,10 +390,16 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
             }
             // match cursor movement events
             winit_event::WindowEvent::CursorMoved { position, .. } => {
+                let position = (position.x as f32, position.y as f32);
+
+                // move by x_origin and y_origin
+                let window_state = window.state.lock().unwrap();
+                let window_size = window_state.size;
                 let position = (
-                    Size::Pixels(position.x as f32) - Size::ScreenWidth(0.5),
-                    Size::Pixels(position.y as f32) - Size::ScreenHeight(0.5),
+                    position.0 - (window_size.width as f32 / 2.0),
+                    position.1 - (window_size.height as f32 / 2.0),
                 );
+
                 Event::CursorMoved {
                     timestamp,
                     position,
@@ -442,7 +447,7 @@ pub struct EventReceiver {
 
 /// Contains a vector of events.
 #[derive(Debug, Clone)]
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct EventVec(Vec<Event>);
 
 // convenience methods for KeyEventVec
@@ -547,8 +552,8 @@ impl EventReceiver {
 }
 
 pub(crate) type EventHandlerId = usize;
-pub(crate) type EventHandler = Box<dyn Fn(Event) -> bool + Send + Sync>;
 
+pub(crate) type EventHandler = Arc<dyn Fn(Event) -> bool + Send + Sync>;
 /// Extension for tvpes
 pub trait EventHandlingExt {
     /// Add an event handler to handle a specific event type.
@@ -562,4 +567,24 @@ pub trait EventHandlingExt {
     /// Dispatch an event. Returns a boolean indicating whether the event was
     /// consumed by any of the handlers.
     fn dispatch_event(&self, event: Event) -> bool;
+}
+
+impl FromPyObject<'_> for EventKind {
+    fn extract_bound(ob: &pyo3::Bound<'_, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let kind = ob.extract::<String>()?;
+        // try to convert the string to an EventKind
+        let kind = EventKind::from_str(&kind).map_err(|_| {
+            let possible_kinds = EventKind::VARIANTS
+                .iter()
+                .map(|v| format!("{:}", v))
+                .collect::<Vec<_>>()
+                .join(", ");
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid event kind '{:}'. Possible values are: {:}",
+                kind, possible_kinds
+            ))
+        })?;
+
+        Ok(kind)
+    }
 }

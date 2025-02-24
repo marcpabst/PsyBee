@@ -1,4 +1,6 @@
-from psybee import run_experiment, ShapeStimulus, Shape, GaborStimulus, ImageStimulus, Transformation2D
+from psybee import run_experiment
+from psybee.visual.geometry import Transformation2D, Shape
+from psybee.visual.stimuli import ShapeStimulus, GaborStimulus, ImageStimulus
 import time
 import sys
 
@@ -7,11 +9,28 @@ def my_experiment(exp_manager) -> None:
 
     main_window = exp_manager.create_default_window(0)
 
-    main_window.add_event_handler("KeyPress", lambda e: sys.exit(0) if e.key == "Q" else None)
+    circle = ShapeStimulus(Shape.circle(0, 0, "0.01sw"), x=-100, fill_color=(1, 0, 0, 1))
+
+    def circle_move(event):
+        x, y = event.position
+        # print(x, y)
+        circle["x"] = x
+        circle["y"] = y
+
+    def circle_click(event):
+        circle["fill_color"] = "yellow"
+
+    def circle_release(event):
+        circle["fill_color"] = "blue"
+
+    main_window.add_event_handler("key_press", lambda e: sys.exit(0) if e.key == "Q" else None)
+    main_window.add_event_handler("cursor_moved", circle_move)
+    main_window.add_event_handler("mouse_button_press", circle_click)
+    main_window.add_event_handler("mouse_button_release", circle_release)
 
     event_receiver = main_window.create_event_receiver()
 
-    rect0 = ShapeStimulus(Shape.rectangle("-0.25sw", "-0.25sh", "0.25sw", "0.25sh"), fill_color=(1, 0, 0, 1))
+    rect0 = ShapeStimulus(Shape.rectangle("-0.5sw", "-0.5sh", "1sw", "0.5sh"), fill_color=(1, 0, 0, 1))
     rect1 = ShapeStimulus(Shape.rectangle("-0.25sw", "-0.25sh", "0.25sw", "0.25sh"), fill_color=(0, 0, 0, 1))
     image = ImageStimulus("test.png", "-0.25sw", "-0.25sh",  main_window, "0.25sw", "0.25sw", anchor = "center")
     rect2 = ShapeStimulus(Shape.rectangle(0, 0, "0.25sw", "0.25sw"), stroke_color=(1, 0, 0, 1), stroke_width=10)
@@ -23,6 +42,7 @@ def my_experiment(exp_manager) -> None:
     for i in range(10000000):
         frame = main_window.get_frame()
 
+
         angle = (i / 10) % 360
 
         gabor.rotated_at(angle, 0, 0)
@@ -30,9 +50,6 @@ def my_experiment(exp_manager) -> None:
         rect2.rotated_at(-angle, 0, 0)
         image.rotated_at(-angle, 0, 0)
 
-        frame.draw(gabor)
-        frame.draw(image)
-        frame.draw(rect2)
 
         keys = event_receiver.poll()
 
@@ -48,9 +65,15 @@ def my_experiment(exp_manager) -> None:
         if is_visible2:
             frame.draw(rect0)
 
+        frame.draw(gabor)
+        frame.draw(image)
+        frame.draw(rect2)
+        frame.draw(circle)
+
         is_visible2 = not is_visible2
 
         main_window.present(frame)
+
 
 
 

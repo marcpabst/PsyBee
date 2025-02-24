@@ -1,0 +1,77 @@
+site_name: PsyBee
+site_url: https://psybee.org/
+repo_url: https://github.com/marcpabst/psybee
+repo_name: marcpabst/psybee
+docs_dir: user-guide
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.footer
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/beehive-outline
+# extra_css:
+#   - stylesheets/styles.css
+
+markdown_extensions:
+  - footnotes
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          # format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  # - pymdownx.emoji:
+  #     emoji_index: !!python/name:material.extensions.emoji.twemoji
+  #     emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - admonition
+  - pymdownx.details
+  - md_in_html
+
+watch:
+  - user-guide
+
+# order of the pages in the navigation
+nav:
+  - Home: index.md
+  - User Guide:
+      - Getting Started: getting-started/index.md
+      - getting-started/installation.md
+      - Tutorials:
+          - getting-started/tutorial1.md
+      - Concepts:
+          - concepts/frame.md
+          - concepts/colours.md
+          - concepts/events.md
+          - concepts/sizes.md
+          - concepts/visual-stimuli/index.md
+      - advanced/index.md
+      - Background:
+          - background/graphicspipeline.md
+          - background/colours.md
+  - API:
+      - api/index.md
+      - api/window.md
+      - api/events.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [psybee/psybee]
+
+          options:
+            filters:
+              - "!^__"
+            find_stubs_package: false
+
+            allow_inspection: true
+            force_inspection: true
+            docstring_style: numpy
+            show_source: false
+            show_type_annotations: true

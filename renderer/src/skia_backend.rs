@@ -312,7 +312,7 @@ impl Renderer for SkiaRenderer {
         height: u32,
         scene: &mut dyn Scene,
     ) {
-        let mut skia_context = self.context.borrow_mut();
+        let mut skia_context = self.context.try_borrow_mut().expect("Failed to borrow skia context");
 
         // create a new surface
         #[cfg(target_os = "windows")]

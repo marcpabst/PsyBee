@@ -130,7 +130,7 @@ pub trait StimulusParams {
 }
 
 /// The stimulus trait.
-pub trait Stimulus: downcast_rs::Downcast + std::fmt::Debug {
+pub trait Stimulus: downcast_rs::Downcast + std::fmt::Debug + Send {
     /// Draw the stimulus onto the frame.
     fn draw(&mut self, scene: &mut Frame);
 
@@ -278,12 +278,9 @@ pub struct DynamicStimulus(Arc<Mutex<dyn Stimulus>>);
 /// Wraps a Stimulus. This class is used either as a base class for other
 /// stimulus classes or as a standalone class, when no specific runtume type
 /// information is available.
-#[pyclass(name = "Stimulus", subclass)]
-#[pyo3(unsendable)]
+#[pyclass(name = "Stimulus", subclass, module = "psybee.visual.stimuli")]
 #[derive(Debug, Clone)]
 pub struct PyStimulus(DynamicStimulus);
-
-// bing back WrappedStimulus
 
 impl DynamicStimulus {
     pub fn new(stimulus: impl Stimulus + 'static) -> Self {
@@ -315,13 +312,19 @@ macro_rules! downcast_stimulus {
     };
 }
 
-macro_rules! downcast_stimulus_mut {
+macro_rules! downcast_py_stimulus_mut {
     ($slf:ident, $name:ident) => {
         $slf.as_super()
             .0
             .lock()
             .downcast_mut::<$name>()
             .expect("downcast failed")
+    };
+}
+
+macro_rules! downcast_stimulus_mut {
+    ($slf:ident, $name:ident) => {
+        $slf.0.lock().downcast_mut::<$name>().expect("downcast failed")
     };
 }
 
@@ -334,13 +337,16 @@ macro_rules! impl_pystimulus_for_wrapper {
 
         use crate::visual::{
             geometry::IntoSize,
-            stimuli::{downcast_stimulus, downcast_stimulus_mut, IntoStimulusParamValue, Repeat, TransitionFunction},
+            stimuli::{
+                downcast_py_stimulus_mut, downcast_stimulus, downcast_stimulus_mut, IntoStimulusParamValue, Repeat,
+                TransitionFunction,
+            },
             window::Window,
         };
 
         #[pymethods]
         impl $wrapper {
-            fn __getitem__(mut slf: PyRef<'_, Self>, name: &str) -> PyResult<Py<PyAny>> {
+            fn __getitem__(slf: PyRef<'_, Self>, name: &str) -> PyResult<Py<PyAny>> {
                 let py = slf.py();
 
                 let param = downcast_stimulus!(slf, $name).get_param(name);
@@ -359,40 +365,87 @@ macro_rules! impl_pystimulus_for_wrapper {
                 }
             }
 
-            fn __setitem__(mut slf: PyRefMut<'_, Self>, name: &str, value: Py<PyAny>) -> PyResult<()> {
+            fn __setitem__(slf: Bound<Self>, name: &str, value: Py<PyAny>) -> PyResult<()> {
                 let py = slf.py();
 
-                let current_val = &downcast_stimulus!(slf, $name).get_param(name).unwrap();
+                // get DynamicStimulus from the wrapper
+                let dynamic_stimulus = slf.as_super().borrow().0.clone();
+
+                let current_val = py.allow_threads(move || dynamic_stimulus.0.lock().unwrap().get_param(name).unwrap());
+
+                let dynamic_stimulus = slf.as_super().borrow().0.clone();
 
                 match current_val {
                     StimulusParamValue::String(_) => {
                         let value = value.extract::<String>(py)?;
-                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::String(value));
+                        let value = StimulusParamValue::String(value);
+
+                        py.allow_threads(move || {
+                            let mut ds = dynamic_stimulus.0.lock().unwrap();
+                            let ds = ds.downcast_mut::<$name>().expect("downcast failed");
+                            ds.set_param(name, value);
+                        });
+
                         return Ok(());
                     }
                     StimulusParamValue::Size(_) => {
                         let value = value.extract::<IntoSize>(py)?;
-                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::Size(value.into()));
+                        let value = StimulusParamValue::Size(value.into());
+
+                        py.allow_threads(move || {
+                            let mut ds = dynamic_stimulus.0.lock().unwrap();
+                            let ds = ds.downcast_mut::<$name>().expect("downcast failed");
+                            ds.set_param(name, value);
+                        });
+
                         return Ok(());
                     }
                     StimulusParamValue::f64(_) => {
                         let value = value.extract::<f64>(py)?;
-                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::f64(value));
+                        let value = StimulusParamValue::f64(value);
+
+                        py.allow_threads(move || {
+                            let mut ds = dynamic_stimulus.0.lock().unwrap();
+                            let ds = ds.downcast_mut::<$name>().expect("downcast failed");
+                            ds.set_param(name, value);
+                        });
+
                         return Ok(());
                     }
                     StimulusParamValue::bool(_) => {
                         let value = value.extract::<bool>(py)?;
-                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::bool(value));
+                        let value = StimulusParamValue::bool(value);
+
+                        py.allow_threads(move || {
+                            let mut ds = dynamic_stimulus.0.lock().unwrap();
+                            let ds = ds.downcast_mut::<$name>().expect("downcast failed");
+                            ds.set_param(name, value);
+                        });
+
                         return Ok(());
                     }
                     StimulusParamValue::i64(_) => {
                         let value = value.extract::<i64>(py)?;
-                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::i64(value));
+                        let value = StimulusParamValue::i64(value);
+
+                        py.allow_threads(move || {
+                            let mut ds = dynamic_stimulus.0.lock().unwrap();
+                            let ds = ds.downcast_mut::<$name>().expect("downcast failed");
+                            ds.set_param(name, value);
+                        });
+
                         return Ok(());
                     }
                     StimulusParamValue::LinRgba(_) => {
-                        let value = value.extract::<crate::visual::color::LinRgba>(py)?;
-                        downcast_stimulus_mut!(slf, $name).set_param(name, StimulusParamValue::LinRgba(value));
+                        let value = value.extract::<crate::visual::color::IntoLinRgba>(py)?;
+                        let value = StimulusParamValue::LinRgba(value.into());
+
+                        py.allow_threads(move || {
+                            let mut ds = dynamic_stimulus.0.lock().unwrap();
+                            let ds = ds.downcast_mut::<$name>().expect("downcast failed");
+                            ds.set_param(name, value);
+                        });
+
                         return Ok(());
                     }
                     _ => {}
@@ -403,13 +456,13 @@ macro_rules! impl_pystimulus_for_wrapper {
 
             /// Rotate the stimulus at a given point.
             fn rotated_at(mut slf: PyRefMut<'_, Self>, angle: f32, x: IntoSize, y: IntoSize) -> PyRefMut<'_, Self> {
-                downcast_stimulus_mut!(slf, $name).rotate_point(angle, x.into(), y.into());
+                downcast_py_stimulus_mut!(slf, $name).rotate_point(angle, x.into(), y.into());
                 slf
             }
 
             /// Translate the stimulus.
             fn translated(mut slf: PyRefMut<'_, Self>, x: IntoSize, y: IntoSize) -> PyRefMut<'_, Self> {
-                downcast_stimulus_mut!(slf, $name).translate(x.into(), y.into());
+                downcast_py_stimulus_mut!(slf, $name).translate(x.into(), y.into());
                 slf
             }
 
@@ -421,19 +474,19 @@ macro_rules! impl_pystimulus_for_wrapper {
                 x: IntoSize,
                 y: IntoSize,
             ) -> PyRefMut<'_, Self> {
-                downcast_stimulus_mut!(slf, $name).scale_point(sx, sy, x.into(), y.into());
+                downcast_py_stimulus_mut!(slf, $name).scale_point(sx, sy, x.into(), y.into());
                 slf
             }
 
             // Hide the stimulus
             fn hide(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
-                downcast_stimulus_mut!(slf, $name).hide();
+                downcast_py_stimulus_mut!(slf, $name).hide();
                 slf
             }
 
             // Show the stimulus
             fn show(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
-                downcast_stimulus_mut!(slf, $name).show();
+                downcast_py_stimulus_mut!(slf, $name).show();
                 slf
             }
 
@@ -446,7 +499,17 @@ macro_rules! impl_pystimulus_for_wrapper {
                 downcast_stimulus!(slf, $name).contains(x.into(), y.into(), window)
             }
 
-            // Animate the stimulus
+            /// Animate a parameter of the stimulus.
+            /// The parameter must be a valid parameter of the stimulus.
+            ///
+            /// Parameters
+            /// ----------
+            /// param_name : str
+            ///    The name of the parameter to animate.
+            /// to :
+            ///   The target value of the animation.
+            /// duration : float
+            ///  The duration of the animation in seconds.
             fn animate(mut slf: PyRefMut<'_, Self>, param_name: &str, to: Py<PyAny>, duration: f64) -> PyResult<()> {
                 let from = downcast_stimulus!(slf, $name)
                     .get_param(param_name)
@@ -472,7 +535,7 @@ macro_rules! impl_pystimulus_for_wrapper {
                     _ => return Err(PyValueError::new_err("invalid value type for animation")),
                 };
 
-                downcast_stimulus_mut!(slf, $name).animate(
+                downcast_py_stimulus_mut!(slf, $name).animate(
                     param_name,
                     from.into(),
                     to.into(),
@@ -486,6 +549,7 @@ macro_rules! impl_pystimulus_for_wrapper {
     };
 }
 
+pub(crate) use downcast_py_stimulus_mut;
 pub(crate) use downcast_stimulus;
 pub(crate) use downcast_stimulus_mut;
 pub(crate) use impl_pystimulus_for_wrapper;

@@ -59,7 +59,7 @@ impl App {
     pub fn new() -> Self {
         let (action_sender, action_receiver) = std::sync::mpsc::channel();
 
-        let backend = wgpu::Backends::DX12 | wgpu::Backends::METAL;
+        let backend = wgpu::Backends::PRIMARY;
         let instance_desc = wgpu::InstanceDescriptor {
             backends: backend,
             // use defaults for the rest
@@ -260,7 +260,7 @@ impl App {
     /// * `experiment_fn` - The function that is your experiment. This function
     ///   will be called with a `Window` object that you can use to create
     ///   stimuli and submit frames to the window.
-    pub fn run_experiment<F>(&mut self, experiment_fn: F)
+    pub fn run_experiment<F>(&mut self, experiment_fn: F) -> Result<(), errors::PsybeeError>
     where
         F: FnOnce(ExperimentManager) -> Result<(), errors::PsybeeError> + 'static + Send,
     {
@@ -284,12 +284,16 @@ impl App {
                 // throw error
                 log::error!("Experiment failed with {:?}: {:}", e, e);
                 // quit program
-                std::process::exit(1);
+                panic!("Experiment failed with {:?}: {:}", e, e.to_string());
+                // std::process::exit(1);
             }
         });
 
         // start event loop
         let _ = event_loop.run_app(self);
+        println!("event loop finished");
+        // this should never return
+        Ok(())
     }
 
     // Start a thread that will dispath
@@ -297,11 +301,11 @@ impl App {
 
 impl ApplicationHandler<()> for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        println!("resumed");
+        println!("app resumed");
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: ()) {
-        println!("user event");
+        println!("received user event");
         // check if we need to create a new window
         self.action_receiver.try_recv().map(|action| match action {
             EventLoopAction::CreateNewWindow(options, sender) => {
@@ -349,13 +353,25 @@ impl ApplicationHandler<()> for App {
                     window.resize(size);
                 }
             }
-            WindowEvent::KeyboardInput {
-                device_id,
-                event: _,
-                is_synthetic,
-            } => {
+            WindowEvent::KeyboardInput { .. }
+            | WindowEvent::CursorMoved { .. }
+            | WindowEvent::MouseInput { .. }
+            | WindowEvent::MouseWheel { .. } => {
                 // find the window
                 let window = self.windows.iter().find(|w| w.winit_id == window_id);
+
+                // if this was a cursor moved event, update the mouse position
+                if let WindowEvent::CursorMoved { position, .. } = event {
+                    if let Some(window) = window {
+                        let mut window_state = window.state.lock().unwrap();
+                        let win_size = window_state.size;
+                        let shifted_position = (
+                            position.x as f32 - win_size.width as f32 / 2.0,
+                            position.y as f32 - win_size.height as f32 / 2.0,
+                        );
+                        window_state.mouse_position = Some(shifted_position);
+                    }
+                }
 
                 if let Some(window) = window {
                     if let Some(input) = Event::try_from_winit(event.clone(), &window).ok() {

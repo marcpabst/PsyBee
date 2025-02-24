@@ -70,6 +70,28 @@ impl ShapeStimulus {
 
 #[derive(Debug, Clone)]
 #[pyclass(name = "ShapeStimulus", extends=PyStimulus)]
+/// A stimulus that displays a shape.
+///
+/// Parameters
+/// ----------
+/// shape : Shape
+///     The shape to display.
+/// x : Size, optional
+///     The x-coordinate of the center of the shape.
+/// y : Size, optional
+///     The y-coordinate of the center of the shape.
+/// fill_color : Union[LinRgba, (float, float, float), (float, float, float, float), str], optional
+///    The fill color of the shape.
+/// stroke_style : StrokeStyle, optional
+///    The stroke style of the shape.
+/// stroke_color : Union[LinRgba, (float, float, float), (float, float, float, float), str], optional
+///   The stroke color of the shape.
+/// stroke_width : Union[Size, float], optional
+///  The stroke width of the shape.
+/// alpha : float, optional
+///  The alpha channel of the shape.
+/// transform : Transformation2D, optional
+/// The transformation of the shape.
 pub struct PyShapeStimulus();
 
 #[pymethods]
@@ -86,6 +108,28 @@ impl PyShapeStimulus {
         alpha = None,
         transform = Transformation2D::Identity()
     ))]
+    /// A stimulus that displays a shape.
+    ///
+    /// Parameters
+    /// ----------
+    /// shape : Shape
+    ///     The shape to display.
+    /// x : Size, optional
+    ///     The x-coordinate of the center of the shape.
+    /// y : Size, optional
+    ///     The y-coordinate of the center of the shape.
+    /// fill_color : Union[LinRgba, (float, float, float), (float, float, float, float), str], optional
+    ///    The fill color of the shape.
+    /// stroke_style : StrokeStyle, optional
+    ///    The stroke style of the shape.
+    /// stroke_color : Union[LinRgba, (float, float, float), (float, float, float, float), str], optional
+    ///   The stroke color of the shape.
+    /// stroke_width : Union[Size, float], optional
+    ///    The stroke width of the shape.
+    /// alpha : float, optional
+    ///    The alpha channel of the shape.
+    /// transform : Transformation2D, optional
+    ///    The transformation of the shape.
     fn __new__(
         shape: Shape,
         x: IntoSize,
@@ -139,8 +183,10 @@ impl Stimulus for ShapeStimulus {
         let windows_size = window_state.size;
         let screen_props = window_state.physical_screen;
 
-        let x = self.params.x.eval(windows_size, screen_props) as f64;
-        let y = self.params.y.eval(windows_size, screen_props) as f64;
+        let x_origin = self.params.x.eval(windows_size, screen_props) as f64;
+        let y_origin = self.params.y.eval(windows_size, screen_props) as f64;
+
+        // println!("x_origin: {}, y_origin: {}", x_origin, y_origin);
 
         let fill_brush = super::helpers::create_fill_brush(
             &self.params.fill_color,
@@ -165,6 +211,10 @@ impl Stimulus for ShapeStimulus {
                 let y = y.eval(windows_size, screen_props) as f64;
                 let radius = radius.eval(windows_size, screen_props) as f64;
 
+                // move by x_origin and y_origin
+                let x = x + x_origin;
+                let y = y + y_origin;
+
                 let shape = renderer::shapes::Shape::circle((x, y), radius);
 
                 frame.scene_mut().draw_shape_fill(shape, fill_brush.clone(), None, None);
@@ -178,6 +228,10 @@ impl Stimulus for ShapeStimulus {
                 let y = y.eval(windows_size, screen_props) as f64;
                 let width = width.eval(windows_size, screen_props) as f64;
                 let height = height.eval(windows_size, screen_props) as f64;
+
+                // move by x_origin and y_origin
+                let x = x + x_origin;
+                let y = y + y_origin;
 
                 let shape = renderer::shapes::Shape::rectangle((x, y), width, height);
 

@@ -10,8 +10,9 @@ use async_channel::{bounded, Receiver, Sender};
 use derive_debug::Dbg;
 use experiment::{py_run_experiment, ExperimentManager};
 use futures_lite::{future::block_on, Future};
-use pyo3::prelude::*;
+use pyo3::{prelude::*, py_run};
 use renderer::wgpu_renderer;
+use visual::geometry::Size;
 use wgpu::{MemoryHints, TextureFormat};
 use winit::{
     event::{Event as WinitEvent, WindowEvent},
@@ -42,26 +43,66 @@ use pyo3::types::{PyDict, PyList, PyTuple, PyType};
 
 use crate::visual::window::Frame;
 
+// macro that adds a sub-module to the current module
+// example usage:
+//
+macro_rules! new_submodule {
+    ($supermodule:ident, $supermodule_name:literal, $name:literal) => {{
+        let m = PyModule::new($supermodule.py(), $name)?;
+        m.setattr("__module__", concat!($supermodule_name, ".", $name))?;
+        m.py()
+            .import("sys")?
+            .getattr("modules")?
+            .set_item(concat!($supermodule_name, ".", $name), &m)?;
+        $supermodule.add_submodule(&m)?;
+        m
+    }};
+}
+
 /// This module is implemented in Rust.
 #[pymodule]
 fn psybee(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // m.add_class::<WindowOptions>()?;
-    m.add_class::<ExperimentManager>()?;
-    m.add_class::<visual::stimuli::gabor::PyGaborStimulus>()?;
-    // m.add_class::<visual::stimuli::text::PyTextStimulus>()?;
-    m.add_class::<visual::stimuli::image::PyImageStimulus>()?;
-    // m.add_class::<visual::stimuli::video::PyVideoStimulus>()?;
-    // m.add_class::<visual::stimuli::vector::PyVectorStimulus>()?;
-    // m.add_class::<visual::stimuli::sprite::PySpriteStimulus>()?;
-    // m.add_class::<visual::stimuli::grid::PyGridStimulus>()?;
-    m.add_class::<visual::stimuli::shape::PyShapeStimulus>()?;
-    m.add_class::<visual::geometry::Size>()?;
-    m.add_class::<visual::geometry::Transformation2D>()?;
-    m.add_class::<visual::geometry::Shape>()?;
-    m.add_class::<visual::geometry::Size>()?;
-    m.add_class::<visual::color::LinRgba>()?;
-
     m.add_function(wrap_pyfunction!(py_run_experiment, m)?);
+    m.add_class::<ExperimentManager>()?;
+
+    let m_visual = {
+        let m = new_submodule!(m, "psybee", "visual");
+
+        let m_stimuli = {
+            let m = new_submodule!(m, "psybee.visual", "stimuli");
+            m.add_class::<visual::stimuli::PyStimulus>()?;
+            m.add_class::<visual::stimuli::gabor::PyGaborStimulus>()?;
+            m.add_class::<visual::stimuli::image::PyImageStimulus>()?;
+            m.add_class::<visual::stimuli::shape::PyShapeStimulus>()?;
+            m
+        };
+
+        m.add_submodule(&m_stimuli)?;
+
+        let m_geometry = {
+            let m = new_submodule!(m, "psybee.visual", "geometry");
+            m.add_class::<visual::geometry::Transformation2D>()?;
+            m.add_class::<visual::geometry::Shape>()?;
+            m.add_class::<visual::geometry::Size>()?;
+            m
+        };
+
+        m.add_submodule(&m_geometry)?;
+
+        let m_colors = {
+            let m = new_submodule!(m, "psybee.visual", "colors");
+            m.add_class::<visual::geometry::Transformation2D>()?;
+            m.add_class::<visual::geometry::Shape>()?;
+            m.add_class::<visual::geometry::Size>()?;
+            m
+        };
+
+        m.add_submodule(&m_colors)?;
+
+        m
+    };
+
+    m.add_submodule(&m_visual)?;
 
     Ok(())
 }

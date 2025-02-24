@@ -135,7 +135,7 @@ impl GaborStimulus {
 }
 
 #[derive(Debug, Clone)]
-#[pyclass(name = "GaborStimulus", extends=PyStimulus)]
+#[pyclass(name = "GaborStimulus", extends=PyStimulus, module = "psybee.visual.stimuli")]
 pub struct PyGaborStimulus();
 
 #[pymethods]
@@ -151,6 +151,7 @@ impl PyGaborStimulus {
         orientation = 0.0,
         anchor = Anchor::Center
     ))]
+    /// Create a new Gabor stimulus.
     fn __new__(
         cx: IntoSize,
         cy: IntoSize,

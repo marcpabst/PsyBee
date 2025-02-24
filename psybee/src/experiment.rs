@@ -4,7 +4,7 @@ use derive_debug::Dbg;
 use pyo3::{
     pyclass, pyfunction, pymethods,
     types::{PyDict, PyList, PyListMethods, PySequenceMethods, PyTuple, PyTupleMethods},
-    IntoPy, Py, PyAny, Python,
+    IntoPy, Py, PyAny, PyResult, Python,
 };
 use winit::event_loop::EventLoopProxy;
 
@@ -109,9 +109,9 @@ impl ExperimentManager {
         window
     }
 
-    /// Create a default window. This is a convenience function that creates a
+    /// Create a new window. This is a convenience function that creates a
     /// window with the default options.
-    pub fn create_default_window(&self, monitor: Option<u32>) -> Window {
+    pub fn create_default_window(&self, fullscreen: bool, monitor: Option<u32>) -> Window {
         // select monitor 1 if available
         // find all monitors available
         let monitors = self.get_available_monitors();
@@ -145,9 +145,25 @@ impl ExperimentManager {
 #[pymethods]
 impl ExperimentManager {
     #[pyo3(name = "create_default_window")]
-    #[pyo3(signature = (monitor = None))]
-    fn py_create_default_window(&self, monitor: Option<u32>) -> Window {
-        self.create_default_window(monitor)
+    #[pyo3(signature = (fullscreen = false, monitor = None))]
+    /// Create a new window. This is a convenience function that creates a
+    /// window with the default options. When `fullscreen` is set to `true`,
+    /// `monitor` can be used to select the monitor to use. Monitor enumeration
+    /// is OS-specific and the primary monitor may not always be at index 0.
+    ///
+    /// Parameters
+    /// ----------
+    /// fullscreen : bool, optional
+    ///   Whether to create a fullscreen window. Defaults to `false`.
+    /// monitor : int, optional
+    ///   The index of the monitor to use. Defaults to 0.
+    ///
+    /// Returns
+    /// -------
+    /// Window
+    ///  The new window.
+    fn py_create_default_window(&self, fullscreen: bool, monitor: Option<u32>) -> Window {
+        self.create_default_window(fullscreen, monitor)
     }
 
     #[pyo3(name = "get_available_monitors")]
@@ -157,8 +173,7 @@ impl ExperimentManager {
 }
 
 /// Runs your experiment function. This function will block the current thread
-/// until the experiment function returns.
-/// returns.
+/// until the experiment function returns!
 ///
 /// Parameters
 /// ----------
@@ -166,7 +181,12 @@ impl ExperimentManager {
 ///    The function that runs your experiment. This function should take a single argument, an instance of `ExperimentManager`, and should not return nothing.
 #[pyfunction]
 #[pyo3(name = "run_experiment", signature = (experiment_fn, *args, **kwargs))]
-pub fn py_run_experiment(py: Python, experiment_fn: Py<PyAny>, args: Py<PyTuple>, kwargs: Option<Py<PyDict>>) {
+pub fn py_run_experiment(
+    py: Python,
+    experiment_fn: Py<PyAny>,
+    args: Py<PyTuple>,
+    kwargs: Option<Py<PyDict>>,
+) -> PyResult<()> {
     let rust_experiment_fn = move |em: ExperimentManager| -> Result<(), errors::PsybeeError> {
         Python::with_gil(|py| -> _ {
             // bind kwargs
@@ -188,13 +208,14 @@ pub fn py_run_experiment(py: Python, experiment_fn: Py<PyAny>, args: Py<PyTuple>
             let args = args.to_tuple().unwrap();
 
             experiment_fn.call_bound(py, args, Some(&kwargs))
-        })
-        .unwrap();
+        })?;
         Ok(())
     };
 
     // create app
     let mut app = App::new();
 
-    py.allow_threads(move || app.run_experiment(rust_experiment_fn));
+    py.allow_threads(move || app.run_experiment(rust_experiment_fn))?; // run the experiment
+    println!("Experiment finished");
+    Ok(())
 }

@@ -69,7 +69,7 @@ impl NumberOrSize {
 /// let unit = Size::ScreenHeight(0.1);
 /// ```
 #[derive(Clone, Debug)]
-#[pyclass]
+#[pyclass(module = "psybee.visual")]
 pub enum Size {
     // Physical pixels
     Pixels(f32),
@@ -541,6 +541,34 @@ impl Transformation2D {
     }
 }
 
+#[pymethods]
+impl Transformation2D {
+    /// Create a new identity transformation.
+    ///
+    /// Returns
+    /// -------
+    /// Transformation2D
+    ///    The identity transformation.
+    #[staticmethod]
+    fn identity() -> Transformation2D {
+        Transformation2D::Identity()
+    }
+
+    /// Create a new rotation around the origin.
+    ///
+    /// Parameters
+    /// ----------
+    /// angle : float
+    ///    The angle of rotation in degrees.
+    /// Returns
+    /// -------
+    /// Transformation2D
+    ///   The rotation transformation.
+    #[staticmethod]
+    fn rotation_origin(angle: f32) -> Transformation2D {
+        Transformation2D::RotationOrigin(angle)
+    }
+}
 // allow multiplication of transformations
 impl std::ops::Mul for Transformation2D {
     type Output = Transformation2D;
@@ -594,7 +622,21 @@ impl Shape {
     }
 
     #[staticmethod]
-    /// Create a new circle.
+    /// Create a new circle, centered at (x, y) with the given radius.
+    ///
+    /// Parameters
+    /// ----------
+    /// x : Size or float
+    ///    The x-coordinate of the center of the circle.
+    /// y : Size or float
+    ///    The y-coordinate of the center of the circle.
+    /// radius : Size or float
+    ///    The radius of the circle.
+    ///
+    /// Returns
+    /// -------
+    /// Shape
+    ///  The circle.
     fn circle(x: IntoSize, y: IntoSize, radius: IntoSize) -> Shape {
         Shape::Circle {
             x: x.into(),
@@ -605,6 +647,22 @@ impl Shape {
 
     #[staticmethod]
     /// Create a new line.
+    ///
+    /// Parameters
+    /// ----------
+    /// x1 : Size or float
+    ///   The x-coordinate of the start of the line.
+    /// y1 : Size or float
+    ///   The y-coordinate of the start of the line.
+    /// x2 : Size or float
+    ///   The x-coordinate of the end of the line.
+    /// y2 : Size or float
+    ///   The y-coordinate of the end of the line.
+    ///
+    /// Returns
+    /// -------
+    /// Shape
+    ///   The line.
     fn line(x1: IntoSize, y1: IntoSize, x2: IntoSize, y2: IntoSize) -> Shape {
         Shape::Line {
             x1: x1.into(),
@@ -616,6 +674,21 @@ impl Shape {
 
     #[staticmethod]
     /// Create a new ellipse.
+    ///
+    /// Parameters
+    /// ----------
+    /// x : Size or float
+    ///     The x-coordinate of the center of the ellipse.
+    /// y : Size or float
+    ///     The y-coordinate of the center of the ellipse.
+    /// radius_x : Size or float
+    ///     The radius of the ellipse in the x-direction.
+    /// radius_y : Size or float
+    ///     The radius of the ellipse in the y-direction.
+    /// Returns
+    /// -------
+    /// Shape
+    ///     The ellipse.
     fn ellipse(x: IntoSize, y: IntoSize, radius_x: IntoSize, radius_y: IntoSize) -> Shape {
         Shape::Ellipse {
             x: x.into(),

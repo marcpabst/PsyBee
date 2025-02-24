@@ -10,5 +10,5 @@ if platform.system() == 'Darwin':
     os.environ["GST_PLUGIN_PATH"] = path + ":" + os.environ.get("GST_PLUGIN_PATH", "")
 
 __doc__ = psybee.__doc__
-if hasattr(psybee, "__all__"):
-    __all__ = psybee.__all__
+# if hasattr(psybee, "__all__"):
+#     __all__ = psybee.__all__

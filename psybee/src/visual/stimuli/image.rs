@@ -36,6 +36,8 @@ pub struct ImageStimulus {
     visible: bool,
 }
 
+unsafe impl Send for ImageStimulus {}
+
 impl ImageStimulus {
     pub fn from_image(
         image: DynamicBitmap,

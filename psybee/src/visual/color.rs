@@ -5,6 +5,29 @@ use crate::visual::geometry::IntoSize;
 
 #[pyclass(name = "LinRgba")]
 #[derive(Debug, Clone, Copy)]
+/// Create a new linear RGBA color.
+/// The alpha channel defaults to 1.0.
+///
+/// Parameters
+/// ----------
+/// r : float
+///    The red channel (0.0 to 1.0).
+/// g : float
+///   The green channel (0.0 to 1.0).
+/// b : float
+///  The blue channel.
+/// a : float, optional
+///   The alpha channel (0.0 to 1.0).
+///
+/// Returns
+/// -------
+/// LinRgba
+///  The linear RGBA color.
+///
+/// Examples
+/// --------
+/// >>> black = LinRgba(0.0, 0.0, 0.0)
+/// >>> blue = LinRgba.from_str("blue")
 pub struct LinRgba {
     pub r: f32,
     pub g: f32,
@@ -68,26 +91,47 @@ impl LinRgba {
 
     #[staticmethod]
     #[pyo3(name = "from_str")]
+    /// Create a new linear RGBA color from a CSS-style color string.
+    ///
+    /// Parameters
+    /// ----------
+    /// css_color_str : str
+    ///    The CSS-style color string.
+    ///
+    /// Returns
+    /// -------
+    /// LinRgba
+    ///   The linear RGBA color.
+    ///
+    /// Examples
+    /// --------
+    /// >>> black = LinRgba.from_str("black")
+    /// >>> blue = LinRgba.from_str("blue")
+    /// >>> dark_red = LinRgba.from_str("darkred")
     fn py_from_str(css_color_str: &str) -> Self {
         Self::from_str(css_color_str)
     }
 
     #[getter]
+    /// The red channel.
     fn r(&self) -> f32 {
         self.r
     }
 
     #[getter]
+    /// The green channel.
     fn g(&self) -> f32 {
         self.g
     }
 
     #[getter]
+    /// The blue channel.
     fn b(&self) -> f32 {
         self.b
     }
 
     #[getter]
+    /// The alpha channel.
     fn a(&self) -> f32 {
         self.a
     }

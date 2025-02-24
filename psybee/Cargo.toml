@@ -66,17 +66,17 @@ derive-debug = "0.1.2"
 downcast-rs = "1.2.1"
 dyn-clone = "1.0.17"
 enum-fields = "0.1.0"
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
 
-pyo3 = { version = "0.22.3", features = [
+pyo3 = { version = "0.23.4", features = [
     "extension-module",
     "abi3-py310",
     "multiple-pymethods",
 ] }
 send_wrapper = "0.6.0"
 regex = "1.10.6"
-numpy = "0.22.1"
+numpy = "0.23.*"
 strum_macros = "0.26.4"
 expand = "0.3.0"
 csscolorparser = "0.7.0"
