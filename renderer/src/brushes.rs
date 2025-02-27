@@ -1,5 +1,3 @@
-
-
 use crate::{
     affine::Affine,
     bitmaps::DynamicBitmap,
@@ -79,6 +77,7 @@ impl Gradient {
                 color: *color,
             })
             .collect();
+
         Self { extend, kind, stops }
     }
 }

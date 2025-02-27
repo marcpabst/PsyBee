@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use psybee_proc::StimulusParams;
+use psybee_proc::{FromPyStr, StimulusParams};
 use pyo3::{pyclass, pymethods};
 use renderer::{
     affine::Affine,
@@ -9,21 +9,29 @@ use renderer::{
     shapes::{Point, Shape},
     styles::BlendMode,
 };
+use strum::EnumString;
 use uuid::Uuid;
 
 use super::{
     animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
+    StrokeStyle,
 };
 use crate::visual::{
+    color::LinRgba,
     geometry::{Anchor, Size, Transformation2D},
     window::Frame,
 };
 
+#[derive(EnumString, Debug, Clone, Copy, PartialEq, FromPyStr)]
 pub enum Pattern {
     Sine,
     Square,
-    // Triangle,
-    // Sawtooth,
+}
+
+#[derive(EnumString, Debug, Clone, Copy, PartialEq, FromPyStr)]
+pub enum ColorInterpolation {
+    Linear,
+    Srgb,
 }
 
 #[derive(StimulusParams, Clone, Debug)]
@@ -35,6 +43,10 @@ pub struct GaborParams {
     pub phase: f64,
     pub sigma: Size,
     pub orientation: f64,
+    pub stroke_style: Option<StrokeStyle>,
+    pub stroke_color: Option<LinRgba>,
+    pub stroke_width: Option<Size>,
+    pub alpha: Option<f64>,
 }
 
 #[derive(Clone, Debug)]
@@ -45,6 +57,8 @@ pub struct GaborStimulus {
 
     pattern_colors: Vec<RGBA>,
     gaussian_colors: Option<Vec<RGBA>>,
+    pattern: Pattern,
+    color_interpolation: ColorInterpolation,
 
     transformation: Transformation2D,
     anchor: Anchor,
@@ -57,11 +71,17 @@ impl GaborStimulus {
         cx: Size,
         cy: Size,
         radius: Size,
+        pattern: Pattern,
         cycle_length: Size,
         phase: f64,
         sigma: Size,
         orientation: f64,
         anchor: Anchor,
+        color_interpolation: ColorInterpolation,
+        stroke_style: Option<StrokeStyle>,
+        stroke_color: Option<LinRgba>,
+        stroke_width: Option<Size>,
+        alpha: Option<f64>,
     ) -> Self {
         let gaussian_colors: Vec<RGBA> = (0..128)
             .map(|i| {
@@ -95,9 +115,15 @@ impl GaborStimulus {
                 phase,
                 sigma,
                 orientation,
+                stroke_style,
+                stroke_color,
+                stroke_width,
+                alpha,
             },
             pattern_colors: Self::create_sine_colors(256),
             gaussian_colors: Some(gaussian_colors),
+            pattern,
+            color_interpolation,
         }
     }
 
@@ -136,6 +162,38 @@ impl GaborStimulus {
 
 #[derive(Debug, Clone)]
 #[pyclass(name = "GaborStimulus", extends=PyStimulus, module = "psybee.visual.stimuli")]
+/// A 1D grating multiplied with a Gaussian envelope.
+///
+/// Parameters
+/// ----------
+/// cx : str or Number
+///   The x-coordinate of the center of the stimulus.
+/// cy : str or Number
+///   The y-coordinate of the center of the stimulus.
+/// radius : str or Number
+///   The radius of the stimulus.
+/// cycle_length : str or Number
+///   The length of a single cycle of the grating.
+/// sigma : str or Number
+///   The standard deviation of the Gaussian envelope.
+/// pattern : Literal['sine', 'square'], optional
+///   The pattern of the grating (default is 'sine').
+/// phase : float, optional
+///   The phase of the grating (default is 0.0).
+/// orientation : float, optional
+///   The orientation of the grating in degrees (default is 0.0).
+/// anchor : Literal['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'], optional
+///   The anchor point of the stimulus (default is 'center').
+/// color_interpolation : Literal['linear', 'srgb'], optional
+///   The color interpolation mode (default is 'linear').
+/// stroke_style : str or StrokeStyle, optional
+///   The stroke style of the stimulus.
+/// stroke_color : (float,float,float),  (float,float,float, float), str or LinRgba, optional
+///   The stroke color of the stimulus. Either an sRGB(A) tuple or a LinRgba color.
+/// stroke_width : str or Number, optional
+///   With of the stroke.
+/// alpha : float, optional
+///   The alpha value of the stimulus.
 pub struct PyGaborStimulus();
 
 #[pymethods]
@@ -147,9 +205,15 @@ impl PyGaborStimulus {
         radius,
         cycle_lenght,
         sigma,
+        pattern = Pattern::Sine,
         phase = 0.0,
         orientation = 0.0,
-        anchor = Anchor::Center
+        anchor = Anchor::Center,
+        color_interpolation = ColorInterpolation::Linear,
+        stroke_style = None,
+        stroke_color = None,
+        stroke_width = None,
+        alpha = None
     ))]
     /// Create a new Gabor stimulus.
     fn __new__(
@@ -158,9 +222,15 @@ impl PyGaborStimulus {
         radius: IntoSize,
         cycle_lenght: IntoSize,
         sigma: IntoSize,
+        pattern: Pattern,
         phase: f64,
         orientation: f64,
         anchor: Anchor,
+        color_interpolation: ColorInterpolation,
+        stroke_style: Option<StrokeStyle>,
+        stroke_color: Option<LinRgba>,
+        stroke_width: Option<IntoSize>,
+        alpha: Option<f64>,
     ) -> (Self, PyStimulus) {
         (
             Self(),
@@ -168,11 +238,17 @@ impl PyGaborStimulus {
                 cx.into(),
                 cy.into(),
                 radius.into(),
+                pattern,
                 cycle_lenght.into(),
                 phase,
                 sigma.into(),
                 orientation,
                 anchor,
+                color_interpolation,
+                stroke_style,
+                stroke_color,
+                stroke_width.map(Into::into),
+                alpha,
             )),
         )
     }
@@ -247,8 +323,14 @@ impl Stimulus for GaborStimulus {
         ));
 
         let transform = self.transformation.eval(window_size, screen_props);
-
-        scene.start_layer(BlendMode::SourceOver, gaussian_shape, Some(transform.into()), None, 1.0);
+        let alpha = self.params.alpha.unwrap_or(1.0);
+        scene.start_layer(
+            BlendMode::SourceOver,
+            gaussian_shape,
+            Some(transform.into()),
+            None,
+            alpha as f32,
+        );
         scene.draw_shape_fill(
             gaussian_shape,
             gaussian_brush,
@@ -263,7 +345,17 @@ impl Stimulus for GaborStimulus {
         );
         scene.end_layer();
 
-        // println!("Gaussian colors: {:?}", self.gaussian_colors);
+        // if the stimulus has a stroke, draw it
+        if let Some(stroke_style) = &self.params.stroke_style {
+            let stroke_color = self.params.stroke_color.unwrap_or(LinRgba::new(0.0, 0.0, 0.0, 1.0));
+            let stroke_brush = Brush::Solid(stroke_color.into());
+            let stroke_width = self.params.stroke_width.clone().unwrap_or(Size::Pixels(0.0));
+            let stroke_width = stroke_width.eval(window_size, screen_props) as f64;
+            let stroke_options = renderer::styles::StrokeStyle::new(stroke_width);
+
+            let shape = Shape::circle(Point { x: pos_x, y: pos_y }, radius);
+            scene.draw_shape_stroke(shape, stroke_brush, stroke_options, Some(transform.into()), None);
+        }
     }
 
     fn set_visible(&mut self, visible: bool) {

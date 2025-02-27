@@ -1,13 +1,12 @@
 from psybee import run_experiment
 from psybee.visual.geometry import Transformation2D, Shape
 from psybee.visual.stimuli import ShapeStimulus, GaborStimulus, ImageStimulus
-import time
 import sys
 
 def my_experiment(exp_manager) -> None:
     # create a new window
 
-    main_window = exp_manager.create_default_window()
+    main_window = exp_manager.create_default_window(fullscreen=True, monitor=1)
 
     circle = ShapeStimulus(Shape.circle(0, 0, "0.01sw"), x=-100, fill_color=(1, 0, 0, 1))
 
@@ -31,10 +30,10 @@ def my_experiment(exp_manager) -> None:
     event_receiver = main_window.create_event_receiver()
 
     rect0 = ShapeStimulus(Shape.rectangle("-0.5sw", "-0.5sh", "1sw", "0.5sh"), fill_color=(1, 0, 0, 1))
-    rect1 = ShapeStimulus(Shape.rectangle("-0.25sw", "-0.25sh", "0.25sw", "0.25sh"), fill_color=(0, 0, 0, 1))
+    rect1 = ShapeStimulus(Shape.rectangle("-0.5sw", "-0.5sh", "1sw", "1sh"), fill_color=(0, 0, 0, 1))
     image = ImageStimulus("test.png", "-0.25sw", "-0.25sh",  main_window, "0.25sw", "0.25sw", anchor = "center")
     rect2 = ShapeStimulus(Shape.rectangle(0, 0, "0.25sw", "0.25sw"), stroke_color=(1, 0, 0, 1), stroke_width=10)
-    gabor = GaborStimulus(0, 0, "0.25sw", 70, 50, anchor = "center")
+    gabor = GaborStimulus(0, 0, "0.25sw", 70, 50, anchor = "center", stroke_style="Solid", stroke_width=5)
 
     is_visible = False
     is_visible2 = False
@@ -62,8 +61,8 @@ def my_experiment(exp_manager) -> None:
         if is_visible:
             frame.draw(rect1)
 
-        if is_visible2:
-            frame.draw(rect0)
+        # if is_visible2:
+        #     frame.draw(rect0)
 
         frame.draw(gabor)
         frame.draw(image)

@@ -90,21 +90,22 @@ gstreamer-video = { version = "0.23.3", optional = true }
 tupleops = "0.1.1"
 anyhow = "1.0.93"
 pollster = "0.4.0"
+tikv-jemallocator = { version = "0.5.4", features = ["profiling"] }
 
 # MacOS dependencies
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5.1"
-#objc2-app-kit = { version = "0.2.0", features = [
-#    "NSAlert",
-#    "NSApplication",
-#    "NSTextField",
-#    "NSControl",
-#    "NSResponder",
-#    "NSView",
-#    "NSButton",
-#] }
+objc2-foundation = "0.2.0"
+
+# iOS dependencies
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2 = "0.5.1"
 objc2-foundation = "0.2.0"
 
 [features]
 # default = ["gst"]
 gst = ["dep:glib", "dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video"]
+
+# include debug symbols in release builds
+[profile.release]
+debug = true

@@ -6,6 +6,12 @@ platforms = ["win-64", "osx-arm64"]
 version = "0.1.0"
 
 [tasks]
+"build-py" = { cwd = "psybee", cmd = "maturin build" }
+"build-py-ios" = { cwd = "psybee", env = { PYTHON_VERSION = "3.10", PYTHONDIR = "$PIXI_PROJECT_ROOT/psybee/build_helpers/python_310_ios_arm64/ios-arm64" }, cmd = "build_helpers/build_ios.sh" }
+"build-docs" = "sphinx-build -M html docs/source/ docs/build/ -W -a -j auto -n --keep-going"
+
+"dev-py" = { cwd = "psybee", cmd = "maturin develop" }
+
 
 [dependencies]
 python = "3.10"
@@ -23,3 +29,4 @@ sphinx = ">=8.1.3,<9"
 sphinxcontrib-napoleon = ">=0.7, <0.8"
 sphinx-rtd-theme = ">=3.0.2, <4"
 pydata-sphinx-theme = ">=0.16.1, <0.17"
+briefcase = ">=0.3.22, <0.4"

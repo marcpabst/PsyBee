@@ -123,3 +123,8 @@ html_theme_options = {
     ],
     # END: social icons
 }
+
+
+html_css_files = [
+    'css/custom.css',
+]

@@ -6,7 +6,7 @@ use foreign_types_shared::ForeignType;
 use image::EncodableLayout;
 #[cfg(target_os = "windows")]
 use skia_safe::gpu::{d3d, d3d::BackendContext, Protected};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 use skia_safe::gpu::{mtl, mtl::BackendContext};
 #[cfg(target_os = "windows")]
 use windows::Win32::Graphics::Dxgi::Common::{
@@ -44,7 +44,6 @@ pub struct SkiaScene {
     // pub canvas: skia_safe::Canvas,
     pub width: u32,
     pub height: u32,
-    pub current_blend_mode: SkBlendMode,
 }
 
 pub struct SkiaRenderer {
@@ -83,7 +82,6 @@ impl SkiaScene {
             picture_recorder,
             width,
             height,
-            current_blend_mode: SkBlendMode::SrcOver,
         }
     }
 
@@ -209,14 +207,14 @@ impl Scene for SkiaScene {
         alpha: f32,
     ) {
         let mut canvas = self.picture_recorder.recording_canvas().unwrap();
-        let mut layer_paint = skia_safe::Paint::default();
-        layer_paint.set_alpha_f(alpha);
-        layer_paint.set_blend_mode(composite_mode.into());
-        let save_layer_rec = skia_safe::canvas::SaveLayerRec::default();
-        let save_layer_rec = save_layer_rec.paint(&layer_paint);
+        // let mut layer_paint = skia_safe::Paint::default();
+        // layer_paint.set_alpha_f(alpha);
+        // // layer_paint.set_blend_mode(composite_mode.into());
+        // let save_layer_rec = skia_safe::canvas::SaveLayerRec::default();
+        // let save_layer_rec = save_layer_rec.paint(&layer_paint);
 
-        canvas.save_layer(&save_layer_rec);
-        Self::clip_shape(&mut canvas, skia_safe::Paint::default(), clip, clip_transform);
+        canvas.save_layer_alpha_f(None, alpha);
+        // Self::clip_shape(&mut canvas, skia_safe::Paint::default(), clip, clip_transform);
 
         // update the current blend mode
         // self.current_blend_mode = composite_mode.into();
@@ -224,7 +222,6 @@ impl Scene for SkiaScene {
 
     fn end_layer(&mut self) {
         self.picture_recorder.recording_canvas().unwrap().restore();
-        self.current_blend_mode = SkBlendMode::SrcOver;
     }
 
     fn draw_shape_fill(
@@ -317,7 +314,7 @@ impl Renderer for SkiaRenderer {
         // create a new surface
         #[cfg(target_os = "windows")]
         let mut surface = Self::create_surface_dx12(device, width, height, texture, &self.backend, &mut skia_context);
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
         let mut surface = Self::create_surface_metal(device, width, height, texture, &self.backend, &mut skia_context);
 
         let canvas = surface.canvas();
@@ -378,7 +375,7 @@ impl Renderer for SkiaRenderer {
 }
 
 impl SkiaRenderer {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn try_create_backend_metal(device: &Device, queue: &Queue) -> Option<(mtl::BackendContext, gpu::DirectContext)> {
         let command_queue_ptr =
             unsafe { queue.as_hal::<wgpu::hal::api::Metal, _, _>(|queue| queue.map(|s| s.as_raw().as_ptr())) };
@@ -401,7 +398,7 @@ impl SkiaRenderer {
         }
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn create_surface_metal(
         device: &Device,
         width: u32,
@@ -521,7 +518,7 @@ impl SkiaRenderer {
         #[cfg(target_os = "windows")]
         let (backend, mut skia_context) = Self::try_create_backend_dx12(adapter, device, queue).unwrap();
 
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
         let (backend, mut skia_context) = Self::try_create_backend_metal(device, queue).unwrap();
 
         let font_manager = skia_safe::FontMgr::new();

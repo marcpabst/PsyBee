@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use wgpu::{
-    util::DeviceExt, BindGroup, Buffer, Device, Instance, Queue, RenderPipeline, Surface, Texture,
-    TextureFormat,
+    util::DeviceExt, BindGroup, Buffer, Device, Instance, Queue, RenderPipeline, Surface, Texture, TextureFormat,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -177,7 +176,7 @@ impl WgpuRenderer {
                         buffer: &device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                             label: Some("Gamma Buffer"),
                             contents: bytemuck::cast_slice(&[GammaParams {
-                                correction: 3, // 0: none, 1: psychopy, 2: polylog4, 3: polylog5, 4: polylog6
+                                correction: 0, // 0: none, 1: psychopy, 2: polylog4, 3: polylog5, 4: polylog6
                                 r: [
                                     0.9972361456765942,
                                     0.5718201120693766,

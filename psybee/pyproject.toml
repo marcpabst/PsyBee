@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.4,<=1.7.5"]
+requires = ["maturin>=1.4,<=1.9"]
 build-backend = "maturin"
 
 [project]
@@ -19,4 +19,3 @@ dynamic = ["version"]
 [tool.maturin]
 features = ["pyo3/extension-module"]
 cargo-extra-args = "--features extension-module"
-

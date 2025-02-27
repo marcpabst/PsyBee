@@ -1,0 +1,10 @@
+/* anything related to the light theme */
+:root[data-theme="light"] {
+    /* set variables */
+    --pst-color-background: #f7f7f2 !important;
+    --pst-font-family-base-system: sans-serif !important;
+    --pst-font-family-heading: serif !important;
+    --pst-color-text: #333 !important;
+    --pst-color-heading: rgb(9, 74, 206) !important;
+    --pst-color-surface: #dedede !important;
+}

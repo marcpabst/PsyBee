@@ -169,3 +169,34 @@ pub fn derive_call_fn(input: TokenStream) -> TokenStream {
 
     expanded.into()
 }
+
+// a derive macro that implements FromPyObject for a simple enum (from a snake_case string)
+// the enum must also implement strum::EnumString
+#[proc_macro_derive(FromPyStr)]
+pub fn derive_from_py_str(input: TokenStream) -> TokenStream {
+    // Parse the input (the enum on which we're deriving) into a syntax tree
+    let input = parse_macro_input!(input as DeriveInput);
+    let enum_ident = input.ident;
+
+    // Generate an impl block for the enum that adds `call_fn`.
+    // We make `call_fn` take `self` by value here; you can change it to `&self` if needed.
+    let expanded = quote! {
+
+
+
+        impl<'py> FromPyObject<'py> for #enum_ident {
+            fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+                use std::str::FromStr;
+                let s = ob.extract::<String>()?;
+                if let Ok(v) = #enum_ident::from_str(&s) {
+                    Ok(v)
+                } else {
+                    panic!("Invalid value for {}: {}", stringify!(#enum_ident), s)
+                    // Err(PyErr::new::<exceptions::ValueError, _>(format!("Invalid value for {}: {}", stringify!(#enum_ident), s)))
+                }
+            }
+        }
+    };
+
+    expanded.into()
+}

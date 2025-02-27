@@ -346,6 +346,14 @@ impl EventTryFrom<winit_event::WindowEvent> for Event {
                 //  let position = (Size::Pixels(position.x) - Size::ScreenWidth(0.5), Size::Pixels(-position.y) + Size::ScreenHeight(0.5));
                 let position = (touch.location.x as f32, touch.location.y as f32);
 
+                // move by x_origin and y_origin
+                let window_state = window.state.lock().unwrap();
+                let window_size = window_state.size;
+                let position = (
+                    position.0 - (window_size.width as f32 / 2.0),
+                    position.1 - (window_size.height as f32 / 2.0),
+                );
+
                 // dispatch on TouchPhase
                 match touch.phase {
                     winit_event::TouchPhase::Started => Event::TouchStart {
