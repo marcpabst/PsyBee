@@ -250,6 +250,12 @@ impl Event {
     fn py_key(&self) -> Option<String> {
         self.key().cloned()
     }
+
+    #[getter]
+    #[pyo3(name = "id")]
+    fn py_id(&self) -> Option<u64> {
+        self.id().cloned().flatten()
+    }
 }
 
 // Custom conversion from winit events to InputEvents.

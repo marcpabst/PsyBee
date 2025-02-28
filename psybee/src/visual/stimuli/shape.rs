@@ -250,7 +250,22 @@ impl Stimulus for ShapeStimulus {
                 todo!("Render ellipse")
             }
             Shape::Line { x1, y1, x2, y2 } => {
-                todo!("Render line")
+                let x1 = x1.eval(windows_size, screen_props) as f64;
+                let y1 = y1.eval(windows_size, screen_props) as f64;
+                let x2 = x2.eval(windows_size, screen_props) as f64;
+                let y2 = y2.eval(windows_size, screen_props) as f64;
+
+                // move by x_origin and y_origin
+                let x1 = x1 + x_origin;
+                let y1 = y1 + y_origin;
+                let x2 = x2 + x_origin;
+                let y2 = y2 + y_origin;
+
+                let shape = renderer::shapes::Shape::line((x1, y1), (x2, y2));
+
+                frame
+                    .scene_mut()
+                    .draw_shape_stroke(shape, stroke_brush, stroke_options, None, None);
             }
             Shape::Polygon { points } => {
                 todo!("Render polygon")

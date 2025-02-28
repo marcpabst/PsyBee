@@ -8,30 +8,37 @@ def my_experiment(exp_manager) -> None:
 
     main_window = exp_manager.create_default_window(fullscreen=True, monitor=1)
 
-    circle = ShapeStimulus(Shape.circle(0, 0, "0.01sw"), x=-100, fill_color=(1, 0, 0, 1))
+    input_circles = {}
+
 
     def circle_move(event):
+        print(event)
         x, y = event.position
-        # print(x, y)
-        circle["x"] = x
-        circle["y"] = y
+        id = event.id if event.id is not None else 0
 
-    def circle_click(event):
-        circle["fill_color"] = "yellow"
+        if id not in input_circles:
+            input_circles[id] = ShapeStimulus(Shape.circle(0, 0, "0.01sw"), x=-100, fill_color=(1, 0, 0, 1))
 
-    def circle_release(event):
-        circle["fill_color"] = "blue"
+        input_circles[id]["x"] = x
+        input_circles[id]["y"] = y
+
+    # def circle_click(event):
+    #     circle["fill_color"] = "yellow"
+
+    # def circle_release(event):
+    #     circle["fill_color"] = "blue"
 
     main_window.add_event_handler("key_press", lambda e: sys.exit(0) if e.key == "Q" else None)
     main_window.add_event_handler("cursor_moved", circle_move)
-    main_window.add_event_handler("mouse_button_press", circle_click)
-    main_window.add_event_handler("mouse_button_release", circle_release)
+    main_window.add_event_handler("touch_move", circle_move)
+    # main_window.add_event_hanxdler("mouse_button_press", circle_click)
+    # main_window.add_event_handler("mouse_button_release", circle_release)
 
     event_receiver = main_window.create_event_receiver()
 
-    rect0 = ShapeStimulus(Shape.rectangle("-0.5sw", "-0.5sh", "1sw", "0.5sh"), fill_color=(1, 0, 0, 1))
+    # rect0 = ShapeStimulus(Shape.rectangle("-0.5sw", "-0.5sh", "1sw", "0.5sh"), fill_color=(1, 0, 0, 1))
     rect1 = ShapeStimulus(Shape.rectangle("-0.5sw", "-0.5sh", "1sw", "1sh"), fill_color=(0, 0, 0, 1))
-    image = ImageStimulus("test.png", "-0.25sw", "-0.25sh",  main_window, "0.25sw", "0.25sw", anchor = "center")
+    # image = ImageStimulus("test.png", "-0.25sw", "-0.25sh",  main_window, "0.25sw", "0.25sw", anchor = "center")
     rect2 = ShapeStimulus(Shape.rectangle(0, 0, "0.25sw", "0.25sw"), stroke_color=(1, 0, 0, 1), stroke_width=10)
     gabor = GaborStimulus(0, 0, "0.25sw", 70, 50, anchor = "center", stroke_style="Solid", stroke_width=5)
 
@@ -47,7 +54,7 @@ def my_experiment(exp_manager) -> None:
         gabor.rotated_at(angle, 0, 0)
 
         rect2.rotated_at(-angle, 0, 0)
-        image.rotated_at(-angle, 0, 0)
+        # image.rotated_at(-angle, 0, 0)
 
 
         keys = event_receiver.poll()
@@ -65,19 +72,15 @@ def my_experiment(exp_manager) -> None:
         #     frame.draw(rect0)
 
         frame.draw(gabor)
-        frame.draw(image)
+        # frame.draw(image)
         frame.draw(rect2)
-        frame.draw(circle)
+
+        for circle in input_circles.values():
+            frame.draw(circle)
 
         is_visible2 = not is_visible2
 
         main_window.present(frame)
-
-
-
-
-
-
 
 if __name__ == "__main__":
     run_experiment(my_experiment)

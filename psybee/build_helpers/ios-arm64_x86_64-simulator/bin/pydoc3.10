@@ -1,0 +1,5 @@
+#!/Users/runner/work/Python-Apple-support/Python-Apple-support/install/iOS/iphonesimulator.x86_64/python-3.10.15/bin/python3.10
+
+import pydoc
+if __name__ == '__main__':
+    pydoc.cli()

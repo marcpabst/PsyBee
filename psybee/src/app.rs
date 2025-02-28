@@ -356,7 +356,8 @@ impl ApplicationHandler<()> for App {
             WindowEvent::KeyboardInput { .. }
             | WindowEvent::CursorMoved { .. }
             | WindowEvent::MouseInput { .. }
-            | WindowEvent::MouseWheel { .. } => {
+            | WindowEvent::MouseWheel { .. }
+            | WindowEvent::Touch { .. } => {
                 // find the window
                 let window = self.windows.iter().find(|w| w.winit_id == window_id);
 
@@ -382,7 +383,7 @@ impl ApplicationHandler<()> for App {
                         }
 
                         // broadcast the event
-                        window.event_broadcast_sender.try_broadcast(input.clone()).unwrap();
+                        window.event_broadcast_sender.try_broadcast(input.clone()); //.unwrap();
 
                         // send the event to the window
                         window.dispatch_event(input);

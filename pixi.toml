@@ -7,7 +7,7 @@ version = "0.1.0"
 
 [tasks]
 "build-py" = { cwd = "psybee", cmd = "maturin build" }
-"build-py-ios" = { cwd = "psybee", env = { PYTHON_VERSION = "3.10", PYTHONDIR = "$PIXI_PROJECT_ROOT/psybee/build_helpers/python_310_ios_arm64/ios-arm64" }, cmd = "build_helpers/build_ios.sh" }
+"build-py-ios" = { cwd = "psybee", env = { PYTHON_VERSION = "3.10", PYTHONDIR = "$PIXI_PROJECT_ROOT/psybee/build_helpers/ios-arm64/" }, cmd = "build_helpers/build_ios.sh" }
 "build-docs" = "sphinx-build -M html docs/source/ docs/build/ -W -a -j auto -n --keep-going"
 
 "dev-py" = { cwd = "psybee", cmd = "maturin develop" }
@@ -21,6 +21,7 @@ mkdocs = ">=1.6.1,<2"
 mkdocs-material = ">=9.6.5,<10"
 mkdocstrings-python = ">=1.16.1,<2"
 griffe-inherited-docstrings = ">=1.1.1,<2"
+pymunk = ">=6.10.0,<7"
 
 [pypi-dependencies]
 maturin = ">=1.7.4, <2"
