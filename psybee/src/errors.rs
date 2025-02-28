@@ -25,8 +25,8 @@ pub enum PsybeeError {
     DataLengthMismatchError(usize, usize),
     #[error("The column name {0} does not exist.")]
     ColumnNameDoesNotExistError(String),
-    #[error("{0}")]
-    CSVError(#[from] csv::Error),
+    // #[error("{0}")]
+    // CSVError(#[from] csv::Error),
 
     // BIDS errors
     #[error("The provided file name or path is not allowed under the BIDS specification: {0}. Reason: {1}")]

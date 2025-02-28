@@ -20,24 +20,25 @@ wgpu = { path = "../../wgpu/wgpu" }
 nalgebra = "0.33.0"
 custom_debug = "0.6.1"
 bytemuck = "1.20.0"
-vello = { git = "https://github.com/linebender/vello.git", rev = "4ec6b24" }
-vello_svg = "0.6.0"
-skrifa = "0.26.5"
 psybee-proc = { path = "../psybee-proc" }
 foreign-types-shared = "0.3.1"
 cosmic-text = "0.12.1"
 winit = "0.30.8"
 
+# vello
+skrifa = { version = "0.26.5", optional = true }
+vello = { git = "https://github.com/linebender/vello.git", rev = "4ec6b24", optional = true }
+vello_svg = { version = "0.6.0", optional = true }
 
 # macOS only
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 metal = "0.31.0"
-skia-safe = { version = "0.81.0", features = ["metal"] }
+skia-safe = { version = "0.81.0", features = ["metal"], optional = true }
 
 
 # windows only
 [target.'cfg(target_os = "windows")'.dependencies]
-skia-safe = { version = "0.81.0", features = ["d3d"] }
+skia-safe = { version = "0.81.0", features = ["d3d"], optional = true }
 windows = { version = "0.58.0", features = [
     "Win32",
     "Win32_Graphics",
@@ -47,3 +48,9 @@ windows = { version = "0.58.0", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dxgi_Common",
 ] }
+
+
+[features]
+default = ["skia"]
+skia = ["dep:skia-safe"]
+vello = ["dep:vello"]
