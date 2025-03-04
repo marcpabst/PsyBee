@@ -3,9 +3,10 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use derive_debug::Dbg;
 use pyo3::{
     pyclass, pyfunction, pymethods,
-    types::{PyDict, PyList, PyListMethods, PySequenceMethods, PyTuple, PyTupleMethods},
+    types::{PyAnyMethods, PyDict, PyList, PyListMethods, PySequenceMethods, PyTuple, PyTupleMethods},
     IntoPy, Py, PyAny, PyResult, Python,
 };
+use renderer::renderer::RendererFactory;
 use winit::event_loop::EventLoopProxy;
 
 use crate::{app::App, errors, visual::window::Window};
@@ -14,6 +15,32 @@ use crate::{app::App, errors, visual::window::Window};
 pub enum EventLoopAction {
     CreateNewWindow(WindowOptions, Sender<Window>),
     GetAvailableMonitors(Sender<Vec<Monitor>>),
+}
+
+#[derive(Debug)]
+#[pyclass]
+pub struct PyRendererFactory(pub Box<dyn RendererFactory>);
+
+// impl Clone for PyRendererFactory
+impl Clone for PyRendererFactory {
+    fn clone(&self) -> Self {
+        Self(self.0.cloned())
+    }
+}
+
+// deref for PyRendererFactory
+impl std::ops::Deref for PyRendererFactory {
+    type Target = dyn RendererFactory;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
+
+impl PyRendererFactory {
+    pub fn inner(&self) -> &dyn RendererFactory {
+        self.0.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -191,6 +218,22 @@ pub fn py_run_experiment(
     args: Py<PyTuple>,
     kwargs: Option<Py<PyDict>>,
 ) -> PyResult<()> {
+    // create app
+    let mut app = App::new();
+
+    // set the __globals__ to make "_renderer_factory" available
+    // this will allow functions to create renderer-specific objects
+    // without having to pass the renderer object around
+
+    let globals = PyDict::new(py);
+    let renderer_factory = PyRendererFactory(app.renderer_factory.cloned());
+
+    experiment_fn
+        .getattr(py, "__globals__")?
+        .bind(py)
+        .downcast::<PyDict>()?
+        .set_item("__renderer_factory", renderer_factory)?;
+
     let rust_experiment_fn = move |em: ExperimentManager| -> Result<(), errors::PsybeeError> {
         Python::with_gil(|py| -> _ {
             // bind kwargs
@@ -215,9 +258,6 @@ pub fn py_run_experiment(
         })?;
         Ok(())
     };
-
-    // create app
-    let mut app = App::new();
 
     py.allow_threads(move || app.run_experiment(rust_experiment_fn))?; // run the experiment
     println!("Experiment finished");

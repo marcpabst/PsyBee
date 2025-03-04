@@ -1,15 +1,23 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 
 use psybee_proc::StimulusParams;
+use pyo3::ffi::c_str;
 use renderer::{prelude::*, DynamicBitmap};
 use uuid::Uuid;
 
 use super::{
-    animations::Animation, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue, StimulusParams,
+    animations::Animation, helpers, impl_pystimulus_for_wrapper, PyStimulus, Stimulus, StimulusParamValue,
+    StimulusParams,
 };
-use crate::visual::{
-    geometry::{Anchor, Size, Transformation2D},
-    window::Frame,
+use crate::{
+    experiment::PyRendererFactory,
+    visual::{
+        geometry::{Anchor, Size, Transformation2D},
+        window::Frame,
+    },
 };
 
 #[derive(StimulusParams, Clone, Debug)]
@@ -55,19 +63,6 @@ impl ImageStimulus {
             params,
         }
     }
-
-    pub fn from_path(
-        src: String,
-        params: ImageParams,
-        transform: Option<Transformation2D>,
-        anchor: Anchor,
-        window: Window,
-        is_srgb: bool,
-    ) -> Self {
-        let win_state = window.state.lock().unwrap();
-        let image = win_state.renderer.create_bitmap_from_path(&src);
-        Self::from_image(image, params, transform, anchor)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -81,7 +76,6 @@ impl PyImageStimulus {
         src,
         x,
         y,
-        window,
         width,
         height,
         opacity = 1.0,
@@ -90,10 +84,10 @@ impl PyImageStimulus {
         srgb = true
     ))]
     fn __new__(
+        py: Python,
         src: String,
         x: IntoSize,
         y: IntoSize,
-        window: Window,
         width: IntoSize,
         height: IntoSize,
         opacity: f64,
@@ -101,10 +95,14 @@ impl PyImageStimulus {
         transform: Option<Transformation2D>,
         srgb: bool,
     ) -> (Self, PyStimulus) {
+        let renderer_factory = helpers::get_renderer_factory(py).unwrap();
+
+        let bitmap = renderer_factory.create_bitmap_from_path(&src);
+
         (
             Self(),
-            PyStimulus::new(ImageStimulus::from_path(
-                src,
+            PyStimulus::new(ImageStimulus::from_image(
+                bitmap,
                 ImageParams {
                     x: x.into(),
                     y: y.into(),
@@ -116,8 +114,6 @@ impl PyImageStimulus {
                 },
                 transform,
                 anchor,
-                window,
-                srgb,
             )),
         )
     }

@@ -7,12 +7,13 @@ use std::{
     thread,
 };
 
+use derive_debug::Dbg;
 use pyo3::{
     pyclass, pyfunction,
     types::{PyDict, PyTuple},
     Py, PyAny, Python,
 };
-use renderer::wgpu::TextureFormat;
+use renderer::{renderer::RendererFactory, wgpu::TextureFormat};
 use wgpu::MemoryHints;
 use winit::{
     application::ApplicationHandler,
@@ -40,13 +41,15 @@ pub struct GPUState {
     pub queue: wgpu::Queue,
 }
 
-#[derive(Debug)]
+#[derive(Dbg)]
 pub struct App {
     pub windows: Vec<Window>,
     pub gpu_state: ArcMutex<GPUState>,
     pub action_receiver: Receiver<EventLoopAction>,
     pub action_sender: Sender<EventLoopAction>,
     pub dummy_window: Option<Window>,
+    #[dbg(placeholder = "[[ RendererFactory ]]")]
+    pub renderer_factory: Box<dyn RendererFactory>,
 }
 
 impl Default for App {
@@ -109,6 +112,7 @@ impl App {
             action_receiver,
             action_sender,
             dummy_window: None,
+            renderer_factory: Box::new(renderer::skia_backend::SkiaRendererFactory::new()),
         }
     }
 
@@ -185,15 +189,9 @@ impl App {
         ));
 
         // create the renderer
-        let mut renderer = renderer::DynamicRenderer::new(
-            renderer::Backend::Skia,
-            adapter,
-            device,
-            queue,
-            swapchain_format,
-            size.width,
-            size.height,
-        );
+        let mut renderer =
+            self.renderer_factory
+                .create_renderer(adapter, device, queue, swapchain_format, size.width, size.height);
 
         let winit_id = winit_window.id();
 

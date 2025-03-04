@@ -28,9 +28,6 @@ class Ball:
 
 def my_experiment(exp_manager) -> None:
     # create a new window
-    #
-    print(__renderer_factory)
-
     main_window = exp_manager.create_default_window(fullscreen=True, monitor=1)
 
     space = pymunk.Space()      # Create a Space which contain the simulation
@@ -53,8 +50,9 @@ def my_experiment(exp_manager) -> None:
     # the background
     # background = PatternStimulus(Shape.rectangle(width="1sw", height="1sh"), x="-0.25sw", y=-550, pattern="checkerboard", stroke_color="red", fill_color=(0.0, 0.0, 0.0, 1.0))
 
-    background = PatternStimulus(Shape.circle(600), pattern="checkerboard", stroke_color="red", fill_color=(0.0, 0.0, 0.0, 1.0))
+    background = PatternStimulus(Shape.rectangle(width="1sw",height="1sh"), x="-0.5sw", y="-0.5sh", pattern="checkerboard", cycle_length="200px", stroke_color="red", fill_color=(0.0, 0.0, 0.0, 1.0))
 
+    event_receiver = main_window.create_event_receiver()
 
     for i in range(10000000):
         frame = main_window.get_frame()
@@ -74,6 +72,11 @@ def my_experiment(exp_manager) -> None:
 
 
         frame.draw(ground_stim)
+
+        keys = event_receiver.poll()
+
+        if "Enter" in keys.keys_pressed():
+            background["phase_x"] = (background["phase_x"] + 180) % 360
 
 
         main_window.present(frame)

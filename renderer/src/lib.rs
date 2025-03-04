@@ -7,7 +7,7 @@ pub mod prerenderd_scene;
 pub mod renderer;
 pub mod scenes;
 pub mod shapes;
-mod skia_backend;
+pub mod skia_backend;
 pub mod styles;
 pub mod text;
 mod utils;

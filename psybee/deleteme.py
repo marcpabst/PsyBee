@@ -38,7 +38,7 @@ def my_experiment(exp_manager) -> None:
 
     # rect0 = ShapeStimulus(Shape.rectangle("-0.5sw", "-0.5sh", "1sw", "0.5sh"), fill_color=(1, 0, 0, 1))
     rect1 = ShapeStimulus(Shape.rectangle("-0.5sw", "-0.5sh", "1sw", "1sh"), fill_color=(0, 0, 0, 1))
-    # image = ImageStimulus("test.png", "-0.25sw", "-0.25sh",  main_window, "0.25sw", "0.25sw", anchor = "center")
+    image = ImageStimulus("test.png", "-0.25sw", "-0.25sh", "0.25sw", "0.25sw", anchor = "center")
     rect2 = ShapeStimulus(Shape.rectangle(0, 0, "0.25sw", "0.25sw"), stroke_color=(1, 0, 0, 1), stroke_width=10)
     gabor = GaborStimulus(0, 0, "0.25sw", 70, 50, anchor = "center", stroke_style="Solid", stroke_width=5)
 
@@ -72,7 +72,7 @@ def my_experiment(exp_manager) -> None:
         #     frame.draw(rect0)
 
         frame.draw(gabor)
-        # frame.draw(image)
+        frame.draw(image)
         frame.draw(rect2)
 
         for circle in input_circles.values():

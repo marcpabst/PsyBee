@@ -20,14 +20,15 @@ pub struct DynamicRenderer {
 }
 
 impl DynamicRenderer {
-    pub fn new(
-        backend: Backend,
-        adapter: &wgpu::Adapter,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        surface_format: wgpu::TextureFormat,
-        width: u32,
-        height: u32,
+    pub(crate) fn new(
+        backend_renderer: Box<dyn Renderer>,
+        // backend: Backend,
+        // adapter: &wgpu::Adapter,
+        // device: &wgpu::Device,
+        // queue: &wgpu::Queue,
+        // surface_format: wgpu::TextureFormat,
+        // width: u32,
+        // height: u32,
     ) -> Self {
         // create a font system (=font manager)
         let empty_db = cosmic_text::fontdb::Database::new();
@@ -43,26 +44,26 @@ impl DynamicRenderer {
         let noto_sans_bold_italic = include_bytes!("../assets/fonts/NotoSans-BoldItalic.ttf");
         font_manager.db_mut().load_font_data(noto_sans_bold_italic.to_vec());
 
-        let backend_renderer = match backend {
-            Backend::Vello => {
-                // let renderer = vello::Renderer::new(
-                //     &device,
-                //     RendererOptions {
-                //         surface_format: Some(surface_format),
-                //         use_cpu: false,
-                //         antialiasing_support: vello::AaSupport::all(),
-                //         num_init_threads: std::num::NonZeroUsize::new(1),
-                //     },
-                // )
-                // .unwrap();
-                todo!()
-                // Box::new(renderer) as Box<dyn Renderer>
-            }
-            Backend::Skia => {
-                let renderer = skia_backend::SkiaRenderer::new(width, height, adapter, device, queue);
-                Box::new(renderer) as Box<dyn Renderer>
-            }
-        };
+        // let backend_renderer = match backend {
+        //     Backend::Vello => {
+        //         // let renderer = vello::Renderer::new(
+        //         //     &device,
+        //         //     RendererOptions {
+        //         //         surface_format: Some(surface_format),
+        //         //         use_cpu: false,
+        //         //         antialiasing_support: vello::AaSupport::all(),
+        //         //         num_init_threads: std::num::NonZeroUsize::new(1),
+        //         //     },
+        //         // )
+        //         // .unwrap();
+        //         todo!()
+        //         // Box::new(renderer) as Box<dyn Renderer>
+        //     }
+        //     Backend::Skia => {
+        //         let renderer = skia_backend::SkiaRenderer::new(width, height, adapter, device, queue);
+        //         Box::new(renderer) as Box<dyn Renderer>
+        //     }
+        // };
 
         DynamicRenderer {
             font_manager: font_manager,
@@ -187,6 +188,32 @@ pub trait Renderer {
 
     fn create_scene(&self, width: u32, heigth: u32) -> Box<dyn Scene>;
 
+    fn load_font_face(
+        &mut self,
+        face_info: &cosmic_text::fontdb::FaceInfo,
+        font_data: &[u8],
+        index: usize,
+    ) -> DynamicFontFace;
+
+    fn create_bitmap(&self, data: DynamicImage) -> DynamicBitmap;
+
+    fn create_bitmap_from_path(&self, path: &str) -> DynamicBitmap {
+        let image = image::open(path).unwrap();
+        self.create_bitmap(image)
+    }
+}
+
+pub trait RendererFactory: Send + Sync + std::fmt::Debug {
+    fn create_renderer(
+        &self,
+        adapter: &wgpu::Adapter,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        surface_format: wgpu::TextureFormat,
+        width: u32,
+        height: u32,
+    ) -> DynamicRenderer;
+
     fn create_bitmap(&self, data: DynamicImage) -> DynamicBitmap;
 
     fn create_bitmap_from_path(&self, path: &str) -> DynamicBitmap {
@@ -194,10 +221,5 @@ pub trait Renderer {
         self.create_bitmap(image)
     }
 
-    fn load_font_face(
-        &mut self,
-        face_info: &cosmic_text::fontdb::FaceInfo,
-        font_data: &[u8],
-        index: usize,
-    ) -> DynamicFontFace;
+    fn cloned(&self) -> Box<dyn RendererFactory>;
 }

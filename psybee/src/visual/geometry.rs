@@ -611,8 +611,14 @@ pub enum Shape {
 #[pymethods]
 impl Shape {
     #[staticmethod]
+    #[pyo3(signature = (
+        width,
+        height,
+        x = IntoSize(Size::Pixels(0.0)),
+        y = IntoSize(Size::Pixels(0.0)),
+    ))]
     /// Create a new rectangle.
-    fn rectangle(x: IntoSize, y: IntoSize, width: IntoSize, height: IntoSize) -> Shape {
+    fn rectangle(width: IntoSize, height: IntoSize, x: IntoSize, y: IntoSize) -> Shape {
         Shape::Rectangle {
             x: x.into(),
             y: y.into(),
@@ -622,22 +628,26 @@ impl Shape {
     }
 
     #[staticmethod]
+    #[pyo3(signature = (
+        radius,
+        x = IntoSize(Size::Pixels(0.0)),
+        y = IntoSize(Size::Pixels(0.0)),
+    ))]
     /// Create a new circle, centered at (x, y) with the given radius.
     ///
     /// Parameters
     /// ----------
-    /// x : Size or float
-    ///    The x-coordinate of the center of the circle.
-    /// y : Size or float
-    ///    The y-coordinate of the center of the circle.
     /// radius : Size or float
     ///    The radius of the circle.
-    ///
+    /// x : Size or float (optional)
+    ///    The x-coordinate of the center of the circle.
+    /// y : Size or float (optional)
+    ///    The y-coordinate of the center of the circle.
     /// Returns
     /// -------
     /// Shape
     ///  The circle.
-    fn circle(x: IntoSize, y: IntoSize, radius: IntoSize) -> Shape {
+    fn circle(radius: IntoSize, x: IntoSize, y: IntoSize) -> Shape {
         Shape::Circle {
             x: x.into(),
             y: y.into(),

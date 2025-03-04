@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{
     affine::Affine,
     bitmaps::DynamicBitmap,
@@ -37,7 +39,7 @@ pub enum Brush<'a> {
         /// The lattic to use for the pattern.
         latice: Affine,
         /// The brush to use for the pattern.
-        brush: &'a Brush<'a>,
+        brush: Box<Brush<'a>>,
     },
 }
 

@@ -12,6 +12,10 @@ pub enum PsybeeError {
     #[error("{0}")]
     Pyo3Error(#[from] pyo3::PyErr),
 
+    // a brush creation error
+    #[error("{0}")]
+    BrushError(String),
+
     // file errors
     #[error("{0}")]
     IOError(#[from] std::io::Error),

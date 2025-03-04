@@ -31,7 +31,7 @@ use crate::{
     brushes::{Brush, Extend, Gradient, GradientKind, ImageSampling},
     colors::RGBA,
     prelude::{BlendMode, DynamicFontFace, Glyph, StrokeStyle},
-    renderer::Renderer,
+    renderer::{Renderer, RendererFactory},
     scenes::Scene,
     shapes::{Point, Shape},
     styles::ImageFitMode,
@@ -337,32 +337,6 @@ impl Renderer for SkiaRenderer {
         Box::new(SkiaScene::new(width, heigth))
     }
 
-    fn create_bitmap(&self, img: image::DynamicImage) -> DynamicBitmap {
-        // extract the image data as an rgba buffer
-        let rgba = img.to_rgba8();
-        let (width, height) = rgba.dimensions();
-        let buffer = rgba.into_raw();
-        let boxed_buffer = buffer.into_boxed_slice();
-
-        // create a new skia image
-        let image = sk_raster_from_data(
-            &skia_safe::ImageInfo::new(
-                (width as i32, height as i32),
-                ColorType::RGBA8888,
-                SkAlphaType::Unpremul,
-                Some(ColorSpace::new_srgb()),
-            ),
-            &unsafe { skia_safe::Data::new_bytes(&boxed_buffer) },
-            width as usize * 4,
-        )
-        .unwrap();
-
-        DynamicBitmap(Box::new(SkiaBitmap {
-            image,
-            data: boxed_buffer,
-        }))
-    }
-
     fn load_font_face(&mut self, face_info: &FaceInfo, font_data: &[u8], index: usize) -> DynamicFontFace {
         // load the font face using skia
         let typeface = self
@@ -372,13 +346,17 @@ impl Renderer for SkiaRenderer {
         // let typeface = self.font_manager.n
         return DynamicFontFace(Box::new(typeface));
     }
+
+    fn create_bitmap(&self, data: image::DynamicImage) -> DynamicBitmap {
+        skia_create_bitmap(data)
+    }
 }
 
 impl SkiaRenderer {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn try_create_backend_metal(device: &Device, queue: &Queue) -> Option<(mtl::BackendContext, gpu::DirectContext)> {
         let command_queue_ptr =
-            unsafe { queue.as_hal::<wgpu::hal::api::Metal, _, _>(|queue| queue.map(|s| s.as_raw().as_ptr())) };
+            unsafe { queue.as_hal::<wgpu::hal::api::Metal, _, _>(|queue| queue.map(|s| s.as_raw().lock().as_ptr())) };
 
         if let Some(command_queue_ptr) = command_queue_ptr {
             let raw_device_ptr = unsafe {
@@ -663,15 +641,16 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                 paint
             }
             Brush::ShapePattern { shape, latice, brush } => {
-                let mut paint: skia_safe::Paint = (*brush).into();
+                let brush = brush.as_ref();
+                let mut paint: skia_safe::Paint = (brush).into();
 
                 let path = shape.into();
                 let latice = &(*latice).into();
 
                 // create a path effect
                 let path_effect = skia_safe::PathEffect::path_2d(latice, &path);
-
                 paint.set_path_effect(path_effect);
+
                 paint
             }
         }
@@ -792,4 +771,63 @@ impl From<Brush<'_>> for skia_safe::Paint {
     fn from(value: Brush) -> Self {
         (&value).into()
     }
+}
+
+#[derive(Debug)]
+pub struct SkiaRendererFactory;
+
+impl SkiaRendererFactory {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl RendererFactory for SkiaRendererFactory {
+    fn create_bitmap(&self, data: image::DynamicImage) -> DynamicBitmap {
+        skia_create_bitmap(data)
+    }
+
+    fn create_renderer(
+        &self,
+        adapter: &wgpu::Adapter,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        _surface_format: wgpu::TextureFormat,
+        width: u32,
+        height: u32,
+    ) -> crate::DynamicRenderer {
+        let renderer = SkiaRenderer::new(width, height, adapter, device, queue);
+        let backend_render = Box::new(renderer) as Box<dyn Renderer>;
+        crate::DynamicRenderer::new(backend_render)
+    }
+
+    fn cloned(&self) -> Box<dyn RendererFactory> {
+        Box::new(Self::new())
+    }
+}
+
+fn skia_create_bitmap(img: image::DynamicImage) -> DynamicBitmap {
+    // extract the image data as an rgba buffer
+    let rgba = img.to_rgba8();
+    let (width, height) = rgba.dimensions();
+    let buffer = rgba.into_raw();
+    let boxed_buffer = buffer.into_boxed_slice();
+
+    // create a new skia image
+    let image = sk_raster_from_data(
+        &skia_safe::ImageInfo::new(
+            (width as i32, height as i32),
+            ColorType::RGBA8888,
+            SkAlphaType::Unpremul,
+            Some(ColorSpace::new_srgb()),
+        ),
+        &unsafe { skia_safe::Data::new_bytes(&boxed_buffer) },
+        width as usize * 4,
+    )
+    .unwrap();
+
+    DynamicBitmap(Box::new(SkiaBitmap {
+        image,
+        data: boxed_buffer,
+    }))
 }

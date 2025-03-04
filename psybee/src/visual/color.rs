@@ -35,6 +35,12 @@ pub struct LinRgba {
     pub a: f32,
 }
 
+impl Default for LinRgba {
+    fn default() -> Self {
+        Self::new(0.0, 0.0, 0.0, 1.0)
+    }
+}
+
 impl LinRgba {
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self { r, g, b, a }
