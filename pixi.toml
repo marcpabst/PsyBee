@@ -23,6 +23,7 @@ mkdocstrings-python = ">=1.16.1,<2"
 griffe-inherited-docstrings = ">=1.1.1,<2"
 pymunk = ">=6.10.0,<7"
 emsdk = ">=3.1.46,<4"
+numpy = ">=2.2.3,<3"
 
 [pypi-dependencies]
 maturin = ">=1.7.4, <2"

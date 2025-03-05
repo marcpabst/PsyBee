@@ -350,6 +350,10 @@ impl Renderer for SkiaRenderer {
     fn create_bitmap(&self, data: image::DynamicImage) -> DynamicBitmap {
         skia_create_bitmap(data)
     }
+
+    fn create_renderer_factory(&self) -> Box<dyn RendererFactory> {
+        Box::new(SkiaRendererFactory)
+    }
 }
 
 impl SkiaRenderer {

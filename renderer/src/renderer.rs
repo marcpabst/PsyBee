@@ -83,6 +83,10 @@ impl DynamicRenderer {
             .render_to_texture(device, queue, texture, width, height, scene.inner().as_mut());
     }
 
+    pub fn create_renderer_factory(&self) -> Box<dyn RendererFactory> {
+        self.backend.create_renderer_factory()
+    }
+
     pub fn create_scene(&self, width: u32, heigth: u32) -> DynamicScene {
         let scene = self.backend.create_scene(width, heigth);
         DynamicScene::new(scene)
@@ -201,6 +205,8 @@ pub trait Renderer {
         let image = image::open(path).unwrap();
         self.create_bitmap(image)
     }
+
+    fn create_renderer_factory(&self) -> Box<dyn RendererFactory>;
 }
 
 pub trait RendererFactory: Send + Sync + std::fmt::Debug {

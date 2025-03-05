@@ -26,7 +26,7 @@ use crate::visual::{
 #[strum(serialize_all = "snake_case")]
 pub enum FillPattern {
     Uniform,
-    Square,
+    Stripes,
     Sinosoidal,
     Checkerboard,
 }
@@ -55,7 +55,6 @@ pub struct PatternStimulus {
 
     gradient_colors: Option<Vec<LinRgba>>,
     pattern_image: Option<DynamicBitmap>,
-
     transform: Transformation2D,
     animations: Vec<Animation>,
     visible: bool,
@@ -71,7 +70,7 @@ impl PatternStimulus {
         cycle_length: Size,
         fill_color: Option<LinRgba>,
         background_color: Option<LinRgba>,
-        pattern: Option<FillPattern>,
+        pattern: FillPattern,
         stroke_style: Option<StrokeStyle>,
         stroke_color: Option<LinRgba>,
         stroke_width: Option<Size>,
@@ -80,13 +79,7 @@ impl PatternStimulus {
         transform: Transformation2D,
         renderer_factory: &dyn RendererFactory,
     ) -> Self {
-        // for now, create a 2x2 checkerboard pattern
-        let image_2x2_data = vec![0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 0];
-        let image_2x2 = renderer::image::RgbImage::from_raw(2, 2, image_2x2_data).unwrap();
-
-        let pattern_image = renderer_factory.create_bitmap(renderer::image::DynamicImage::ImageRgb8(image_2x2));
-
-        Self {
+        let mut stim = Self {
             id: Uuid::new_v4(),
             params: PatternParams {
                 shape,
@@ -102,14 +95,34 @@ impl PatternStimulus {
                 stroke_width,
                 alpha,
             },
-            fill_pattern: pattern.unwrap_or(FillPattern::Uniform),
+            fill_pattern: pattern,
             gradient_colors: None,
-            pattern_image: Some(pattern_image),
-
+            pattern_image: None,
             transform,
             animations: Vec::new(),
             visible: true,
+        };
+
+        match pattern {
+            FillPattern::Uniform => {}
+            FillPattern::Stripes => {
+                let image_2x2_data = vec![0, 0, 0, 255, 255, 255];
+                let image_2x2 = renderer::image::RgbImage::from_raw(2, 1, image_2x2_data).unwrap();
+
+                let pattern_image = renderer_factory.create_bitmap(renderer::image::DynamicImage::ImageRgb8(image_2x2));
+                stim.pattern_image = Some(pattern_image);
+            }
+            FillPattern::Sinosoidal => todo!(),
+            FillPattern::Checkerboard => {
+                let image_2x2_data = vec![0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 0];
+                let image_2x2 = renderer::image::RgbImage::from_raw(2, 2, image_2x2_data).unwrap();
+
+                let pattern_image = renderer_factory.create_bitmap(renderer::image::DynamicImage::ImageRgb8(image_2x2));
+                stim.pattern_image = Some(pattern_image);
+            }
         }
+
+        stim
     }
 }
 
@@ -151,7 +164,7 @@ impl PyPatternStimulus {
         cycle_length = IntoSize(Size::Pixels(100.0)),
         fill_color = None,
         background_color = None,
-        pattern = None,
+        pattern = FillPattern::Uniform,
         stroke_style = None,
         stroke_color = None,
         stroke_width = None,
@@ -190,7 +203,7 @@ impl PyPatternStimulus {
         cycle_length: IntoSize,
         fill_color: Option<IntoLinRgba>,
         background_color: Option<IntoLinRgba>,
-        pattern: Option<FillPattern>,
+        pattern: FillPattern,
         stroke_style: Option<StrokeStyle>,
         stroke_color: Option<IntoLinRgba>,
         stroke_width: Option<IntoSize>,
@@ -246,6 +259,8 @@ impl Stimulus for PatternStimulus {
         let windows_size = window_state.size;
         let screen_props = window_state.physical_screen;
 
+        let renderer_factory = window_state.renderer.create_renderer_factory();
+
         let x_origin = self.params.x.eval(windows_size, screen_props) as f64;
         let y_origin = self.params.y.eval(windows_size, screen_props) as f64;
 
@@ -254,17 +269,24 @@ impl Stimulus for PatternStimulus {
         let shift_x = (self.params.phase_x % 360.0) / 360.0 * cycle_length as f64;
         let shift_y = (self.params.phase_y % 360.0) / 360.0 * cycle_length as f64;
 
-        let fill_brush = Brush::Image {
-            image: self.pattern_image.as_ref().unwrap(),
-            start: (shift_x, shift_y).into(),
-            fit_mode: ImageFitMode::Exact {
-                width: cycle_length,
-                height: cycle_length,
+        let fill_brush = match self.fill_pattern {
+            FillPattern::Uniform => {
+                let color = self.params.fill_color.unwrap_or(LinRgba::new(0.0, 0.0, 0.0, 0.0));
+                Brush::Solid(color.into())
+            }
+            FillPattern::Sinosoidal => todo!(),
+            FillPattern::Checkerboard | FillPattern::Stripes => Brush::Image {
+                image: &self.pattern_image.as_ref().unwrap(),
+                start: (shift_x, shift_y).into(),
+                fit_mode: ImageFitMode::Exact {
+                    width: cycle_length,
+                    height: cycle_length,
+                },
+                sampling: ImageSampling::Nearest,
+                edge_mode: (Extend::Repeat, Extend::Repeat),
+                transform: None,
+                alpha: self.params.alpha.map(|a| a as f32),
             },
-            sampling: ImageSampling::Nearest,
-            edge_mode: (Extend::Repeat, Extend::Repeat),
-            transform: None,
-            alpha: self.params.alpha.map(|a| a as f32),
         };
 
         let stroke_color = self.params.stroke_color.unwrap_or(LinRgba::new(0.0, 0.0, 0.0, 0.0));

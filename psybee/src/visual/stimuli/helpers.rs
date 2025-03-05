@@ -29,7 +29,7 @@ pub(crate) fn create_fill_brush_pattern<'a>(
 ) -> Brush<'a> {
     match pattern {
         FillPattern::Uniform => Brush::Solid((*foreground_color).into()),
-        FillPattern::Square => todo!(),
+        FillPattern::Stripes => todo!(),
         FillPattern::Sinosoidal => todo!(),
         FillPattern::Checkerboard => {
             let size = 20.0;
