@@ -12,6 +12,11 @@ impl RGBA {
         Self { r, g, b, a }
     }
 
+    /// Convert to an RGBA color with sRGB encoding.
+    pub fn as_srgba(&self) -> (f32, f32, f32, f32) {
+        (lin2srgb(self.r), lin2srgb(self.g), lin2srgb(self.b), self.a)
+    }
+
     pub const WHITE: Self = Self {
         r: 1.0,
         g: 1.0,
@@ -81,4 +86,12 @@ impl RGBA {
         b: 0.5,
         a: 1.0,
     };
+}
+
+fn lin2srgb(c: f32) -> f32 {
+    if c <= 0.0031308 {
+        12.92 * c
+    } else {
+        1.055 * c.powf(1.0 / 2.4) - 0.055
+    }
 }
