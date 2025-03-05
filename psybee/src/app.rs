@@ -62,7 +62,7 @@ impl App {
     pub fn new() -> Self {
         let (action_sender, action_receiver) = std::sync::mpsc::channel();
 
-        let backend = wgpu::Backends::PRIMARY;
+        let backend = wgpu::Backends::METAL | wgpu::Backends::DX12;
         let instance_desc = wgpu::InstanceDescriptor {
             backends: backend,
             // use defaults for the rest
