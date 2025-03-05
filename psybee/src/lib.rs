@@ -90,15 +90,17 @@ fn psybee(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
         m.add_submodule(&m_geometry)?;
 
-        let m_colors = {
-            let m = new_submodule!(m, "psybee.visual", "colors");
-            m.add_class::<visual::geometry::Transformation2D>()?;
-            m.add_class::<visual::geometry::Shape>()?;
-            m.add_class::<visual::geometry::Size>()?;
+        let m_color = {
+            let m = new_submodule!(m, "psybee.visual", "color");
+            m.add_class::<visual::color::LinRgba>()?;
+            m.add_function(wrap_pyfunction!(visual::color::py_rgb, &m)?)?;
+            m.add_function(wrap_pyfunction!(visual::color::py_rgba, &m)?)?;
+            m.add_function(wrap_pyfunction!(visual::color::py_linrgb, &m)?)?;
+            m.add_function(wrap_pyfunction!(visual::color::py_linrgba, &m)?)?;
             m
         };
 
-        m.add_submodule(&m_colors)?;
+        m.add_submodule(&m_color)?;
 
         m
     };

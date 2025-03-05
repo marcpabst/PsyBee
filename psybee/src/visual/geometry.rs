@@ -74,9 +74,9 @@ pub enum Size {
     // Physical pixels
     Pixels(f32),
     /// Fraction of the screen height.
-    ScreenHeight(f32),
+    ViewportHeight(f32),
     /// Fraction of the screen width.
-    ScreenWidth(f32),
+    ViewportWidth(f32),
     /// Degrees of visual angle.
     Degrees(f32),
     /// Millimeters.
@@ -264,8 +264,8 @@ impl Size {
     pub fn eval(&self, window_size: PixelSize, window_props: PhysicalScreen) -> f32 {
         match self {
             Size::Pixels(pixels) => *pixels,
-            Size::ScreenWidth(normalised) => *normalised * window_size.width as f32,
-            Size::ScreenHeight(normalised) => *normalised * window_size.height as f32,
+            Size::ViewportWidth(normalised) => *normalised * window_size.width as f32,
+            Size::ViewportHeight(normalised) => *normalised * window_size.height as f32,
             Size::Degrees(degrees) => {
                 Size::angle_to_milimeter(*degrees, window_props.viewing_distance).eval(window_size, window_props)
             }
@@ -321,8 +321,8 @@ impl Size {
         // match the unit
         match unit {
             "px" => Ok(Size::Pixels(if negative { -number } else { number })),
-            "sw" => Ok(Size::ScreenWidth(if negative { -number } else { number })),
-            "sh" => Ok(Size::ScreenHeight(if negative { -number } else { number })),
+            "vw" => Ok(Size::ViewportWidth(if negative { -number } else { number })),
+            "vh" => Ok(Size::ViewportHeight(if negative { -number } else { number })),
             "deg" => Ok(Size::Degrees(if negative { -number } else { number })),
             "mm" => Ok(Size::Millimeters(if negative { -number } else { number })),
             "cm" => Ok(Size::Centimeters(if negative { -number } else { number })),

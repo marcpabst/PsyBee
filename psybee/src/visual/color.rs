@@ -37,7 +37,7 @@ pub struct LinRgba {
 
 impl Default for LinRgba {
     fn default() -> Self {
-        Self::new(0.0, 0.0, 0.0, 1.0)
+        Self::new(0.0, 0.0, 0.0, 0.0)
     }
 }
 
@@ -73,6 +73,38 @@ impl LinRgba {
             b: Self::srgb_to_lin_rgb(color.b),
             a: color.a,
         }
+    }
+
+    pub fn r(&self) -> f32 {
+        self.r
+    }
+
+    pub fn g(&self) -> f32 {
+        self.g
+    }
+
+    pub fn b(&self) -> f32 {
+        self.b
+    }
+
+    pub fn a(&self) -> f32 {
+        self.a
+    }
+
+    pub fn r_u8(&self) -> u8 {
+        (self.r * 255.0).round() as u8
+    }
+
+    pub fn g_u8(&self) -> u8 {
+        (self.g * 255.0).round() as u8
+    }
+
+    pub fn b_u8(&self) -> u8 {
+        (self.b * 255.0).round() as u8
+    }
+
+    pub fn a_u8(&self) -> u8 {
+        (self.a * 255.0).round() as u8
     }
 }
 
@@ -119,26 +151,30 @@ impl LinRgba {
     }
 
     #[getter]
+    #[pyo3(name = "r")]
     /// The red channel.
-    fn r(&self) -> f32 {
+    fn py_r(&self) -> f32 {
         self.r
     }
 
     #[getter]
+    #[pyo3(name = "g")]
     /// The green channel.
-    fn g(&self) -> f32 {
+    fn py_g(&self) -> f32 {
         self.g
     }
 
     #[getter]
+    #[pyo3(name = "b")]
     /// The blue channel.
-    fn b(&self) -> f32 {
+    fn py_B(&self) -> f32 {
         self.b
     }
 
     #[getter]
+    #[pyo3(name = "a")]
     /// The alpha channel.
-    fn a(&self) -> f32 {
+    fn py_a(&self) -> f32 {
         self.a
     }
 }
@@ -183,4 +219,33 @@ impl<'py> FromPyObject<'py> for IntoLinRgba {
             ))
         }
     }
+}
+
+// expose functons to python to create a LinRgba
+#[pyfunction]
+#[pyo3(name = "rgb")]
+#[pyo3(signature = (r, g, b, a = 1.0))]
+pub fn py_rgb(r: f32, g: f32, b: f32, a: f32) -> LinRgba {
+    LinRgba::from_srgba(r, g, b, a)
+}
+
+#[pyfunction]
+#[pyo3(name = "rgba")]
+#[pyo3(signature = (r, g, b, a))]
+pub fn py_rgba(r: f32, g: f32, b: f32, a: f32) -> LinRgba {
+    LinRgba::from_srgba(r, g, b, a)
+}
+
+#[pyfunction]
+#[pyo3(name = "linrgb")]
+#[pyo3(signature = (r, g, b, a = 1.0))]
+pub fn py_linrgb(r: f32, g: f32, b: f32, a: f32) -> LinRgba {
+    LinRgba::new(r, g, b, a)
+}
+
+#[pyfunction]
+#[pyo3(name = "linrgba")]
+#[pyo3(signature = (r, g, b, a))]
+pub fn py_linrgba(r: f32, g: f32, b: f32, a: f32) -> LinRgba {
+    LinRgba::new(r, g, b, a)
 }

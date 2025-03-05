@@ -45,8 +45,9 @@ pub enum StimulusParamValue {
     StrokeStyle(StrokeStyle),
 }
 
-#[derive(Debug, Clone, EnumString, Display)]
+#[derive(Debug, Clone, EnumString, Display, Default)]
 pub enum StrokeStyle {
+    #[default]
     None,
     Solid,
     Dashed,
