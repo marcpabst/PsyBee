@@ -13,28 +13,29 @@ def my_experiment(exp_manager) -> None:
 
     main_window.add_event_handler("key_press", lambda e: sys.exit(0) if e.key == "Q" else None)
 
-    checkerboard_sizes = [4]
+    checkerboard_sizes = [4,8,40,100]
     michelson_contrast = 1.0
 
     background = PatternStimulus(
-        Shape.rectangle(width = "1vw", height = "1vh"),
+        Shape.rectangle(width = "0.5vw", height = "1vh"),
         x = "-0.5vw", y = "-0.5vh",
         pattern = "uniform",
+        fill_color = linrgb(0.50, 0.50, 0.50)
     )
 
-    checkerboard = PatternStimulus(
-        Shape.rectangle(width = "1vw", height = "1vh"),
-        x = "-0.5vw", y = "-0.5vh",
-        pattern = "checkerboard",
-        fill_color = linrgb(0.25, 0.25, 0.25),
-        background_color = linrgb(0.75, 0.75, 0.75),
-        alpha = 1.0,
+    stimulus1 = PatternStimulus(
+        Shape.rectangle(width = "0.5vw", height = "1vh"),
+        x = 0, y = "-0.5vh",
+        pattern = "uniform",
+        fill_color = linrgb(0.3,0.3,0.3)
     )
 
-
-    fixation = ShapeStimulus(Shape.circle(10), fill_color=(1, 0, 0, 1))
-
-    checkerboard_size_index = 0
+    stimulus2 = PatternStimulus(
+        Shape.rectangle(width = "0.5vw", height = "1vh"),
+        x = 0, y = "-0.5vh",
+        pattern = "uniform",
+        fill_color = linrgb(0.7,0.7,0.7)
+    )
 
     global luminance
     luminance = 0.2198
@@ -57,16 +58,10 @@ def my_experiment(exp_manager) -> None:
 
         frame.draw(background)
 
-        if i % 200 > 100:
-            # checkerboard["phase_x"] = (checkerboard["phase_x"] + 180) % 360
-            frame.draw(checkerboard)
-            frame.draw(fixation)
-
-        if i % 500 == 0:
-            checkerboard["cycle_length"] = checkerboard_sizes[checkerboard_size_index]
-            checkerboard_size_index = (checkerboard_size_index + 1) % len(checkerboard_sizes)
-
-
+        if i % 2 == 0:
+            frame.draw(stimulus1)
+        else:
+            frame.draw(stimulus2)
 
         main_window.present(frame)
 

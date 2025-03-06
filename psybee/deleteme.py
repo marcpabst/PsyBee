@@ -6,7 +6,7 @@ import sys
 def my_experiment(exp_manager) -> None:
     # create a new window
 
-    main_window = exp_manager.create_default_window(fullscreen=True, monitor=1)
+    main_window = exp_manager.create_default_window(fullscreen=True, monitor=2)
 
     input_circles = {}
 

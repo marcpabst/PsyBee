@@ -25,7 +25,7 @@ use winit::{
 
 use crate::{
     errors,
-    experiment::{EventLoopAction, ExperimentManager, Monitor},
+    experiment::{EventLoopAction, ExperimentManager, Monitor, WindowOptions},
     input::Event,
     visual::window::{PhysicalScreen, Window, WindowState},
     EventTryFrom,
@@ -117,11 +117,7 @@ impl App {
     }
 
     /// Create a new window with the given options.
-    pub fn create_window(
-        &self,
-        // window_options: &WindowOptions,
-        event_loop: &ActiveEventLoop,
-    ) -> Window {
+    pub fn create_window(&self, window_options: &WindowOptions, event_loop: &ActiveEventLoop) -> Window {
         let window_attributes = WinitWindow::default_attributes()
             .with_title("Winit window")
             .with_transparent(false);
@@ -178,7 +174,10 @@ impl App {
         surface.configure(device, &config);
 
         // set fullscreen mode
-        // winit_window.set_fullscreen(fullscreen_mode);
+        let mon_handle = window_options.monitor().unwrap().handle();
+        let mon_name = mon_handle.name().unwrap_or("Unnamed monitor".to_string());
+
+        winit_window.set_fullscreen(Some(winit::window::Fullscreen::Borderless(Some(mon_handle.clone()))));
 
         let wgpu_renderer = pollster::block_on(renderer::wgpu_renderer::WgpuRenderer::new(
             winit_window.clone(),
@@ -307,7 +306,7 @@ impl ApplicationHandler<()> for App {
         // check if we need to create a new window
         self.action_receiver.try_recv().map(|action| match action {
             EventLoopAction::CreateNewWindow(options, sender) => {
-                let window = self.create_window(event_loop);
+                let window = self.create_window(&options, event_loop);
                 self.windows.push(window.clone());
                 sender.send(window).unwrap();
             }

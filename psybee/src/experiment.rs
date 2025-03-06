@@ -60,6 +60,14 @@ impl Monitor {
             handle,
         }
     }
+
+    pub fn handle(&self) -> &winit::monitor::MonitorHandle {
+        &self.handle
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 /// Options for creating a window. The ExperimentManager will try to find a
@@ -97,6 +105,17 @@ pub enum WindowOptions {
         monitor: Option<Monitor>,
         refresh_rate: Option<f64>,
     },
+}
+
+impl WindowOptions {
+    pub fn monitor(&self) -> Option<&Monitor> {
+        match self {
+            WindowOptions::Windowed { .. } => None,
+            WindowOptions::FullscreenExact { monitor, .. } => monitor.as_ref(),
+            WindowOptions::FullscreenHighestRefreshRate { monitor, .. } => monitor.as_ref(),
+            WindowOptions::FullscreenHighestResolution { monitor, .. } => monitor.as_ref(),
+        }
+    }
 }
 
 /// The ExperimentManager is available to the user in the experiment function.
@@ -141,7 +160,10 @@ impl ExperimentManager {
     pub fn create_default_window(&self, fullscreen: bool, monitor: Option<u32>) -> Window {
         // select monitor 1 if available
         // find all monitors available
+
         let monitors = self.get_available_monitors();
+        println!("{:?}", monitor);
+        println!("Found monitors: {:?}", monitors);
         // get the second monitor if available, otherwise use the first one
         let monitor = monitors
             .get(monitor.unwrap_or(0) as usize)
