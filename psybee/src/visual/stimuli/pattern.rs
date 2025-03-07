@@ -301,10 +301,7 @@ impl Stimulus for PatternStimulus {
         let shift_y = (self.params.phase_y % 360.0) / 360.0 * cycle_length as f64;
 
         let fill_brush = match self.fill_pattern {
-            FillPattern::Uniform => {
-                println!("Fill color: {:?}", self.params.fill_color);
-                Brush::Solid(self.params.fill_color.into())
-            }
+            FillPattern::Uniform => Brush::Solid(self.params.fill_color.into()),
             FillPattern::Sinosoidal => todo!(),
             FillPattern::Checkerboard | FillPattern::Stripes => Brush::Image {
                 image: &self.pattern_image.as_ref().unwrap(),

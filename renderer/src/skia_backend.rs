@@ -234,7 +234,7 @@ impl Scene for SkiaScene {
         let mut canvas = self.picture_recorder.recording_canvas().unwrap();
         let mut paint: skia_safe::Paint = brush.into();
 
-        paint.set_anti_alias(true);
+        paint.set_anti_alias(false);
 
         if let Some(blend_mode) = blend_mode {
             paint.set_blend_mode(blend_mode.into());
@@ -254,7 +254,7 @@ impl Scene for SkiaScene {
         let mut canvas = self.picture_recorder.recording_canvas().unwrap();
         let mut paint: skia_safe::Paint = brush.into();
         paint.set_stroke(true);
-        paint.set_anti_alias(true);
+        paint.set_anti_alias(false);
 
         if let Some(blend_mode) = blend_mode {
             paint.set_blend_mode(blend_mode.into());
