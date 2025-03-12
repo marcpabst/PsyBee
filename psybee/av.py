@@ -9,6 +9,8 @@ import time
 exp_params = {
     "fps": 120,
     "trial_duration_ms": 150,
+    "fixation_duration_ms": 500,
+    "probability_rare": 0.1,
 }
 
 
@@ -19,6 +21,7 @@ def my_experiment(exp_manager) -> None:
     main_window.add_event_handler("key_press", lambda e: sys.exit(0) if e.key == "Q" else None)
 
     trial_duration_frames = int(exp_params["fps"] * exp_params["trial_duration_ms"] / 1000)
+    fixation_duration_frames = int(exp_params["fps"] * exp_params["fixation_duration_ms"] / 1000)
 
     fixation = PatternStimulus(
         Shape.circle(radius = 10),
@@ -100,19 +103,22 @@ def my_experiment(exp_manager) -> None:
         else:
             i_stim["pattern_rotation"] = 0
 
+
+
+        for i in range(fixation_duration_frames):
+            frame = main_window.get_frame()
+            frame.draw(fixation)
+
+            main_window.present(frame)
         for i in range(trial_duration_frames):
             frame = main_window.get_frame()
 
             frame.draw(i_stim)
             frame.draw(fixation)
 
-
             main_window.present(frame)
 
-        for i in range(100):
-            frame = main_window.get_frame()
-            frame.draw(fixation)
-            main_window.present(frame)
+
 
 if __name__ == "__main__":
     run_experiment(my_experiment)
