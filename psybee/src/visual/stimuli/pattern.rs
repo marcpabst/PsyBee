@@ -2,13 +2,15 @@ use std::sync::Arc;
 
 use psybee_proc::{FromPyStr, StimulusParams};
 use renderer::{
-    affine::Affine, brushes::Brush, colors::RGBA, prelude::ImageSampling, renderer::RendererFactory,
-    styles::ImageFitMode, DynamicBitmap,
+    affine::Affine,
+    brushes::{Brush, Extend, ImageSampling},
+    colors::RGBA,
+    renderer::RendererFactory,
+    styles::ImageFitMode,
+    DynamicBitmap,
 };
 use strum::EnumString;
 use uuid::Uuid;
-
-use renderer::prelude::*;
 
 unsafe impl Send for PatternStimulus {}
 
@@ -41,6 +43,7 @@ pub struct PatternParams {
     pub cycle_length: Size,
     pub fill_color: LinRgba,
     pub background_color: LinRgba,
+    pub pattern_rotation: f64,
     pub stroke_style: StrokeStyle,
     pub stroke_color: LinRgba,
     pub stroke_width: Size,
@@ -71,6 +74,7 @@ impl PatternStimulus {
         fill_color: LinRgba,
         background_color: LinRgba,
         pattern: FillPattern,
+        pattern_rotation: f64,
         stroke_style: StrokeStyle,
         stroke_color: LinRgba,
         stroke_width: Size,
@@ -90,6 +94,7 @@ impl PatternStimulus {
                 cycle_length,
                 fill_color,
                 background_color,
+                pattern_rotation,
                 stroke_style,
                 stroke_color,
                 stroke_width,
@@ -196,6 +201,7 @@ impl PyPatternStimulus {
         fill_color = IntoLinRgba(LinRgba::default()),
         background_color = IntoLinRgba(LinRgba::default()),
         pattern = FillPattern::Uniform,
+        pattern_rotation = 0.0,
         stroke_style = StrokeStyle::default(),
         stroke_color = IntoLinRgba(LinRgba::default()),
         stroke_width = IntoSize(Size::Pixels(0.0)),
@@ -235,6 +241,7 @@ impl PyPatternStimulus {
         fill_color: IntoLinRgba,
         background_color: IntoLinRgba,
         pattern: FillPattern,
+        pattern_rotation: f64,
         stroke_style: StrokeStyle,
         stroke_color: IntoLinRgba,
         stroke_width: IntoSize,
@@ -254,6 +261,7 @@ impl PyPatternStimulus {
                 fill_color.into(),
                 background_color.into(),
                 pattern,
+                pattern_rotation,
                 stroke_style,
                 stroke_color.into(),
                 stroke_width.into(),
@@ -300,6 +308,8 @@ impl Stimulus for PatternStimulus {
         let shift_x = (self.params.phase_x % 360.0) / 360.0 * cycle_length as f64;
         let shift_y = (self.params.phase_y % 360.0) / 360.0 * cycle_length as f64;
 
+        let pattern_transform = Affine::rotate(self.params.pattern_rotation);
+
         let fill_brush = match self.fill_pattern {
             FillPattern::Uniform => Brush::Solid(self.params.fill_color.into()),
             FillPattern::Sinosoidal => todo!(),
@@ -312,7 +322,7 @@ impl Stimulus for PatternStimulus {
                 },
                 sampling: ImageSampling::Nearest,
                 edge_mode: (Extend::Repeat, Extend::Repeat),
-                transform: None,
+                transform: Some(pattern_transform),
                 alpha: self.params.alpha.map(|a| a as f32),
             },
         };

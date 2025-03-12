@@ -3,7 +3,6 @@ use std::{any::Any, cell::RefCell};
 use cosmic_text::fontdb::FaceInfo;
 use foreign_types_shared::ForeignType;
 
-use image::EncodableLayout;
 #[cfg(target_os = "windows")]
 use skia_safe::gpu::{d3d, d3d::BackendContext, Protected};
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -20,8 +19,8 @@ use skia_safe::{
     },
     image::Image as SkImage,
     images::raster_from_data as sk_raster_from_data,
-    scalar, AlphaType as SkAlphaType, BlendMode as SkBlendMode, ColorSpace, ColorType, Font as SkFont, Matrix,
-    PictureRecorder, SamplingOptions, Typeface as SkTypeface,
+    scalar, AlphaType as SkAlphaType, ColorSpace, ColorType, Font as SkFont, Matrix, PictureRecorder, SamplingOptions,
+    Typeface as SkTypeface,
 };
 use wgpu::{Adapter, Device, Queue, Texture};
 
@@ -30,12 +29,11 @@ use crate::{
     bitmaps::{Bitmap, DynamicBitmap},
     brushes::{Brush, Extend, Gradient, GradientKind, ImageSampling},
     colors::RGBA,
-    prelude::{BlendMode, DynamicFontFace, Glyph, StrokeStyle},
+    font::{DynamicFontFace, Glyph, Typeface},
     renderer::{Renderer, RendererFactory},
     scenes::Scene,
     shapes::{Point, Shape},
-    styles::ImageFitMode,
-    text::Typeface,
+    styles::{BlendMode, ImageFitMode, StrokeStyle},
 };
 
 #[derive(Debug)]
@@ -65,6 +63,10 @@ impl Typeface for SkTypeface {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn cloned(&self) -> Box<dyn Typeface> {
+        Box::new(self.clone())
     }
 }
 
@@ -273,6 +275,7 @@ impl Scene for SkiaScene {
         font_face: &DynamicFontFace,
         font_size: f32,
         brush: Brush,
+        alpha: Option<f32>,
         transform: Option<Affine>,
         blend_mode: Option<BlendMode>,
     ) {
@@ -283,7 +286,12 @@ impl Scene for SkiaScene {
         let skia_font = SkFont::from_typeface(skia_typeface, font_size);
 
         // create a new paint
-        let paint: skia_safe::Paint = brush.into();
+        let mut paint: skia_safe::Paint = brush.into();
+
+        // set the alpha if it's not none
+        if let Some(alpha) = alpha {
+            paint.set_alpha_f(alpha);
+        }
 
         // the origin of the text
         let origin: skia_safe::Point = position.into();
@@ -607,7 +615,7 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                     .expect("You're trying to use a non-skia image with a skia renderer")
                     .image;
 
-                let local_matrix = match fit_mode {
+                let mut local_matrix = match fit_mode {
                     ImageFitMode::Original => Matrix::new_identity(),
                     ImageFitMode::Exact { width, height } => {
                         let scale_x = width / skia_image.width() as f32;
@@ -618,6 +626,12 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                         mat
                     }
                 };
+
+                // multiply the local matrix with the transform matrix
+                if let Some(transform) = transform {
+                    local_matrix.post_concat(&(*transform).into());
+                    // println!("local matrix: {:?}", local_matrix);
+                }
 
                 let sampling_options = match sampling {
                     ImageSampling::Nearest => {
@@ -642,19 +656,6 @@ impl From<&Brush<'_>> for skia_safe::Paint {
                 if let Some(alpha) = alpha {
                     paint.set_alpha_f(*alpha);
                 }
-
-                paint
-            }
-            Brush::ShapePattern { shape, latice, brush } => {
-                let brush = brush.as_ref();
-                let mut paint: skia_safe::Paint = (brush).into();
-
-                let path = shape.into();
-                let latice = &(*latice).into();
-
-                // create a path effect
-                let path_effect = skia_safe::PathEffect::path_2d(latice, &path);
-                paint.set_path_effect(path_effect);
 
                 paint
             }
@@ -701,7 +702,7 @@ impl From<Extend> for skia_safe::TileMode {
 
 // convert CompositeMode to skia blend mode
 impl From<BlendMode> for skia_safe::BlendMode {
-    fn from(composite_mode: crate::prelude::BlendMode) -> Self {
+    fn from(composite_mode: BlendMode) -> Self {
         match composite_mode {
             BlendMode::SourceAtop => skia_safe::BlendMode::SrcATop,
             BlendMode::SourceIn => skia_safe::BlendMode::SrcIn,
@@ -808,6 +809,15 @@ impl RendererFactory for SkiaRendererFactory {
 
     fn cloned(&self) -> Box<dyn RendererFactory> {
         Box::new(Self::new())
+    }
+
+    fn create_font_face(&self, font_data: &[u8], index: u32) -> DynamicFontFace {
+        let font_manager = skia_safe::FontMgr::new();
+        let typeface = font_manager
+            .new_from_data(font_data, index as usize)
+            .expect("Failed to load font face");
+        // let typeface = self.font_manager.n
+        return DynamicFontFace(Box::new(typeface));
     }
 }
 

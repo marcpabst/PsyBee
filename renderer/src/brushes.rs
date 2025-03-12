@@ -1,12 +1,4 @@
-use std::borrow::Cow;
-
-use crate::{
-    affine::Affine,
-    bitmaps::DynamicBitmap,
-    colors::RGBA,
-    shapes::{Point, Shape},
-    styles::ImageFitMode,
-};
+use crate::{affine::Affine, bitmaps::DynamicBitmap, colors::RGBA, shapes::Point, styles::ImageFitMode};
 
 #[derive(Debug, Clone)]
 pub enum Brush<'a> {
@@ -31,15 +23,6 @@ pub enum Brush<'a> {
         transform: Option<Affine>,
         /// Optional alpha value to apply to the image.
         alpha: Option<f32>,
-    },
-    /// A brush that fills an area with a repeating pattern of shapes.
-    ShapePattern {
-        /// The shape to use for the pattern.
-        shape: Shape,
-        /// The lattic to use for the pattern.
-        latice: Affine,
-        /// The brush to use for the pattern.
-        brush: Box<Brush<'a>>,
     },
 }
 

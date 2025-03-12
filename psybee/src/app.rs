@@ -13,7 +13,7 @@ use pyo3::{
     types::{PyDict, PyTuple},
     Py, PyAny, Python,
 };
-use renderer::{renderer::RendererFactory, wgpu::TextureFormat};
+use renderer::{cosmic_text, renderer::RendererFactory, wgpu::TextureFormat};
 use wgpu::MemoryHints;
 use winit::{
     application::ApplicationHandler,
@@ -49,7 +49,8 @@ pub struct App {
     pub action_sender: Sender<EventLoopAction>,
     pub dummy_window: Option<Window>,
     #[dbg(placeholder = "[[ RendererFactory ]]")]
-    pub renderer_factory: Box<dyn RendererFactory>,
+    pub renderer_factory: Arc<dyn RendererFactory>,
+    pub font_manager: ArcMutex<renderer::cosmic_text::FontSystem>,
 }
 
 impl Default for App {
@@ -106,13 +107,29 @@ impl App {
             queue,
         };
 
+        // create font manager
+        // create a font system (=font manager)
+        let empty_db = cosmic_text::fontdb::Database::new();
+        let mut font_manager = cosmic_text::FontSystem::new_with_locale_and_db("en".to_string(), empty_db);
+
+        // load Noto Sans
+        let noto_sans_regular = include_bytes!("../assets/fonts/NotoSans-Regular.ttf");
+        font_manager.db_mut().load_font_data(noto_sans_regular.to_vec());
+        let noto_sans_bold = include_bytes!("../assets/fonts/NotoSans-Bold.ttf");
+        font_manager.db_mut().load_font_data(noto_sans_bold.to_vec());
+        let noto_sans_italic = include_bytes!("../assets/fonts/NotoSans-Italic.ttf");
+        font_manager.db_mut().load_font_data(noto_sans_italic.to_vec());
+        let noto_sans_bold_italic = include_bytes!("../assets/fonts/NotoSans-BoldItalic.ttf");
+        font_manager.db_mut().load_font_data(noto_sans_bold_italic.to_vec());
+
         Self {
             windows: vec![],
             gpu_state: Arc::new(Mutex::new(gpu_state)),
             action_receiver,
             action_sender,
             dummy_window: None,
-            renderer_factory: Box::new(renderer::skia_backend::SkiaRendererFactory::new()),
+            renderer_factory: Arc::new(renderer::skia_backend::SkiaRendererFactory::new()),
+            font_manager: Arc::new(Mutex::new(font_manager)),
         }
     }
 
@@ -250,13 +267,7 @@ impl App {
     //     let _ = event_loop.run_app(self);
     // }
 
-    /// Starts the experiment. This will block until the experiment.
-    ///
-    /// # Arguments
-    ///
-    /// * `experiment_fn` - The function that is your experiment. This function
-    ///   will be called with a `Window` object that you can use to create
-    ///   stimuli and submit frames to the window.
+    /// Starts the experiment. This will block until the experiment is finished.
     pub fn run_experiment<F>(&mut self, experiment_fn: F) -> Result<(), errors::PsybeeError>
     where
         F: FnOnce(ExperimentManager) -> Result<(), errors::PsybeeError> + 'static + Send,
@@ -265,16 +276,22 @@ impl App {
 
         let event_loop = EventLoop::new().unwrap();
         event_loop.set_control_flow(ControlFlow::Poll);
+
         let event_loop_proxy = event_loop.create_proxy();
         let event_loop_proxy2 = event_loop.create_proxy();
 
         let action_sender = self.action_sender.clone();
 
+        let exp_manager = ExperimentManager::new(
+            event_loop_proxy,
+            action_sender,
+            self.renderer_factory.clone(),
+            self.font_manager.clone(),
+        );
+
         // start experiment
         thread::spawn(move || {
-            let event_manager = ExperimentManager::new(event_loop_proxy, action_sender);
-
-            let res = experiment_fn(event_manager);
+            let res = experiment_fn(exp_manager);
 
             // panic if the experiment function returns an error
             if let Err(e) = res {

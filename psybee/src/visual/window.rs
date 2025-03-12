@@ -16,7 +16,7 @@ use futures_lite::{future::block_on, Future};
 use nalgebra;
 use palette::IntoColor;
 use pyo3::prelude::*;
-use renderer::{prelude::*, renderer::RendererFactory, wgpu_renderer::WgpuRenderer, DynamicRenderer};
+use renderer::{renderer::RendererFactory, wgpu_renderer::WgpuRenderer, DynamicRenderer, DynamicScene};
 use send_wrapper::SendWrapper;
 use uuid::Uuid;
 use wgpu::TextureFormat;

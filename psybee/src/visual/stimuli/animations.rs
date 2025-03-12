@@ -185,11 +185,11 @@ impl Animation {
         match self.repeat {
             Repeat::Loop(n) => {
                 let elapsed = time.duration_since(self.start_time).as_secs_f64();
-                elapsed >= self.duration * n as f64
+                elapsed > self.duration * n as f64
             }
             Repeat::PingPong(n) => {
                 let elapsed = time.duration_since(self.start_time).as_secs_f64();
-                elapsed >= self.duration * n as f64 * 2.0
+                elapsed > self.duration * n as f64 * 2.0
             }
         }
     }

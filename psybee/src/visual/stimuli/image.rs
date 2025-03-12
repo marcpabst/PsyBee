@@ -5,7 +5,12 @@ use std::{
 
 use psybee_proc::StimulusParams;
 use pyo3::ffi::c_str;
-use renderer::{prelude::*, DynamicBitmap};
+use renderer::{
+    brushes::{Brush, Extend, ImageSampling},
+    shapes::Shape,
+    styles::ImageFitMode,
+    DynamicBitmap,
+};
 use uuid::Uuid;
 
 use super::{

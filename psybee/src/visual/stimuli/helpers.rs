@@ -14,7 +14,7 @@ use super::{
     StimulusParamValue, StimulusParams, StrokeStyle,
 };
 use crate::{
-    experiment::PyRendererFactory,
+    experiment::{ExperimentManager, PyRendererFactory},
     visual::{geometry::Size, window::Window},
 };
 
@@ -31,22 +31,7 @@ pub(crate) fn create_fill_brush_pattern<'a>(
         FillPattern::Uniform => Brush::Solid((*foreground_color).into()),
         FillPattern::Stripes => todo!(),
         FillPattern::Sinosoidal => todo!(),
-        FillPattern::Checkerboard => {
-            let size = 20.0;
-            let shape = renderer::shapes::Shape::rectangle((0.0, 0.0), size, size);
-
-            let mut matrix = Affine::scale_xy(size * 2.0, size * 2.0);
-            // matrix.pre_skew(0.5, 0.0);
-            matrix.post_translate(50.0, 0.0);
-
-            // pre_skew
-            let brush = create_fill_brush_uniform(foreground_color);
-            Brush::ShapePattern {
-                shape,
-                latice: matrix,
-                brush: Box::new(brush),
-            }
-        }
+        FillPattern::Checkerboard => todo!(),
     }
 }
 
@@ -102,4 +87,17 @@ pub(crate) fn get_renderer_factory(py: Python) -> PyResult<PyRendererFactory> {
     // let renderer_factory = PyRendererFactory::extract_bound(renderer_factory).unwrap();
     let renderer_factory: PyRendererFactory = renderer_factory.extract().unwrap();
     Ok(renderer_factory)
+}
+
+pub(crate) fn get_experiment_manager(py: Python) -> PyResult<ExperimentManager> {
+    // create the image
+    // first, try to get __renderer_factory from the __globals__
+    let em = py
+        .eval(c_str!("__experiment_manager"), None, None)
+        .expect("No renderer factory found in function scope. Are you calling this function from a stimulus callback?");
+
+    // covert to Rust type
+    // let renderer_factory = PyRendererFactory::extract_bound(renderer_factory).unwrap();
+    let em: ExperimentManager = em.extract().unwrap();
+    Ok(em)
 }

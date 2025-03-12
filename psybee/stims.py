@@ -1,32 +1,44 @@
 from psybee import run_experiment
 from psybee.visual.geometry import Transformation2D, Shape
-from psybee.visual.stimuli import ShapeStimulus, GaborStimulus, ImageStimulus, PatternStimulus
+from psybee.visual.stimuli import ShapeStimulus, GaborStimulus, ImageStimulus, PatternStimulus, TextStimulus
 from psybee.visual.color import rgb, linrgb
 import sys
 import numpy as np
-import tobii_eye_tracker
+# import tobii_eye_tracker
 import time
-
-
 
 
 def my_experiment(exp_manager) -> None:
     # create a new window
-    main_window = exp_manager.create_default_window(fullscreen=True, monitor=0)
+    main_window = exp_manager.create_default_window(fullscreen=True, monitor=1)
 
-    tracker = tobii_eye_tracker.TobiiEyeTracker()
-    tracker.initialize()
+    # tracker = tobii_eye_tracker.TobiiEyeTracker()
+    # tracker.initialize()
 
     main_window.add_event_handler("key_press", lambda e: sys.exit(0) if e.key == "Q" else None)
 
-    checkerboard_sizes = [4]
+    checkerboard_sizes = [2,4,8,16,32,64,128,256,512]
     michelson_contrast = 1.0
+
+    start_text = TextStimulus(
+        "Press = or - to change luminance",
+        font_size = 20,
+        font_weight = "bold",
+        y = -100,
+        fill_color = linrgb(1, 1, 1, 1))
+
+    lum_text = TextStimulus(
+        "Luminance: ?",
+        font_size = 20,
+        font_weight = "bold",
+        y = 100,
+        fill_color = linrgb(1, 1, 1, 1))
+
 
     background = PatternStimulus(
         Shape.rectangle(width = "1vw", height = "1vh"),
         x = "-0.5vw", y = "-0.5vh",
-        pattern = "uniform",
-    )
+        pattern = "uniform")
 
     checkerboard = PatternStimulus(
         Shape.rectangle(width = "1vw", height = "1vh"),
@@ -34,8 +46,7 @@ def my_experiment(exp_manager) -> None:
         pattern = "checkerboard",
         fill_color = linrgb(1,0,0),
         background_color = linrgb(0,0,0),
-        alpha = 1.0,
-    )
+        alpha = 1.0)
 
 
     fixation = ShapeStimulus(Shape.circle(10), fill_color=(1, 1, 1, 1))
@@ -43,7 +54,7 @@ def my_experiment(exp_manager) -> None:
     checkerboard_size_index = 0
 
     global luminance
-    luminance = 0.611
+    luminance = 0.740
 
     def lum_change(e):
         global luminance
@@ -54,31 +65,38 @@ def my_experiment(exp_manager) -> None:
 
     main_window.add_event_handler("key_press", lum_change)
 
+    start_text.animate("font_size", 10000, 10.0)
+
     for i in range(10000000):
         frame = main_window.get_frame()
 
-        gaze_points = tracker.get_gaze_points()
-        for gaze_point in gaze_points:
-            print(gaze_point)
-            fixation["x"] = (gaze_point[0] - 0.5) * 1920
-            fixation["y"] = (gaze_point[1] - 0.5) * 1080
+        # gaze_points = tracker.get_gaze_points()
+        # for gaze_point in gaze_points:
+        #     print(gaze_point)
+        #     fixation["x"] = (gaze_point[0] - 0.5) * 1920
+        #     fixation["y"] = (gaze_point[1] - 0.5) * 1080
 
 
 
         # set background luminance
         background["fill_color"] = linrgb(luminance, 0, 0)
+        lum_text["text"] = f"Luminance: {luminance:.3f}"
 
         frame.draw(background)
 
-        if i % 200 > 100:
+        if i % 10 > 5:
             # checkerboard["phase_x"] = (checkerboard["phase_x"] + 180) % 360
             frame.draw(checkerboard)
 
 
-        if i % 500 == 0:
+
+        if i % 100 == 0:
             checkerboard["cycle_length"] = checkerboard_sizes[checkerboard_size_index]
             checkerboard_size_index = (checkerboard_size_index + 1) % len(checkerboard_sizes)
 
+
+        frame.draw(start_text)
+        frame.draw(lum_text)
         frame.draw(fixation)
 
         main_window.present(frame)

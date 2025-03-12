@@ -3,16 +3,18 @@ pub mod bitmaps;
 pub mod brushes;
 pub mod colors;
 pub mod effects;
+pub mod font;
 pub mod prerenderd_scene;
 pub mod renderer;
 pub mod scenes;
 pub mod shapes;
 pub mod skia_backend;
 pub mod styles;
-pub mod text;
 mod utils;
 // pub mod vello_backend;
 pub mod wgpu_renderer;
+
+pub use cosmic_text;
 
 // re-export the image crate
 // re-export the renderer
@@ -28,6 +30,6 @@ pub enum Backend {
     Skia,
 }
 
-pub mod prelude {
-    pub use super::{affine::*, brushes::*, colors::*, scenes::*, shapes::*, styles::*, text::*};
-}
+// pub mod prelude {
+//     pub use super::{affine::*, brushes::*, colors::*, scenes::*, shapes::*, styles::*, text::*};
+// }

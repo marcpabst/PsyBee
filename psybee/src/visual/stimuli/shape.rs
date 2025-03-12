@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use psybee_proc::{FromPyStr, StimulusParams};
+use renderer::DynamicBitmap;
 use renderer::{affine::Affine, brushes::Brush, colors::RGBA};
-use renderer::{prelude::*, DynamicBitmap};
 use strum::EnumString;
 use uuid::Uuid;
 

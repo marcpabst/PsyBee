@@ -1,4 +1,7 @@
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{
+    mpsc::{channel, Receiver, Sender},
+    Arc, Mutex,
+};
 
 use derive_debug::Dbg;
 use pyo3::{
@@ -6,7 +9,7 @@ use pyo3::{
     types::{PyAnyMethods, PyDict, PyList, PyListMethods, PySequenceMethods, PyTuple, PyTupleMethods},
     IntoPy, Py, PyAny, PyResult, Python,
 };
-use renderer::renderer::RendererFactory;
+use renderer::{cosmic_text, renderer::RendererFactory};
 use winit::event_loop::EventLoopProxy;
 
 use crate::{app::App, errors, visual::window::Window};
@@ -119,19 +122,36 @@ impl WindowOptions {
 }
 
 /// The ExperimentManager is available to the user in the experiment function.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[pyclass(unsendable)]
 pub struct ExperimentManager {
     event_loop_proxy: EventLoopProxy<()>,
     action_sender: Sender<EventLoopAction>,
+    renderer_factory: Arc<dyn RendererFactory>,
+    font_manager: Arc<Mutex<cosmic_text::FontSystem>>,
 }
 
 impl ExperimentManager {
-    pub fn new(event_loop_proxy: EventLoopProxy<()>, action_sender: Sender<EventLoopAction>) -> Self {
+    pub fn new(
+        event_loop_proxy: EventLoopProxy<()>,
+        action_sender: Sender<EventLoopAction>,
+        renderer_factory: Arc<dyn RendererFactory>,
+        font_manager: Arc<Mutex<cosmic_text::FontSystem>>,
+    ) -> Self {
         Self {
             event_loop_proxy,
             action_sender,
+            renderer_factory,
+            font_manager,
         }
+    }
+
+    pub fn font_manager(&self) -> &Arc<Mutex<cosmic_text::FontSystem>> {
+        &self.font_manager
+    }
+
+    pub fn renderer_factory(&self) -> &Arc<dyn RendererFactory> {
+        &self.renderer_factory
     }
 
     /// Create a new window with the given options. This function will dispatch
@@ -233,10 +253,10 @@ impl ExperimentManager {
 /// experiment_fn : callable
 ///    The function that runs your experiment. This function should take a single argument, an instance of `ExperimentManager`, and should not return nothing.
 #[pyfunction]
-#[pyo3(name = "run_experiment", signature = (experiment_fn, *args, **kwargs))]
+#[pyo3(name = "run_experiment", signature = (py_experiment_fn, *args, **kwargs))]
 pub fn py_run_experiment(
     py: Python,
-    experiment_fn: Py<PyAny>,
+    py_experiment_fn: Py<PyAny>,
     args: Py<PyTuple>,
     kwargs: Option<Py<PyDict>>,
 ) -> PyResult<()> {
@@ -250,7 +270,7 @@ pub fn py_run_experiment(
     let globals = PyDict::new(py);
     let renderer_factory = PyRendererFactory(app.renderer_factory.cloned());
 
-    experiment_fn
+    py_experiment_fn
         .getattr(py, "__globals__")?
         .bind(py)
         .downcast::<PyDict>()?
@@ -262,8 +282,14 @@ pub fn py_run_experiment(
             let kwargs = if let Some(kwargs) = kwargs {
                 kwargs.into_bound(py)
             } else {
-                PyDict::new_bound(py)
+                PyDict::new(py)
             };
+
+            py_experiment_fn
+                .getattr(py, "__globals__")?
+                .bind(py)
+                .downcast::<PyDict>()?
+                .set_item("__experiment_manager", em.clone())?;
 
             // TODO: There must be a better way to do this!
             let args = args.bind(py);
@@ -276,7 +302,7 @@ pub fn py_run_experiment(
             let args = em_as_seq.concat(args_as_seq).unwrap();
             let args = args.to_tuple().unwrap();
 
-            experiment_fn.call_bound(py, args, Some(&kwargs))
+            py_experiment_fn.call_bound(py, args, Some(&kwargs))
         })?;
         Ok(())
     };

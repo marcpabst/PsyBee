@@ -108,7 +108,7 @@ impl LinRgba {
     }
 }
 
-impl From<LinRgba> for renderer::prelude::RGBA {
+impl From<LinRgba> for renderer::colors::RGBA {
     fn from(rgba: LinRgba) -> Self {
         Self {
             r: rgba.r,
@@ -167,7 +167,7 @@ impl LinRgba {
     #[getter]
     #[pyo3(name = "b")]
     /// The blue channel.
-    fn py_B(&self) -> f32 {
+    fn py_b(&self) -> f32 {
         self.b
     }
 

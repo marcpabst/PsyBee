@@ -28,7 +28,7 @@ pub mod image;
 pub mod pattern;
 pub mod shape;
 // pub mod sprite;
-// pub mod text;
+pub mod text;
 // pub mod vector;
 // pub mod video;
 
@@ -207,12 +207,13 @@ pub trait Stimulus: downcast_rs::Downcast + std::fmt::Debug + Send {
         let mut params_to_set = Vec::new();
 
         self.animations().retain_mut(|animation| {
-            if animation.finished(time) {
-                return false;
-            }
             let value = animation.value(time, window_state);
             params_to_set.push((animation.parameter().to_string(), value));
-            true
+            if animation.finished(time) {
+                return false;
+            } else {
+                true
+            }
         });
 
         for (param, value) in params_to_set.iter() {
@@ -542,7 +543,7 @@ macro_rules! impl_pystimulus_for_wrapper {
                     from.into(),
                     to.into(),
                     duration,
-                    Repeat::Loop(20),
+                    Repeat::Loop(1),
                     TransitionFunction::None,
                 );
                 Ok(())

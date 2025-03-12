@@ -26,31 +26,13 @@ pub struct WgpuRenderer {
 impl WgpuRenderer {
     pub async fn new(
         window: Arc<Window>,
-        instance: &Instance,
+        _instance: &Instance,
         device: &Device,
-        queue: &Queue,
+        _queue: &Queue,
         surface_format: TextureFormat,
     ) -> Self {
         let size = window.inner_size();
         let (width, height) = (size.width, size.height);
-
-        // let instance = wgpu::Instance::new(&InstanceDescriptor::default());
-        // let adapter = instance
-        //     .request_adapter(&wgpu::RequestAdapterOptions::default())
-        //     .await
-        //     .unwrap();
-        // let (device, queue) = adapter
-        //     .request_device(
-        //         &wgpu::DeviceDescriptor::default(),
-        //         None, // Trace path
-        //     )
-        //     .await
-        //     .unwrap();
-
-        // let surface = instance.create_surface(window.clone()).unwrap();
-
-        // let cap = surface.get_capabilities(&adapter);
-        // let surface_format = cap.formats[1];
 
         // create a render pipeline
         let render_pipeline = Self::create_render_pipelie(&device, surface_format);

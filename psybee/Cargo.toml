@@ -77,6 +77,7 @@ gstreamer = { version = "0.23.3", optional = true }
 gstreamer-app = { version = "0.23.3", optional = true }
 gstreamer-video = { version = "0.23.3", optional = true }
 pollster = "0.4.0"
+cosmic-text = "0.12.1"
 # tikv-jemallocator = { version = "0.5.4", features = ["profiling"] }
 
 # MacOS dependencies

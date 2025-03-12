@@ -11,8 +11,8 @@ use crate::{
     bitmaps::DynamicBitmap,
     brushes::{Brush, Extend},
     colors::RGBA,
+    font::{DynamicFontFace, Glyph},
     shapes::{Point, Shape},
-    text::{DynamicFontFace, Glyph},
 };
 
 pub struct DynamicScene(pub Arc<Mutex<Box<dyn Scene>>>);
@@ -88,30 +88,20 @@ impl DynamicScene {
             .draw_shape_stroke(shape, brush, style, transform, blend_mode);
     }
 
-    fn draw_glyphs(
+    pub fn draw_glyphs(
         &mut self,
         position: Point,
         glyphs: &[Glyph],
         font_face: &DynamicFontFace,
         font_size: f32,
         brush: Brush,
+        alpha: Option<f32>,
         transform: Option<Affine>,
         blend_mode: Option<BlendMode>,
     ) {
-        self.inner()
-            .draw_glyphs(position, glyphs, font_face, font_size, brush, transform, blend_mode);
-    }
-
-    pub fn draw_formated_text(
-        &mut self,
-        fm: &mut cosmic_text::FontSystem,
-        formated_text: &crate::text::FormatedText,
-        brush: Brush,
-        transform: Option<Affine>,
-        blend_mode: Option<BlendMode>,
-    ) {
-        self.inner()
-            .draw_formated_text(fm, formated_text, brush, transform, blend_mode);
+        self.inner().draw_glyphs(
+            position, glyphs, font_face, font_size, brush, alpha, transform, blend_mode,
+        );
     }
 }
 
@@ -176,47 +166,8 @@ pub trait Scene: Any {
         font_face: &DynamicFontFace,
         font_size: f32,
         brush: Brush,
+        alpha: Option<f32>,
         transform: Option<Affine>,
         blend_mode: Option<BlendMode>,
     );
-
-    fn draw_formated_text(
-        &mut self,
-        fm: &mut cosmic_text::FontSystem,
-        formated_text: &crate::text::FormatedText,
-        brush: Brush,
-        transform: Option<Affine>,
-        blend_mode: Option<BlendMode>,
-    ) {
-        let buffer = &mut formated_text.cosmic_buffer.clone();
-        let mut buffer = buffer.borrow_with(fm);
-        buffer.shape_until_scroll(true);
-
-        // Inspect the output runs
-        for run in buffer.layout_runs() {
-            let glyphs = run
-                .glyphs
-                .iter()
-                .map(|g| Glyph {
-                    id: g.glyph_id,
-                    position: Point {
-                        x: g.x as f64,
-                        y: g.y as f64,
-                    },
-                    start: g.start as u32,
-                    end: g.end as u32,
-                })
-                .collect::<Vec<_>>();
-
-            self.draw_glyphs(
-                formated_text.position,
-                &glyphs,
-                &formated_text.renderer_font,
-                formated_text.comic_metrics.font_size,
-                brush.clone(),
-                transform,
-                blend_mode,
-            );
-        }
-    }
 }
