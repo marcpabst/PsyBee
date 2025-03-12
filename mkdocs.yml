@@ -1,7 +1,7 @@
-site_name: PsyBee
-site_url: https://psybee.org/
-repo_url: https://github.com/marcpabst/psybee
-repo_name: marcpabst/psybee
+site_name: psydk
+site_url: https://psydk.org/
+repo_url: https://github.com/marcpabst/psydk
+repo_name: marcpabst/psydk
 docs_dir: user-guide
 
 theme:
@@ -63,7 +63,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [psybee/psybee]
+          paths: [psydk/psydk]
 
           options:
             filters:

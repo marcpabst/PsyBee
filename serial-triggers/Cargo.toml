@@ -1,0 +1,21 @@
+[package]
+name = "serial-triggers"
+version = "0.1.7"
+edition = "2021"
+
+# do not include this package in the workspace
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "serial_triggers"
+crate-type = ["cdylib"]
+
+[dependencies]
+crossbeam = "0.8.4"
+crossbeam-channel = "0.5.14"
+pyo3 = { version = "0.23.4", features = [
+    "extension-module",
+    "abi3-py310",
+    "multiple-pymethods",
+] }
+serialport = "4.7.0"

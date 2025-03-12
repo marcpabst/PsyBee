@@ -1,6 +1,6 @@
 # Colours and Gamma Correction
 
-___This article proides background information on colour spaces and gamma correction. *PsyBee* currently does not provide full colour management support, but you can specify the encoding used and you can perform gamma calibration yourself.___
+___This article proides background information on colour spaces and gamma correction. *psydk* currently does not provide full colour management support, but you can specify the encoding used and you can perform gamma calibration yourself.___
 
 A colour space is a mathematical model that describes how colours can be represented as tuples of numbers. Since human vision is trichromatic (i.e. we have three types of colour receptors in our eyes), most colour spaces are tristimulus colour spaces, meaning that colours can be represented as a combination of three numbers.
 
@@ -111,9 +111,9 @@ If your goal is to present stimuli with a specific light intensity, you have a n
 
 2. You can perform the gamma correction yourself, either by transforming colours before you pass them to the rendering pipeline, by setting a LUT in the GPU set through your operating system, or by correcting it yourself before the framebuffer is sent to the display (either using a transfer function in a fragment shader or by using a LUT in the GPU).
 
-*PsyBee* allows you to combine these two approaches. By default, your operating system and GPU drivers will take care of the gamma correction, but you can also _correct for innacuracies_ in the display's gamma correction by performing the gamma correction yourself. This basically means that we provide a mapping from the theoretically expected light intensity to the actual light intensity emitted by the display. **Note that this approach is slightly different from the traditional approach to gamma correction, which is to provide a mapping from whatever colour space you are using to the actual light intensity emitted by the display.**
+*psydk* allows you to combine these two approaches. By default, your operating system and GPU drivers will take care of the gamma correction, but you can also _correct for innacuracies_ in the display's gamma correction by performing the gamma correction yourself. This basically means that we provide a mapping from the theoretically expected light intensity to the actual light intensity emitted by the display. **Note that this approach is slightly different from the traditional approach to gamma correction, which is to provide a mapping from whatever colour space you are using to the actual light intensity emitted by the display.**
 
-*PsyBee* provides a number of tools to help you calibrate your display, and to ensure that the gamma correction is performed correctly.
+*psydk* provides a number of tools to help you calibrate your display, and to ensure that the gamma correction is performed correctly.
 
 [^1]: Charles Poynton, A Technical Introduction to Digital Video. New York: Wiley, 1996.
 

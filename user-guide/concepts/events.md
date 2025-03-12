@@ -6,11 +6,11 @@ Events are raised whenever something interesting happens in the environment, suc
 - **Window events:** These events are raised when the window is resized, moved, or closed.
 - **Device events:** These result from external devices, and are independent of the window.
 
-Some external triggers can result in multiple events being raised at the same time. For example, a moving a physical mouse can result in both an input event and a device event being raised. This is intentional, as one pertains to the movement of the *cursor* and the other to the movement of the *device* (crucially, your operating system might apply transformations to the cursor movement, such as acceleration or inversion, which are not reflected in the device movement). Similarly, a key press can result in both an input event and a device event being raised (but note that windows will only receive input events if they are focused, while device events are independent of focus). It always depends on the specific requirements of your experiment which events you want to handle. 
+Some external triggers can result in multiple events being raised at the same time. For example, a moving a physical mouse can result in both an input event and a device event being raised. This is intentional, as one pertains to the movement of the *cursor* and the other to the movement of the *device* (crucially, your operating system might apply transformations to the cursor movement, such as acceleration or inversion, which are not reflected in the device movement). Similarly, a key press can result in both an input event and a device event being raised (but note that windows will only receive input events if they are focused, while device events are independent of focus). It always depends on the specific requirements of your experiment which events you want to handle.
 
 ## Handling events
 
-There are two ways to handle events in PsyBee: polling and callbacks. Polling is the process of checking for events at regular intervals, while callbacks are functions that are called when an event occurs. Both methods have their advantages and disadvantages, and the best method to use depends on the specific requirements of your experiment.
+There are two ways to handle events in psydk: polling and callbacks. Polling is the process of checking for events at regular intervals, while callbacks are functions that are called when an event occurs. Both methods have their advantages and disadvantages, and the best method to use depends on the specific requirements of your experiment.
 
 - **Polling:** You can poll for events by creating a new `EventReceiver` object and calling its `poll` method. This will return a list of all events that have occurred since the last call to `poll`. This method is useful when you need to handle events in a loop.
 - **Callbacks:** By adding event handlers through `add_event_handler` to a `Window` (or, with certain limitations, to a `Stimulus`), you can register a callback function that will be called whenever an event occurs. This method is useful when you need to handle events as they occur, rather than in a loop.
@@ -82,4 +82,3 @@ window.add_stimulus(button)
 
 !!! note
     For positional stimuli, the list of stimuli is traversed in the reverse order of their addition to the window. This means that the last stimulus added to the window will be the first to receive events (as it is "on top" of all other stimuli). On an implementation level, stimuli then can "decide" whether to "consume" an event or pass it on to the next stimulus in the list. This is useful to make some stimuli "invisible" to certain events, or to make some stimuli "consume" an event so that it is not passed on to other stimuli.
-

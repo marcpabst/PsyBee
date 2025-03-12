@@ -1,7 +1,7 @@
 # Api
 
-::: psybee
+::: psydk
 
-::: psybee.visual
+::: psydk.visual
 
-::: psybee.visual.stimuli
+::: psydk.visual.stimuli

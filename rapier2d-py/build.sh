@@ -2,7 +2,7 @@
 
 export OSX_SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 export IOS_SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
-export PYTHONDIR="/Users/marc/psybee/bubblesdemo/build/bubblesdemo/ios/xcode/Support/Python.xcframework/ios-arm64"
+export PYTHONDIR="/Users/marc/psydk/bubblesdemo/build/bubblesdemo/ios/xcode/Support/Python.xcframework/ios-arm64"
 export PYO3_CROSS_LIB_DIR="$PYTHONDIR"
 export PYO3_CROSS_PYTHON_VERSION=3.9
 env SDKROOT="$IOS_SDKROOT" \

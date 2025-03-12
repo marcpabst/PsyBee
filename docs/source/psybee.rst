@@ -1,6 +1,6 @@
 Running experiments
 ====================
 
-.. automodule:: psybee.psybee
+.. automodule:: psydk.psydk
    :members:
    :undoc-members:

@@ -1,6 +1,6 @@
-from psybee import run_experiment
-from psybee.visual.geometry import Transformation2D, Shape
-from psybee.visual.stimuli import ShapeStimulus, GaborStimulus, ImageStimulus
+from psydk import run_experiment
+from psydk.visual.geometry import Transformation2D, Shape
+from psydk.visual.stimuli import ShapeStimulus, GaborStimulus, ImageStimulus
 import sys
 
 def my_experiment(exp_manager) -> None:

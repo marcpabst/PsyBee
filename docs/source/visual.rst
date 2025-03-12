@@ -5,13 +5,13 @@ The visual module contains classes for creating visual stimuli for use in experi
 
 Geometry
 --------
-.. automodule:: psybee.visual.geometry
+.. automodule:: psydk.visual.geometry
    :members:
    :undoc-members:
 
 Colors
 --------
-.. automodule:: psybee.visual.colors
+.. automodule:: psydk.visual.colors
    :members:
    :undoc-members:
 
@@ -19,6 +19,6 @@ Stimuli
 --------
 Stimuli are the basic building blocks of visual experiments. They are the objects that are displayed on the screen to the participant.
 
-.. automodule:: psybee.visual.stimuli
+.. automodule:: psydk.visual.stimuli
    :members:
    :undoc-members:

@@ -3,7 +3,7 @@ from rapier2d_py import RealVector
 import numpy as np
 import random
 import time
-from psybee import GaborStimulus
+from psydk import GaborStimulus
 
 # def correct_velocity(velocity, speed):
 #     np_velocity = np.array([velocity.x(), velocity.y()])

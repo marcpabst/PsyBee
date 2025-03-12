@@ -1,6 +1,6 @@
-PsyBee documentation
+psydk documentation
 ====================
 
 .. toctree::
-    psybee
+    psydk
     visual

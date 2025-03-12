@@ -2,7 +2,7 @@
 
 import time
 import pathlib
-from psybee import ExperimentManager, WindowOptions, MainLoop, GaborStimulus, ImageStimulus, SpriteStimulus, Transformation2D, Image, GaborStimulus, Size, TextStimulus, Rgba
+from psydk import ExperimentManager, WindowOptions, MainLoop, GaborStimulus, ImageStimulus, SpriteStimulus, Transformation2D, Image, GaborStimulus, Size, TextStimulus, Rgba
 import numpy as np
 
 import pandas as pd

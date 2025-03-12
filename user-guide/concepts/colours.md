@@ -1,17 +1,17 @@
 # Colours
 <div class="grid cards" markdown>
-- :fontawesome-solid-quote-right: _The rays, to speak properly, are not coloured. In them there is nothing else than a certain power and disposition to stir up a sensation of this or that colour._  
+- :fontawesome-solid-quote-right: _The rays, to speak properly, are not coloured. In them there is nothing else than a certain power and disposition to stir up a sensation of this or that colour._
 <sub>**Isaac Newton (1704), Opticks**</sub>
 </div>
 
 
-Correct handling of colours is important for investigating many interesting questions in cognitive and perceptual science. Unfortunately, colours and colour spaces are complex and can be difficult to understand and work with. This document is intended to provide a brief overview over the handling of colours in the *PsyBee* library. 
+Correct handling of colours is important for investigating many interesting questions in cognitive and perceptual science. Unfortunately, colours and colour spaces are complex and can be difficult to understand and work with. This document is intended to provide a brief overview over the handling of colours in the *psydk* library.
 
 Please read the background information on [colours and colour spaces](./colours-and-colour-spaces.md) if you are interested in a more detailed discussion of the topic.
 
 Key points:
 
-- __There is currently no dedicated support for full colour managment in the *PsyBee* library.__
+- __There is currently no dedicated support for full colour managment in the *psydk* library.__
   As such, the library is limited to working with colours in the RGB colour space using your monitor's primaries. Crucially, this puts the responsibility on the user to ensure that colours are handled correctly.
 - __However, the library provides a number of tools to help you work with colours in the RGB colour space.__
   This mainly concerns the RGB *encoding functions*, describing the non-linear relationship between the RGB values as defined in a particular RGB colour space and the actual light emitted by the monitor. On top of that, the library provides a way to correct for non-linearities in the monitor's gamma curve (that deviates from the standard sRGB gamma curve). Taken, together, these tools allow for what is often called "gamma correction".
@@ -22,4 +22,4 @@ Imagine your goal is to display four grey squares with different intensities on 
 
 Well, not quite. As you might know, human perception of brightness is not linear. So if stimuli *appear* to increase linearly in (perceivded) brightness, they are most likely not *actually* increasing linearly in (physical) luminance. The reason for this is that the relationship between the RGB values and the actual light emitted by the monitor is non-linear. This non-linear relationship is often referred to as the monitor's gamma curve or, more correctly, as the colour space's encoding function.
 
-The process of compensating for the non-linear relationship between the RGB values and the actual light emitted by the monitor is usually called *gamma correction*. 
+The process of compensating for the non-linear relationship between the RGB values and the actual light emitted by the monitor is usually called *gamma correction*.
