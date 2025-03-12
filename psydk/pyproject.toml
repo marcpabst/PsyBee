@@ -1,0 +1,25 @@
+[build-system]
+requires = ["maturin>=1.4,<=1.9"]
+build-backend = "maturin"
+
+[project]
+name = "psydk"
+
+authors = [{ name = "Marc Pabst", email = "mail@xxxxxxx.com" }]
+description = "Python bindings for psydk"
+license = "MPL-2.0"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dynamic = ["version"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+cargo-extra-args = "--features extension-module"
+
+
+[tool.cibuildwheel]
+build = ["cp310-macosx_*"]
